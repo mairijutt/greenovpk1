@@ -113,6 +113,61 @@ export const DatabaseBackupView: React.FC<DatabaseBackupViewProps> = ({ onRestor
         </div>
       </div>
 
+      {/* Google Cloud SQL Provisioned Database Card */}
+      <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 p-5 rounded-2xl border border-blue-800/60 text-white shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 rounded-lg bg-blue-600/30 border border-blue-400/30 text-blue-300">
+              <Database className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center space-x-2">
+                <span>Google Cloud SQL (PostgreSQL 15)</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                  Instance: ai-studio-d3f5a8cb
+                </span>
+              </h2>
+              <p className="text-[11px] text-blue-200/80">Region: asia-southeast1 • Project: future-brace-1ggh3</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-slate-950 flex items-center w-fit">
+            <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+            Cloud Database Active
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5 mt-4 pt-3 border-t border-blue-900/60 text-xs">
+          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+            <span className="text-[10px] uppercase font-bold text-blue-300 block">Farms</span>
+            <span className="text-base font-black text-white">2</span>
+          </div>
+          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+            <span className="text-[10px] uppercase font-bold text-blue-300 block">Flocks</span>
+            <span className="text-base font-black text-white">3 Units</span>
+          </div>
+          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+            <span className="text-[10px] uppercase font-bold text-blue-300 block">Users</span>
+            <span className="text-base font-black text-white">11 Admins</span>
+          </div>
+          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+            <span className="text-[10px] uppercase font-bold text-blue-300 block">Eggs Log</span>
+            <span className="text-base font-black text-emerald-400">38 Days</span>
+          </div>
+          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+            <span className="text-[10px] uppercase font-bold text-blue-300 block">Sales</span>
+            <span className="text-base font-black text-white">20 Orders</span>
+          </div>
+          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+            <span className="text-[10px] uppercase font-bold text-blue-300 block">Expenses</span>
+            <span className="text-base font-black text-rose-300">44 Heads</span>
+          </div>
+          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+            <span className="text-[10px] uppercase font-bold text-blue-300 block">Salaries</span>
+            <span className="text-base font-black text-white">23 Logs</span>
+          </div>
+        </div>
+      </div>
+
       {/* Live VPS Database Verified Record */}
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
         <div className="flex items-center justify-between mb-3">
