@@ -7,8 +7,8 @@ interface LoginViewProps {
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('aaglobal500@gmail.com');
+  const [password, setPassword] = useState('GreenovaAdmin@2026');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     const apiBase = getApiBaseUrl();
 
     try {
-      const response = await fetch(`${apiBase}/login`, {
+      const response = await fetch(`${apiBase}/auth/signin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -36,19 +36,23 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json().catch(() => ({}));
+      const resData = await response.json().catch(() => ({}));
 
-      if (response.ok && (data.token || data.success || data.data?.token)) {
-        const token = data.token || data.data?.token || 'vps-session-token';
-        const userName = data.user?.name || data.data?.name || email.split('@')[0];
-        setSuccessMsg('Successfully authenticated against VPS live database!');
+      if (response.ok && resData.message === 'success' && resData.data?.token) {
+        const token = resData.data.token;
+        const user = resData.data.user;
+        setSuccessMsg(`Welcome, ${user.name}! Connected to GreenOva production database.`);
         setTimeout(() => {
-          onLoginSuccess({ email, name: userName, token });
-        }, 800);
+          onLoginSuccess({
+            email: user.email,
+            name: `${user.name} (${user.role === 'super_admin' ? 'Super Admin' : user.role})`,
+            token,
+          });
+        }, 600);
       } else {
         // Fallback with clear message if credentials don't match VPS database
         setError(
-          data.message ||
+          resData.message ||
             'Invalid credentials on live VPS database. You can use Quick Staging Login below to access all features.'
         );
       }

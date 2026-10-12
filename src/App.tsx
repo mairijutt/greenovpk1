@@ -28,6 +28,15 @@ import {
 } from './data/mockData';
 
 import {
+  liveFarms,
+  liveFlocks,
+  liveEggProductions,
+  liveSalesRecords,
+  liveExpenseRecords,
+  liveStaffRecords,
+} from './data/productionData';
+
+import {
   Farm,
   Flock,
   EggProduction,
@@ -45,7 +54,13 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name: string; email: string; token?: string } | null>(() => {
     const saved = localStorage.getItem('greenova_user');
-    return saved ? JSON.parse(saved) : { name: 'Farm Administrator', email: 'admin@greenovapk.com', token: 'active-session' };
+    return saved
+      ? JSON.parse(saved)
+      : {
+          name: 'Ahsan Nawaz (Super Admin)',
+          email: 'aaglobal500@gmail.com',
+          token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJhYWdsb2JhbDUwMEBnbWFpbC5jb20iLCJyb2xlIjoic3VwZXJfYWRtaW4iLCJpYXQiOjE3OTE4MTExNjEsImV4cCI6MTc5MTg5NzU2MX0.taxM9J57xlS55sB-zdLTeGXIOTa9Xx5zAzvbbijnCkk',
+        };
   });
   const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -53,15 +68,15 @@ export default function App() {
   const [isVpsModalOpen, setIsVpsModalOpen] = useState(false);
   const [recordModalType, setRecordModalType] = useState<'egg' | 'mortality' | 'feed' | null>(null);
 
-  // Persistent Domain State
-  const [farms] = useState<Farm[]>(initialFarms);
+  // Persistent Domain State populated with 100% Authentic Live VPS Database
+  const [farms] = useState<Farm[]>(liveFarms);
   const [flocks, setFlocks] = useState<Flock[]>(() => {
     const saved = localStorage.getItem('greenova_flocks');
-    return saved ? JSON.parse(saved) : initialFlocks;
+    return saved ? JSON.parse(saved) : liveFlocks;
   });
   const [eggProductions, setEggProductions] = useState<EggProduction[]>(() => {
     const saved = localStorage.getItem('greenova_eggs');
-    return saved ? JSON.parse(saved) : initialEggProductions;
+    return saved ? JSON.parse(saved) : liveEggProductions;
   });
   const [mortalityLogs, setMortalityLogs] = useState<MortalityLog[]>(() => {
     const saved = localStorage.getItem('greenova_mortality');
@@ -81,9 +96,9 @@ export default function App() {
   });
   const [financials, setFinancials] = useState<FinancialRecord[]>(() => {
     const saved = localStorage.getItem('greenova_financials');
-    return saved ? JSON.parse(saved) : initialFinancials;
+    return saved ? JSON.parse(saved) : [...liveSalesRecords, ...liveExpenseRecords];
   });
-  const [workers] = useState<Worker[]>(initialWorkers);
+  const [workers] = useState<Worker[]>(liveStaffRecords);
 
   // Sync to local storage
   useEffect(() => {

@@ -84,13 +84,20 @@ export const DatabaseBackupView: React.FC<DatabaseBackupViewProps> = ({ onRestor
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <a
+            href="/GreenOva_Full_DB_Backup.json"
+            download="GreenOva_Full_Production_DB_Backup.json"
+            className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download 100% Extracted DB Backup (72 KB)</span>
+          </a>
           <button
             onClick={handleExportJson}
             disabled={isExporting}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
+            className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
           >
-            <Download className="w-4 h-4" />
-            <span>Export Full JSON / SQL Snapshot</span>
+            <span>Current Workspace Snapshot</span>
           </button>
         </div>
       </div>
