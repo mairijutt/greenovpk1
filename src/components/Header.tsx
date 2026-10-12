@@ -7,6 +7,9 @@ interface HeaderProps {
   onSelectFarm: (farmId: string) => void;
   onOpenRecordModal: (type: 'egg' | 'mortality' | 'feed') => void;
   onOpenVpsModal: () => void;
+  currentUser: { name: string; email: string } | null;
+  onSignOut: () => void;
+  onOpenLogin: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,6 +17,9 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectFarm,
   onOpenRecordModal,
   onOpenVpsModal,
+  currentUser,
+  onSignOut,
+  onOpenLogin,
 }) => {
   const [vpsStatus, setVpsStatus] = useState<VpsStatus>({
     endpoint: 'https://greenovapk.com/api',
@@ -126,6 +132,32 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>+ Mortality</span>
               </button>
             </div>
+
+            {/* User Profile & Auth */}
+            {currentUser ? (
+              <div className="flex items-center space-x-2 pl-2 border-l border-emerald-800">
+                <div className="hidden sm:block text-right">
+                  <div className="text-xs font-bold text-white leading-tight">{currentUser.name}</div>
+                  <div className="text-[10px] text-emerald-300 font-mono truncate max-w-[120px]">
+                    {currentUser.email}
+                  </div>
+                </div>
+                <button
+                  onClick={onSignOut}
+                  title="Sign out of session"
+                  className="px-2.5 py-1.5 bg-emerald-900/80 hover:bg-rose-900/60 hover:text-rose-200 text-emerald-200 text-xs font-semibold rounded-lg border border-emerald-700/60 transition-colors cursor-pointer"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={onOpenLogin}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       </div>

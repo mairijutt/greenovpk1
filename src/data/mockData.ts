@@ -2,6 +2,17 @@ import { Farm, Flock, EggProduction, MortalityLog, VaccineLog, FeedConsumption, 
 
 export const initialFarms: Farm[] = [
   {
+    id: 'farm-live',
+    name: 'GreenOva Farm (GVF2025)',
+    location: 'Multan, Punjab (Live VPS Database)',
+    capacity: 50000,
+    currentBirds: 42500,
+    shedsCount: 4,
+    manager: 'Malik Tariq / Admin',
+    temperature: 25.2,
+    humidity: 60,
+  },
+  {
     id: 'farm-1',
     name: 'GreenOva Main Complex (Shed 01-04)',
     location: 'Sector 4, Agri Zone, Punjab',

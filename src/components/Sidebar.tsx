@@ -10,6 +10,7 @@ import {
   Users,
   FileBarChart2,
   Server,
+  Database,
   CloudCheck,
 } from 'lucide-react';
 
@@ -23,6 +24,7 @@ export type NavTab =
   | 'finance'
   | 'salaries'
   | 'reports'
+  | 'database-backup'
   | 'vps-sync';
 
 interface SidebarProps {
@@ -42,6 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, isOpe
     { id: 'finance', label: 'Sales & Expenses', icon: DollarSign },
     { id: 'salaries', label: 'Staff & Salaries', icon: Users },
     { id: 'reports', label: 'Analytics & Reports', icon: FileBarChart2 },
+    { id: 'database-backup', label: 'Database & Backup', icon: Database, badge: 'SQL' },
     { id: 'vps-sync', label: 'VPS Live Sync & Vercel', icon: Server, badge: 'Live' },
   ];
 

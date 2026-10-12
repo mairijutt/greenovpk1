@@ -10,6 +10,8 @@ import { StocksView } from './components/StocksView';
 import { FinanceView } from './components/FinanceView';
 import { StaffView } from './components/StaffView';
 import { ReportsView } from './components/ReportsView';
+import { DatabaseBackupView } from './components/DatabaseBackupView';
+import { LoginView } from './components/LoginView';
 import { VpsSettingsModal } from './components/VpsSettingsModal';
 import { RecordModal } from './components/RecordModal';
 
@@ -41,6 +43,11 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [activeFarm, setActiveFarm] = useState<string>('all');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; token?: string } | null>(() => {
+    const saved = localStorage.getItem('greenova_user');
+    return saved ? JSON.parse(saved) : { name: 'Farm Administrator', email: 'admin@greenovapk.com', token: 'active-session' };
+  });
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Modals state
   const [isVpsModalOpen, setIsVpsModalOpen] = useState(false);
@@ -161,6 +168,12 @@ export default function App() {
         onSelectFarm={setActiveFarm}
         onOpenRecordModal={(type) => setRecordModalType(type)}
         onOpenVpsModal={() => setIsVpsModalOpen(true)}
+        currentUser={currentUser}
+        onSignOut={() => {
+          localStorage.removeItem('greenova_user');
+          setCurrentUser(null);
+        }}
+        onOpenLogin={() => setShowLoginModal(true)}
       />
 
       {/* Main Body */}
@@ -248,10 +261,33 @@ export default function App() {
               consumptionLogs={consumptionLogs}
             />
           )}
+
+          {currentTab === 'database-backup' && (
+            <DatabaseBackupView />
+          )}
         </main>
       </div>
 
       {/* Popups & Modals */}
+      {showLoginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="relative max-w-md w-full">
+            <button
+              onClick={() => setShowLoginModal(false)}
+              className="absolute right-4 top-4 z-10 text-white/80 hover:text-white font-bold text-lg bg-black/30 rounded-full w-8 h-8 flex items-center justify-center cursor-pointer"
+            >
+              ✕
+            </button>
+            <LoginView
+              onLoginSuccess={(user) => {
+                localStorage.setItem('greenova_user', JSON.stringify(user));
+                setCurrentUser(user);
+                setShowLoginModal(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
       <VpsSettingsModal
         isOpen={isVpsModalOpen}
         onClose={() => setIsVpsModalOpen(false)}
