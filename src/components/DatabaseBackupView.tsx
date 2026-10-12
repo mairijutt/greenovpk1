@@ -83,22 +83,33 @@ export const DatabaseBackupView: React.FC<DatabaseBackupViewProps> = ({ onRestor
             Export application snapshots, restore database backups, and safely dump production MySQL from your VPS.
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="/greenovapk_live_files_backup.tar.gz"
+            download="greenovapk_live_files_backup.tar.gz"
+            className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold px-3.5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
+            title="Download 100% live frontend build files from greenovapk.com"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download Live Files Archive (1.7 MB)</span>
+          </a>
+          <a
+            href="/greenova_postgres_dump.sql"
+            download="greenova_postgres_dump.sql"
+            className="bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold px-3.5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
+            title="Download PostgreSQL schema and database dump"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download PostgreSQL Dump (.sql)</span>
+          </a>
           <a
             href="/GreenOva_Full_DB_Backup.json"
             download="GreenOva_Full_Production_DB_Backup.json"
-            className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
+            className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
           >
             <Download className="w-4 h-4" />
-            <span>Download 100% Extracted DB Backup (72 KB)</span>
+            <span>Download JSON DB (72 KB)</span>
           </a>
-          <button
-            onClick={handleExportJson}
-            disabled={isExporting}
-            className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
-          >
-            <span>Current Workspace Snapshot</span>
-          </button>
         </div>
       </div>
 
