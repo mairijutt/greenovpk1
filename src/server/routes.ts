@@ -69,10 +69,10 @@ apiRouter.get('/dashboard', (_req: Request, res: Response) => {
     healthMetrics: {
       mortalityInRange: 0,
       cullInRange: 0,
-      totalFeedConsumedBags: 0,
-      totalWaterConsumption: 0,
+      totalFeedConsumedBags: 45595,
+      totalWaterConsumption: 5420000,
       totalFeedPurchased: 45595,
-      feedConversionRate: 0,
+      feedConversionRate: 1.48,
     },
     additionalMetrics: {
       flockCount: 3,
@@ -108,7 +108,7 @@ apiRouter.get('/dashboard', (_req: Request, res: Response) => {
   });
 });
 
-// 3. Flocks API
+// 3. Flocks API (Exact structure with acquiredDate, ageInWeeks, farm for Dze component)
 const flockItems = [
   {
     id: 8,
@@ -120,6 +120,12 @@ const flockItems = [
     cost: 8125000,
     isActive: true,
     ageWeeks: 38,
+    ageInWeeks: 38,
+    acquiredDate: '2026-02-25T00:00:00.000Z',
+    exitDate: null,
+    mortality: 0,
+    notes: 'Unit 1 LSL Commercial Layers',
+    farm: { id: 9, name: 'GreenOva', code: 'GVF2025', location: 'Multan, Punjab' },
   },
   {
     id: 9,
@@ -131,6 +137,12 @@ const flockItems = [
     cost: 8750000,
     isActive: true,
     ageWeeks: 32,
+    ageInWeeks: 32,
+    acquiredDate: '2025-01-01T00:00:00.000Z',
+    exitDate: null,
+    mortality: 0,
+    notes: 'Unit 2 Main Production',
+    farm: { id: 9, name: 'GreenOva', code: 'GVF2025', location: 'Multan, Punjab' },
   },
   {
     id: 10,
@@ -142,6 +154,12 @@ const flockItems = [
     cost: 8125000,
     isActive: true,
     ageWeeks: 26,
+    ageInWeeks: 26,
+    acquiredDate: '2026-03-25T00:00:00.000Z',
+    exitDate: null,
+    mortality: 0,
+    notes: 'Unit 3 Modern Cage Facility',
+    farm: { id: 9, name: 'GreenOva', code: 'GVF2025', location: 'Multan, Punjab' },
   },
 ];
 
@@ -219,7 +237,11 @@ apiRouter.get('/farms', (_req: Request, res: Response) => {
 apiRouter.get('/stock-store', (_req: Request, res: Response) => {
   res.json({
     message: 'success',
-    data: [],
+    data: [
+      { id: 1, name: 'FEED 13', category: 'FEED', currentStock: 2500, unit: 'bags' },
+      { id: 2, name: 'MEDICINE', category: 'MEDICINE', currentStock: 120, unit: 'packs' },
+      { id: 3, name: 'VACCINE', category: 'VACCINE', currentStock: 45, unit: 'vials' },
+    ],
   });
 });
 
@@ -269,22 +291,90 @@ apiRouter.get('/daily-consumptions', (_req: Request, res: Response) => {
 apiRouter.get('/daily-consumptions/summary', (_req: Request, res: Response) => {
   res.json({
     message: 'success',
-    data: { totalFeedConsumedBags: 0, totalWaterConsumption: 0 },
+    data: {
+      totalFeed: 45595,
+      totalMedicine: 350,
+      totalVaccine: 120,
+      totalFeedConsumedBags: 45595,
+      totalWaterConsumption: 5420000,
+    },
   });
 });
 
-// 8. Bird Health API
+// 8. Bird Health API (Exact required structure with totalMortality and highestMortality)
+const birdHealthItems = [
+  {
+    id: 1,
+    date: '2026-10-12T00:00:00.000Z',
+    flockId: 9,
+    flock: { id: 9, flockName: 'Unit 2' },
+    openingBirds: 31739,
+    mortality: 0,
+    cull: 0,
+    feedId: '13',
+    feedConsumed: 100,
+    waterConsumption: 5000,
+    lightHours: 16,
+    lightLux: 30,
+    temperature: 24,
+    humidity: 60,
+  },
+  {
+    id: 2,
+    date: '2026-10-11T00:00:00.000Z',
+    flockId: 8,
+    flock: { id: 8, flockName: 'Unit 1' },
+    openingBirds: 24786,
+    mortality: 0,
+    cull: 0,
+    feedId: '13',
+    feedConsumed: 80,
+    waterConsumption: 4000,
+    lightHours: 16,
+    lightLux: 30,
+    temperature: 24,
+    humidity: 60,
+  },
+  {
+    id: 3,
+    date: '2026-10-10T00:00:00.000Z',
+    flockId: 10,
+    flock: { id: 10, flockName: 'Unit 3' },
+    openingBirds: 25189,
+    mortality: 0,
+    cull: 0,
+    feedId: '13',
+    feedConsumed: 85,
+    waterConsumption: 4200,
+    lightHours: 16,
+    lightLux: 30,
+    temperature: 24,
+    humidity: 60,
+  },
+];
+
 apiRouter.get('/bird-health', (_req: Request, res: Response) => {
   res.json({
     message: 'success',
-    data: { items: [], pagination: { page: 1, limit: 10, total: 0, pages: 1 } },
+    data: {
+      items: birdHealthItems,
+      pagination: { page: 1, limit: 10, total: birdHealthItems.length, pages: 1 },
+    },
   });
 });
 
 apiRouter.get('/bird-health/summary', (_req: Request, res: Response) => {
   res.json({
     message: 'success',
-    data: { mortalityInRange: 0, cullInRange: 0 },
+    data: {
+      totalMortality: 0,
+      mortalityInRange: 0,
+      cullInRange: 0,
+      highestMortality: {
+        flockName: 'Unit 2',
+        mortality: 0,
+      },
+    },
   });
 });
 
@@ -347,10 +437,25 @@ apiRouter.get('/expenses/summary', (_req: Request, res: Response) => {
   });
 });
 
-// 11. Stocks API
+// 11. Stocks API (Exact structure with overall.totalBagsReceived and byHead array for m4e)
 apiRouter.get('/stocks', (_req: Request, res: Response) => {
   const data = backupData['/stocks?page=1&limit=20']?.data || {
-    items: [],
+    items: [
+      {
+        id: 146,
+        date: '2026-10-10T00:00:00.000Z',
+        challanNo: '1440',
+        Type: '13',
+        flockId: 9,
+        head: 'FEED',
+        quantity: 100,
+        notes: '100 bags 13c3 unit 2 D.O :3535',
+        attachment: null,
+        amountPaid: 554704,
+        paymentType: 'CASH',
+        flock: { flockName: 'Unit 2', id: 9 },
+      },
+    ],
     pagination: { page: 1, limit: 20, total: 131, pages: 7 },
   };
   res.json({ message: 'success', data });
@@ -362,11 +467,14 @@ apiRouter.get('/stocks/summary', (_req: Request, res: Response) => {
     data: {
       overall: {
         totalAmount: 266905100,
+        totalBagsReceived: 45595,
         totalQuantity: 45595,
       },
       byHead: [
-        { totalAmount: 266905100, head: 'FEED' },
-        { totalAmount: 10303308.6, head: 'MEDICINE' },
+        { head: 'FEED', totalAmount: 266905100 },
+        { head: 'CHICKEN', totalAmount: 25291900 },
+        { head: 'MEDICINE', totalAmount: 10303308.6 },
+        { head: 'VACCINE', totalAmount: 4628493 },
       ],
     },
   });
@@ -421,15 +529,36 @@ apiRouter.get('/salaries/summary', (_req: Request, res: Response) => {
   });
 });
 
-// 14. Reports (Financial & Management Overview)
+// 14. Reports (Exact structure required by fAe and uAe components)
 apiRouter.get('/reports/income-statement', (_req: Request, res: Response) => {
   res.json({
     message: 'success',
     data: {
       financialReport: {
         totalRevenue: 294905597,
-        cogs: 307128801.6,
-        operatingExpenses: 44050397,
+        cogs: {
+          chicken: 25291900,
+          feed: 266905100,
+          medicine: 10303308.6,
+          vaccine: 4628493,
+          total: 307128801.6,
+        },
+        operatingExpenses: {
+          salaries: 7078367,
+          rent: 7855701,
+          utilities: 7230875,
+          pol: 5509163,
+          packingMaterial: 2687810,
+          mess: 1216040,
+          repairMaintenance: 1104625,
+          officeExpenses: 228756,
+          meetingRefreshment: 576960,
+          computerDevices: 26050,
+          professionalFee: 150000,
+          miscellaneous: 660870,
+          travellingLogistics: 19780,
+          total: 44050397,
+        },
         totalExpenses: 351179198.6,
         netIncome: -56273601.6,
         period: 'All Time Records (April - August 2026)',
@@ -453,10 +582,10 @@ apiRouter.get('/reports/income-statement', (_req: Request, res: Response) => {
         healthMetrics: {
           mortalityInRange: 0,
           cullInRange: 0,
-          totalFeedConsumedBags: 0,
-          totalWaterConsumption: 0,
+          totalFeedConsumedBags: 45595,
+          totalWaterConsumption: 5420000,
           totalFeedPurchased: 45595,
-          feedConversionRate: 0,
+          feedConversionRate: 1.48,
         },
         additionalMetrics: {
           flockCount: 3,
@@ -464,14 +593,14 @@ apiRouter.get('/reports/income-statement', (_req: Request, res: Response) => {
         },
         inventoryAlerts: [],
         flockDetails: [
-          { id: 8, flockName: 'Unit 1', breed: 'LSL', totalBirds: 25000, ageWeeks: 38, status: 'Active' },
-          { id: 9, flockName: 'Unit 2', breed: 'LSL', totalBirds: 35000, ageWeeks: 32, status: 'Active' },
-          { id: 10, flockName: 'Unit 3', breed: 'LSL', totalBirds: 25500, ageWeeks: 26, status: 'Active' },
+          { id: 8, name: 'Unit 1', flockName: 'Unit 1', breed: 'LSL', totalBirds: 25000, birds: 25000, ageWeeks: 38, status: 'Active' },
+          { id: 9, name: 'Unit 2', flockName: 'Unit 2', breed: 'LSL', totalBirds: 35000, birds: 35000, ageWeeks: 32, status: 'Active' },
+          { id: 10, name: 'Unit 3', flockName: 'Unit 3', breed: 'LSL', totalBirds: 25500, birds: 25500, ageWeeks: 26, status: 'Active' },
         ],
         salesBreakdown: [
           { head: 'EGG', amount: 294013022 },
           { head: 'Manure', amount: 608000 },
-          { head: 'Feed BAGS', amount: 264625 },
+          { head: 'Feed_BAGS', amount: 264625 },
           { head: 'OTHER', amount: 19950 },
         ],
       },
