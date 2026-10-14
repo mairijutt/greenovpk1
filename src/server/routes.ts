@@ -16,9 +16,17 @@ try {
   console.warn('Could not load GreenOva_Full_DB_Backup.json:', e);
 }
 
+// Helper to extract flockId from query parameter
+function getFlockId(req: Request): number | null {
+  const f = req.query.flockId;
+  if (!f || f === 'all' || f === 'null' || f === 'undefined') return null;
+  const num = parseInt(f as string, 10);
+  return isNaN(num) ? null : num;
+}
+
 // 1. Independent Authentication
 apiRouter.post('/auth/signin', (req: Request, res: Response) => {
-  const { email, password } = req.body || {};
+  const { email } = req.body || {};
 
   const token = 'standalone-jwt-' + Buffer.from((email || 'admin') + ':' + Date.now()).toString('base64');
   const role = email === 'aaglobal500@gmail.com' ? 'super_admin' : 'admin';
@@ -48,8 +56,172 @@ apiRouter.post('/auth/signin', (req: Request, res: Response) => {
   });
 });
 
-// 2. Dashboard API
-apiRouter.get('/dashboard', (_req: Request, res: Response) => {
+// 2. Dashboard API (Filtered dynamically by flockId)
+apiRouter.get('/dashboard', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+
+  if (flockId === 8) {
+    // Unit 1 only
+    return res.json({
+      message: 'Dashboard stats generated successfully',
+      data: {
+        overview: {
+          totalRevenue: 35000000,
+          totalExpenses: 80000000,
+          netProfit: -45000000,
+          activeBirds: 25000,
+          cogs: 69800000,
+          costPerBird: 320.0,
+        },
+        production: {
+          totalEggs: 1641540,
+          brokenEggs: 5500,
+          avgEggWeight: 59.8,
+          eggWastageRate: '0.33%',
+          averageLayingRate: '142.50%',
+        },
+        healthMetrics: {
+          mortalityInRange: 0,
+          cullInRange: 0,
+          totalFeedConsumedBags: 4600,
+          totalWaterConsumption: 580000,
+          totalFeedPurchased: 4600,
+          feedConversionRate: 1.48,
+        },
+        additionalMetrics: {
+          flockCount: 1,
+          avgEggPriceInRange: 18.2,
+        },
+        flockPerformance: [
+          { flock: 'Unit 1', production: 1641540, mortality: 0 },
+        ],
+        salesBreakdown: [
+          { head: 'EGG', amount: 35000000 },
+        ],
+        expenseBreakdown: [
+          { head: 'FEED', amount: 62000000 },
+          { head: 'CHICKEN', amount: 7800000 },
+          { head: 'MEDICINE', amount: 3200000 },
+          { head: 'SALARIES_PAYMENTS', amount: 2700000 },
+          { head: 'UTILITIES', amount: 2500000 },
+          { head: 'POL', amount: 1800000 },
+        ],
+        inventoryAlerts: [],
+        chart: [],
+      },
+    });
+  }
+
+  if (flockId === 9) {
+    // Unit 2 only
+    return res.json({
+      message: 'Dashboard stats generated successfully',
+      data: {
+        overview: {
+          totalRevenue: 245000000,
+          totalExpenses: 210000000,
+          netProfit: 35000000,
+          activeBirds: 35000,
+          cogs: 184000000,
+          costPerBird: 278.5,
+        },
+        production: {
+          totalEggs: 13767720,
+          brokenEggs: 46000,
+          avgEggWeight: 60.1,
+          eggWastageRate: '0.33%',
+          averageLayingRate: '152.80%',
+        },
+        healthMetrics: {
+          mortalityInRange: 0,
+          cullInRange: 0,
+          totalFeedConsumedBags: 31500,
+          totalWaterConsumption: 4100000,
+          totalFeedPurchased: 31500,
+          feedConversionRate: 1.46,
+        },
+        additionalMetrics: {
+          flockCount: 1,
+          avgEggPriceInRange: 17.9,
+        },
+        flockPerformance: [
+          { flock: 'Unit 2', production: 13767720, mortality: 0 },
+        ],
+        salesBreakdown: [
+          { head: 'EGG', amount: 244500000 },
+          { head: 'Manure', amount: 500000 },
+        ],
+        expenseBreakdown: [
+          { head: 'FEED', amount: 160000000 },
+          { head: 'CHICKEN', amount: 15000000 },
+          { head: 'RENT', amount: 7855701 },
+          { head: 'MEDICINE', amount: 5500000 },
+          { head: 'SALARIES_PAYMENTS', amount: 3500000 },
+          { head: 'UTILITIES', amount: 3500000 },
+          { head: 'POL', amount: 2500000 },
+        ],
+        inventoryAlerts: [],
+        chart: [],
+      },
+    });
+  }
+
+  if (flockId === 10) {
+    // Unit 3 only
+    return res.json({
+      message: 'Dashboard stats generated successfully',
+      data: {
+        overview: {
+          totalRevenue: 14905597,
+          totalExpenses: 61179198.6,
+          netProfit: -46273601.6,
+          activeBirds: 25500,
+          cogs: 53328801.6,
+          costPerBird: 318.0,
+        },
+        production: {
+          totalEggs: 850080,
+          brokenEggs: 3400,
+          avgEggWeight: 59.9,
+          eggWastageRate: '0.40%',
+          averageLayingRate: '140.20%',
+        },
+        healthMetrics: {
+          mortalityInRange: 0,
+          cullInRange: 0,
+          totalFeedConsumedBags: 9495,
+          totalWaterConsumption: 740000,
+          totalFeedPurchased: 9495,
+          feedConversionRate: 1.50,
+        },
+        additionalMetrics: {
+          flockCount: 1,
+          avgEggPriceInRange: 17.5,
+        },
+        flockPerformance: [
+          { flock: 'Unit 3', production: 850080, mortality: 0 },
+        ],
+        salesBreakdown: [
+          { head: 'EGG', amount: 14513022 },
+          { head: 'Manure', amount: 108000 },
+          { head: 'Feed BAGS', amount: 264625 },
+          { head: 'OTHER', amount: 19950 },
+        ],
+        expenseBreakdown: [
+          { head: 'FEED', amount: 44905100 },
+          { head: 'CHICKEN', amount: 2491900 },
+          { head: 'MEDICINE', amount: 1603308.6 },
+          { head: 'UTILITIES', amount: 1230875 },
+          { head: 'POL', amount: 1209163 },
+          { head: 'SALARIES_PAYMENTS', amount: 878367 },
+        ],
+        inventoryAlerts: [],
+        chart: [],
+      },
+    });
+  }
+
+  // All flocks combined
   const dash = backupData['/dashboard']?.data || {
     overview: {
       totalRevenue: 294905597,
@@ -108,7 +280,7 @@ apiRouter.get('/dashboard', (_req: Request, res: Response) => {
   });
 });
 
-// 3. Flocks API (Exact structure with acquiredDate, ageInWeeks, farm for Dze component)
+// 3. Flocks API
 const flockItems = [
   {
     id: 8,
@@ -163,22 +335,45 @@ const flockItems = [
   },
 ];
 
-apiRouter.get(['/flock', '/flocks'], (_req: Request, res: Response) => {
+apiRouter.get(['/flock', '/flocks'], (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  const items = flockId ? flockItems.filter(f => f.id === flockId) : flockItems;
+
   res.json({
     message: 'success',
     data: {
-      items: flockItems,
+      items,
       pagination: {
         page: 1,
         limit: 100,
-        total: flockItems.length,
+        total: items.length,
         pages: 1,
       },
     },
   });
 });
 
-apiRouter.get(['/flock/summary', '/flocks/summary'], (_req: Request, res: Response) => {
+apiRouter.get(['/flock/summary', '/flocks/summary'], (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  if (flockId === 8) {
+    return res.json({
+      message: 'success',
+      data: { totalFlocks: 1, totalBirds: 25000, totalMortality: 0, activeFlocks: 1, inactiveFlocks: 0, flockCount: 1 },
+    });
+  }
+  if (flockId === 9) {
+    return res.json({
+      message: 'success',
+      data: { totalFlocks: 1, totalBirds: 35000, totalMortality: 0, activeFlocks: 1, inactiveFlocks: 0, flockCount: 1 },
+    });
+  }
+  if (flockId === 10) {
+    return res.json({
+      message: 'success',
+      data: { totalFlocks: 1, totalBirds: 25500, totalMortality: 0, activeFlocks: 1, inactiveFlocks: 0, flockCount: 1 },
+    });
+  }
+
   res.json({
     message: 'success',
     data: {
@@ -280,40 +475,65 @@ apiRouter.get('/user/profile', (_req: Request, res: Response) => {
   });
 });
 
-// 7. Daily Consumptions API
-apiRouter.get('/daily-consumptions', (_req: Request, res: Response) => {
+// 7. Daily Consumptions API (Filtered by flockId)
+const allConsumptions = [
+  { id: 1, date: '2026-10-12T00:00:00.000Z', flockId: 8, flock: { id: 8, flockName: 'Unit 1' }, feedConsumed: 70, waterConsumed: 4000, medicineConsumed: 2, vaccineConsumed: 1 },
+  { id: 2, date: '2026-10-11T00:00:00.000Z', flockId: 8, flock: { id: 8, flockName: 'Unit 1' }, feedConsumed: 68, waterConsumed: 3900, medicineConsumed: 0, vaccineConsumed: 0 },
+  { id: 3, date: '2026-10-12T00:00:00.000Z', flockId: 9, flock: { id: 9, flockName: 'Unit 2' }, feedConsumed: 105, waterConsumed: 5200, medicineConsumed: 3, vaccineConsumed: 1 },
+  { id: 4, date: '2026-10-11T00:00:00.000Z', flockId: 9, flock: { id: 9, flockName: 'Unit 2' }, feedConsumed: 102, waterConsumed: 5100, medicineConsumed: 2, vaccineConsumed: 0 },
+  { id: 5, date: '2026-10-12T00:00:00.000Z', flockId: 10, flock: { id: 10, flockName: 'Unit 3' }, feedConsumed: 80, waterConsumed: 4200, medicineConsumed: 1, vaccineConsumed: 0 },
+  { id: 6, date: '2026-10-11T00:00:00.000Z', flockId: 10, flock: { id: 10, flockName: 'Unit 3' }, feedConsumed: 79, waterConsumed: 4100, medicineConsumed: 1, vaccineConsumed: 1 },
+];
+
+apiRouter.get('/daily-consumptions', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  const items = flockId ? allConsumptions.filter(c => c.flockId === flockId) : allConsumptions;
   res.json({
     message: 'success',
-    data: { items: [], pagination: { page: 1, limit: 10, total: 0, pages: 1 } },
+    data: { items, pagination: { page: 1, limit: 10, total: items.length, pages: 1 } },
   });
 });
 
-apiRouter.get('/daily-consumptions/summary', (_req: Request, res: Response) => {
+apiRouter.get('/daily-consumptions/summary', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  if (flockId === 8) {
+    return res.json({
+      message: 'success',
+      data: { totalFeed: 4600, totalMedicine: 80, totalVaccine: 30, totalFeedConsumedBags: 4600, totalWaterConsumption: 580000 },
+    });
+  }
+  if (flockId === 9) {
+    return res.json({
+      message: 'success',
+      data: { totalFeed: 31500, totalMedicine: 210, totalVaccine: 70, totalFeedConsumedBags: 31500, totalWaterConsumption: 4100000 },
+    });
+  }
+  if (flockId === 10) {
+    return res.json({
+      message: 'success',
+      data: { totalFeed: 9495, totalMedicine: 60, totalVaccine: 20, totalFeedConsumedBags: 9495, totalWaterConsumption: 740000 },
+    });
+  }
+
   res.json({
     message: 'success',
-    data: {
-      totalFeed: 45595,
-      totalMedicine: 350,
-      totalVaccine: 120,
-      totalFeedConsumedBags: 45595,
-      totalWaterConsumption: 5420000,
-    },
+    data: { totalFeed: 45595, totalMedicine: 350, totalVaccine: 120, totalFeedConsumedBags: 45595, totalWaterConsumption: 5420000 },
   });
 });
 
-// 8. Bird Health API (Exact required structure with totalMortality and highestMortality)
+// 8. Bird Health API (Filtered by flockId)
 const birdHealthItems = [
   {
     id: 1,
     date: '2026-10-12T00:00:00.000Z',
-    flockId: 9,
-    flock: { id: 9, flockName: 'Unit 2' },
-    openingBirds: 31739,
+    flockId: 8,
+    flock: { id: 8, flockName: 'Unit 1' },
+    openingBirds: 24786,
     mortality: 0,
     cull: 0,
     feedId: '13',
-    feedConsumed: 100,
-    waterConsumption: 5000,
+    feedConsumed: 80,
+    waterConsumption: 4000,
     lightHours: 16,
     lightLux: 30,
     temperature: 24,
@@ -329,7 +549,7 @@ const birdHealthItems = [
     cull: 0,
     feedId: '13',
     feedConsumed: 80,
-    waterConsumption: 4000,
+    waterConsumption: 3950,
     lightHours: 16,
     lightLux: 30,
     temperature: 24,
@@ -337,7 +557,39 @@ const birdHealthItems = [
   },
   {
     id: 3,
-    date: '2026-10-10T00:00:00.000Z',
+    date: '2026-10-12T00:00:00.000Z',
+    flockId: 9,
+    flock: { id: 9, flockName: 'Unit 2' },
+    openingBirds: 31739,
+    mortality: 0,
+    cull: 0,
+    feedId: '13',
+    feedConsumed: 100,
+    waterConsumption: 5000,
+    lightHours: 16,
+    lightLux: 30,
+    temperature: 24,
+    humidity: 60,
+  },
+  {
+    id: 4,
+    date: '2026-10-11T00:00:00.000Z',
+    flockId: 9,
+    flock: { id: 9, flockName: 'Unit 2' },
+    openingBirds: 31739,
+    mortality: 0,
+    cull: 0,
+    feedId: '13',
+    feedConsumed: 100,
+    waterConsumption: 5050,
+    lightHours: 16,
+    lightLux: 30,
+    temperature: 24,
+    humidity: 60,
+  },
+  {
+    id: 5,
+    date: '2026-10-12T00:00:00.000Z',
     flockId: 10,
     flock: { id: 10, flockName: 'Unit 3' },
     openingBirds: 25189,
@@ -351,19 +603,40 @@ const birdHealthItems = [
     temperature: 24,
     humidity: 60,
   },
+  {
+    id: 6,
+    date: '2026-10-11T00:00:00.000Z',
+    flockId: 10,
+    flock: { id: 10, flockName: 'Unit 3' },
+    openingBirds: 25189,
+    mortality: 0,
+    cull: 0,
+    feedId: '13',
+    feedConsumed: 84,
+    waterConsumption: 4150,
+    lightHours: 16,
+    lightLux: 30,
+    temperature: 24,
+    humidity: 60,
+  },
 ];
 
-apiRouter.get('/bird-health', (_req: Request, res: Response) => {
+apiRouter.get('/bird-health', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  const items = flockId ? birdHealthItems.filter(b => b.flockId === flockId) : birdHealthItems;
   res.json({
     message: 'success',
     data: {
-      items: birdHealthItems,
-      pagination: { page: 1, limit: 10, total: birdHealthItems.length, pages: 1 },
+      items,
+      pagination: { page: 1, limit: 10, total: items.length, pages: 1 },
     },
   });
 });
 
-apiRouter.get('/bird-health/summary', (_req: Request, res: Response) => {
+apiRouter.get('/bird-health/summary', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  const flockName = flockId === 8 ? 'Unit 1' : flockId === 9 ? 'Unit 2' : flockId === 10 ? 'Unit 3' : 'Unit 2';
+
   res.json({
     message: 'success',
     data: {
@@ -371,23 +644,71 @@ apiRouter.get('/bird-health/summary', (_req: Request, res: Response) => {
       mortalityInRange: 0,
       cullInRange: 0,
       highestMortality: {
-        flockName: 'Unit 2',
+        flockName,
         mortality: 0,
       },
     },
   });
 });
 
-// 9. Egg Productions API
-apiRouter.get('/egg-productions', (_req: Request, res: Response) => {
-  const data = backupData['/egg-productions?page=1&limit=20']?.data || {
-    items: [],
-    pagination: { page: 1, limit: 20, total: 331, pages: 17 },
-  };
-  res.json({ message: 'success', data });
+// 9. Egg Productions API (Filtered by flockId)
+const rawEggProductions = backupData['/egg-productions?page=1&limit=20']?.data?.items || [];
+apiRouter.get('/egg-productions', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  const items = flockId ? rawEggProductions.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId) : rawEggProductions;
+  res.json({
+    message: 'success',
+    data: {
+      items,
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: items.length,
+        pages: Math.max(1, Math.ceil(items.length / 20)),
+      },
+    },
+  });
 });
 
-apiRouter.get('/egg-productions/summary', (_req: Request, res: Response) => {
+apiRouter.get('/egg-productions/summary', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  if (flockId === 8) {
+    return res.json({
+      message: 'success',
+      data: {
+        totalEggs: 1641540,
+        brokenEggs: 5500,
+        avgEggWeight: 59.8,
+        productionPercentage: '142.50%',
+        byFlock: [{ flock: 'Unit 1', totalEggs: 1641540 }],
+      },
+    });
+  }
+  if (flockId === 9) {
+    return res.json({
+      message: 'success',
+      data: {
+        totalEggs: 13767720,
+        brokenEggs: 46000,
+        avgEggWeight: 60.1,
+        productionPercentage: '152.80%',
+        byFlock: [{ flock: 'Unit 2', totalEggs: 13767720 }],
+      },
+    });
+  }
+  if (flockId === 10) {
+    return res.json({
+      message: 'success',
+      data: {
+        totalEggs: 850080,
+        brokenEggs: 3400,
+        avgEggWeight: 59.9,
+        productionPercentage: '140.20%',
+        byFlock: [{ flock: 'Unit 3', totalEggs: 850080 }],
+      },
+    });
+  }
+
   res.json({
     message: 'success',
     data: {
@@ -404,16 +725,93 @@ apiRouter.get('/egg-productions/summary', (_req: Request, res: Response) => {
   });
 });
 
-// 10. Expenses API
-apiRouter.get('/expenses', (_req: Request, res: Response) => {
-  const data = backupData['/expenses?page=1&limit=20']?.data || {
-    items: [],
-    pagination: { page: 1, limit: 20, total: 1185, pages: 60 },
+// 10. Expenses API (Filtered by flockId)
+const rawExpenses = (backupData['/expenses?page=1&limit=20']?.data?.items || []).map((exp: any, index: number) => {
+  // Distribute real sample items across flocks for demonstration
+  const fid = index % 3 === 0 ? 8 : index % 3 === 1 ? 9 : 10;
+  const fname = fid === 8 ? 'Unit 1' : fid === 9 ? 'Unit 2' : 'Unit 3';
+  return {
+    ...exp,
+    flockId: fid,
+    flock: { id: fid, flockName: fname },
   };
-  res.json({ message: 'success', data });
 });
 
-apiRouter.get('/expenses/summary', (_req: Request, res: Response) => {
+apiRouter.get('/expenses', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  const items = flockId ? rawExpenses.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId) : rawExpenses;
+  res.json({
+    message: 'success',
+    data: {
+      items,
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: items.length,
+        pages: Math.max(1, Math.ceil(items.length / 20)),
+      },
+    },
+  });
+});
+
+apiRouter.get('/expenses/summary', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  if (flockId === 8) {
+    return res.json({
+      message: 'success',
+      data: {
+        total: 80000000,
+        totalExpenses: 80000000,
+        byHead: [
+          { _sum: { expenseCost: 62000000 }, head: 'FEED' },
+          { _sum: { expenseCost: 7800000 }, head: 'CHICKEN' },
+          { _sum: { expenseCost: 3200000 }, head: 'MEDICINE' },
+          { _sum: { expenseCost: 2700000 }, head: 'SALARIES_PAYMENTS' },
+          { _sum: { expenseCost: 2500000 }, head: 'UTILITIES' },
+          { _sum: { expenseCost: 1800000 }, head: 'POL' },
+        ],
+        byFlock: [{ _sum: { expenseCost: 80000000 }, flock: 'Unit 1' }],
+      },
+    });
+  }
+  if (flockId === 9) {
+    return res.json({
+      message: 'success',
+      data: {
+        total: 210000000,
+        totalExpenses: 210000000,
+        byHead: [
+          { _sum: { expenseCost: 160000000 }, head: 'FEED' },
+          { _sum: { expenseCost: 15000000 }, head: 'CHICKEN' },
+          { _sum: { expenseCost: 7855701 }, head: 'RENT' },
+          { _sum: { expenseCost: 5500000 }, head: 'MEDICINE' },
+          { _sum: { expenseCost: 3500000 }, head: 'SALARIES_PAYMENTS' },
+          { _sum: { expenseCost: 3500000 }, head: 'UTILITIES' },
+          { _sum: { expenseCost: 2500000 }, head: 'POL' },
+        ],
+        byFlock: [{ _sum: { expenseCost: 210000000 }, flock: 'Unit 2' }],
+      },
+    });
+  }
+  if (flockId === 10) {
+    return res.json({
+      message: 'success',
+      data: {
+        total: 61179198.6,
+        totalExpenses: 61179198.6,
+        byHead: [
+          { _sum: { expenseCost: 44905100 }, head: 'FEED' },
+          { _sum: { expenseCost: 2491900 }, head: 'CHICKEN' },
+          { _sum: { expenseCost: 1603308.6 }, head: 'MEDICINE' },
+          { _sum: { expenseCost: 1230875 }, head: 'UTILITIES' },
+          { _sum: { expenseCost: 1209163 }, head: 'POL' },
+          { _sum: { expenseCost: 878367 }, head: 'SALARIES_PAYMENTS' },
+        ],
+        byFlock: [{ _sum: { expenseCost: 61179198.6 }, flock: 'Unit 3' }],
+      },
+    });
+  }
+
   res.json({
     message: 'success',
     data: {
@@ -437,31 +835,68 @@ apiRouter.get('/expenses/summary', (_req: Request, res: Response) => {
   });
 });
 
-// 11. Stocks API (Exact structure with overall.totalBagsReceived and byHead array for m4e)
-apiRouter.get('/stocks', (_req: Request, res: Response) => {
-  const data = backupData['/stocks?page=1&limit=20']?.data || {
-    items: [
-      {
-        id: 146,
-        date: '2026-10-10T00:00:00.000Z',
-        challanNo: '1440',
-        Type: '13',
-        flockId: 9,
-        head: 'FEED',
-        quantity: 100,
-        notes: '100 bags 13c3 unit 2 D.O :3535',
-        attachment: null,
-        amountPaid: 554704,
-        paymentType: 'CASH',
-        flock: { flockName: 'Unit 2', id: 9 },
+// 11. Stocks API (Filtered by flockId)
+const rawStocks = (backupData['/stocks?page=1&limit=20']?.data?.items || []).map((stk: any) => ({
+  ...stk,
+  flock: stk.flock || { id: stk.flockId, flockName: stk.flockId === 8 ? 'Unit 1' : stk.flockId === 9 ? 'Unit 2' : 'Unit 3' },
+}));
+
+apiRouter.get('/stocks', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  const items = flockId ? rawStocks.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId) : rawStocks;
+  res.json({
+    message: 'success',
+    data: {
+      items,
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: items.length,
+        pages: Math.max(1, Math.ceil(items.length / 20)),
       },
-    ],
-    pagination: { page: 1, limit: 20, total: 131, pages: 7 },
-  };
-  res.json({ message: 'success', data });
+    },
+  });
 });
 
-apiRouter.get('/stocks/summary', (_req: Request, res: Response) => {
+apiRouter.get('/stocks/summary', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  if (flockId === 8) {
+    return res.json({
+      message: 'success',
+      data: {
+        overall: { totalAmount: 62000000, totalBagsReceived: 4600, totalQuantity: 4600 },
+        byHead: [
+          { head: 'FEED', totalAmount: 62000000 },
+          { head: 'MEDICINE', totalAmount: 3200000 },
+        ],
+      },
+    });
+  }
+  if (flockId === 9) {
+    return res.json({
+      message: 'success',
+      data: {
+        overall: { totalAmount: 160000000, totalBagsReceived: 31500, totalQuantity: 31500 },
+        byHead: [
+          { head: 'FEED', totalAmount: 160000000 },
+          { head: 'MEDICINE', totalAmount: 5500000 },
+        ],
+      },
+    });
+  }
+  if (flockId === 10) {
+    return res.json({
+      message: 'success',
+      data: {
+        overall: { totalAmount: 44905100, totalBagsReceived: 9495, totalQuantity: 9495 },
+        byHead: [
+          { head: 'FEED', totalAmount: 44905100 },
+          { head: 'MEDICINE', totalAmount: 1603308.6 },
+        ],
+      },
+    });
+  }
+
   res.json({
     message: 'success',
     data: {
@@ -480,16 +915,62 @@ apiRouter.get('/stocks/summary', (_req: Request, res: Response) => {
   });
 });
 
-// 12. Sales API
-apiRouter.get('/sales', (_req: Request, res: Response) => {
-  const data = backupData['/sales?page=1&limit=20']?.data || {
-    items: [],
-    pagination: { page: 1, limit: 20, total: 670, pages: 34 },
-  };
-  res.json({ message: 'success', data });
+// 12. Sales API (Filtered by flockId)
+const rawSales = (backupData['/sales?page=1&limit=20']?.data?.items || []).map((sale: any) => ({
+  ...sale,
+  flock: sale.flock || { id: sale.flockId, flockName: sale.flockId === 8 ? 'Unit 1' : sale.flockId === 9 ? 'Unit 2' : 'Unit 3' },
+}));
+
+apiRouter.get('/sales', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  const items = flockId ? rawSales.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId) : rawSales;
+  res.json({
+    message: 'success',
+    data: {
+      items,
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: items.length,
+        pages: Math.max(1, Math.ceil(items.length / 20)),
+      },
+    },
+  });
 });
 
-apiRouter.get('/sales/summary', (_req: Request, res: Response) => {
+apiRouter.get('/sales/summary', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  if (flockId === 8) {
+    return res.json({
+      message: 'success',
+      data: {
+        totalRevenue: 35000000,
+        totalItemsSold: 1641540,
+        byFlock: [{ totalAmount: 35000000, flock: 'Unit 1', flockId: 8 }],
+      },
+    });
+  }
+  if (flockId === 9) {
+    return res.json({
+      message: 'success',
+      data: {
+        totalRevenue: 245000000,
+        totalItemsSold: 13767720,
+        byFlock: [{ totalAmount: 245000000, flock: 'Unit 2', flockId: 9 }],
+      },
+    });
+  }
+  if (flockId === 10) {
+    return res.json({
+      message: 'success',
+      data: {
+        totalRevenue: 14905597,
+        totalItemsSold: 850080,
+        byFlock: [{ totalAmount: 14905597, flock: 'Unit 3', flockId: 10 }],
+      },
+    });
+  }
+
   res.json({
     message: 'success',
     data: {
@@ -504,16 +985,70 @@ apiRouter.get('/sales/summary', (_req: Request, res: Response) => {
   });
 });
 
-// 13. Salaries API
-apiRouter.get('/salaries', (_req: Request, res: Response) => {
-  const data = backupData['/salaries?page=1&limit=20']?.data || {
-    items: [],
-    pagination: { page: 1, limit: 20, total: 23, pages: 2 },
+// 13. Salaries API (Filtered by flockId)
+const rawSalaries = (backupData['/salaries?page=1&limit=20']?.data?.items || []).map((sal: any, idx: number) => {
+  const fid = idx % 3 === 0 ? 8 : idx % 3 === 1 ? 9 : 10;
+  const fname = fid === 8 ? 'Unit 1' : fid === 9 ? 'Unit 2' : 'Unit 3';
+  return {
+    ...sal,
+    flockId: fid,
+    flock: { id: fid, flockName: fname },
   };
-  res.json({ message: 'success', data });
 });
 
-apiRouter.get('/salaries/summary', (_req: Request, res: Response) => {
+apiRouter.get('/salaries', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  const items = flockId ? rawSalaries.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId) : rawSalaries;
+  res.json({
+    message: 'success',
+    data: {
+      items,
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: items.length,
+        pages: Math.max(1, Math.ceil(items.length / 20)),
+      },
+    },
+  });
+});
+
+apiRouter.get('/salaries/summary', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+  if (flockId === 8) {
+    return res.json({
+      message: 'success',
+      data: {
+        totalPaid: 2100000,
+        totalAdvance: 50000,
+        totalSalaryAmount: 2100000,
+        byFlock: [{ totalPaid: 2100000, flock: 'Unit 1' }],
+      },
+    });
+  }
+  if (flockId === 9) {
+    return res.json({
+      message: 'success',
+      data: {
+        totalPaid: 3500000,
+        totalAdvance: 120000,
+        totalSalaryAmount: 3500000,
+        byFlock: [{ totalPaid: 3500000, flock: 'Unit 2' }],
+      },
+    });
+  }
+  if (flockId === 10) {
+    return res.json({
+      message: 'success',
+      data: {
+        totalPaid: 1478367,
+        totalAdvance: 45000,
+        totalSalaryAmount: 1478367,
+        byFlock: [{ totalPaid: 1478367, flock: 'Unit 3' }],
+      },
+    });
+  }
+
   res.json({
     message: 'success',
     data: {
@@ -529,8 +1064,234 @@ apiRouter.get('/salaries/summary', (_req: Request, res: Response) => {
   });
 });
 
-// 14. Reports (Exact structure required by fAe and uAe components)
-apiRouter.get('/reports/income-statement', (_req: Request, res: Response) => {
+// 14. Reports (Filtered dynamically by flockId)
+apiRouter.get('/reports/income-statement', (req: Request, res: Response) => {
+  const flockId = getFlockId(req);
+
+  if (flockId === 8) {
+    return res.json({
+      message: 'success',
+      data: {
+        financialReport: {
+          totalRevenue: 35000000,
+          cogs: {
+            chicken: 7800000,
+            feed: 62000000,
+            medicine: 3200000,
+            vaccine: 1200000,
+            total: 74200000,
+          },
+          operatingExpenses: {
+            salaries: 2100000,
+            rent: 0,
+            utilities: 1500000,
+            pol: 1000000,
+            mess: 400000,
+            repairMaintenance: 350000,
+            officeExpenses: 150000,
+            meetingRefreshment: 100000,
+            computerDevices: 10000,
+            professionalFee: 50000,
+            miscellaneous: 140000,
+            travellingLogistics: 0,
+            packingMaterial: 0,
+            total: 5800000,
+          },
+          totalExpenses: 80000000,
+          netIncome: -45000000,
+          period: 'Unit 1 - Flock Performance Statement',
+        },
+        managementReport: {
+          overview: {
+            totalRevenue: 35000000,
+            totalExpenses: 80000000,
+            netProfit: -45000000,
+            activeBirds: 25000,
+            cogs: 74200000,
+            costPerBird: 320.0,
+          },
+          production: {
+            totalEggs: 1641540,
+            brokenEggs: 5500,
+            avgEggWeight: 59.8,
+            eggWastageRate: '0.33%',
+            averageLayingRate: '142.50%',
+          },
+          healthMetrics: {
+            mortalityInRange: 0,
+            cullInRange: 0,
+            totalFeedConsumedBags: 4600,
+            totalWaterConsumption: 580000,
+            totalFeedPurchased: 4600,
+            feedConversionRate: 1.48,
+          },
+          additionalMetrics: {
+            flockCount: 1,
+            avgEggPriceInRange: 18.2,
+          },
+          inventoryAlerts: [],
+          flockDetails: [
+            { id: 8, name: 'Unit 1', flockName: 'Unit 1', breed: 'LSL', totalBirds: 25000, birds: 25000, ageWeeks: 38, status: 'Active' },
+          ],
+          salesBreakdown: [
+            { head: 'EGG', amount: 35000000 },
+          ],
+        },
+      },
+    });
+  }
+
+  if (flockId === 9) {
+    return res.json({
+      message: 'success',
+      data: {
+        financialReport: {
+          totalRevenue: 245000000,
+          cogs: {
+            chicken: 15000000,
+            feed: 160000000,
+            medicine: 5500000,
+            vaccine: 2500000,
+            total: 183000000,
+          },
+          operatingExpenses: {
+            salaries: 3500000,
+            rent: 7855701,
+            utilities: 4500000,
+            pol: 3200000,
+            packingMaterial: 2687810,
+            mess: 600000,
+            repairMaintenance: 600000,
+            officeExpenses: 500000,
+            meetingRefreshment: 400000,
+            computerDevices: 10000,
+            professionalFee: 50000,
+            miscellaneous: 400000,
+            travellingLogistics: 10000,
+            total: 27000000,
+          },
+          totalExpenses: 210000000,
+          netIncome: 35000000,
+          period: 'Unit 2 - Flock Performance Statement',
+        },
+        managementReport: {
+          overview: {
+            totalRevenue: 245000000,
+            totalExpenses: 210000000,
+            netProfit: 35000000,
+            activeBirds: 35000,
+            cogs: 183000000,
+            costPerBird: 278.5,
+          },
+          production: {
+            totalEggs: 13767720,
+            brokenEggs: 46000,
+            avgEggWeight: 60.1,
+            eggWastageRate: '0.33%',
+            averageLayingRate: '152.80%',
+          },
+          healthMetrics: {
+            mortalityInRange: 0,
+            cullInRange: 0,
+            totalFeedConsumedBags: 31500,
+            totalWaterConsumption: 4100000,
+            totalFeedPurchased: 31500,
+            feedConversionRate: 1.46,
+          },
+          additionalMetrics: {
+            flockCount: 1,
+            avgEggPriceInRange: 17.9,
+          },
+          inventoryAlerts: [],
+          flockDetails: [
+            { id: 9, name: 'Unit 2', flockName: 'Unit 2', breed: 'LSL', totalBirds: 35000, birds: 35000, ageWeeks: 32, status: 'Active' },
+          ],
+          salesBreakdown: [
+            { head: 'EGG', amount: 244500000 },
+            { head: 'Manure', amount: 500000 },
+          ],
+        },
+      },
+    });
+  }
+
+  if (flockId === 10) {
+    return res.json({
+      message: 'success',
+      data: {
+        financialReport: {
+          totalRevenue: 14905597,
+          cogs: {
+            chicken: 2491900,
+            feed: 44905100,
+            medicine: 1603308.6,
+            vaccine: 928493,
+            total: 49928801.6,
+          },
+          operatingExpenses: {
+            salaries: 1478367,
+            rent: 0,
+            utilities: 1230875,
+            pol: 1209163,
+            mess: 216040,
+            repairMaintenance: 154625,
+            officeExpenses: 78756,
+            meetingRefreshment: 76960,
+            computerDevices: 6050,
+            professionalFee: 50000,
+            miscellaneous: 120870,
+            travellingLogistics: 9780,
+            packingMaterial: 0,
+            total: 11250397,
+          },
+          totalExpenses: 61179198.6,
+          netIncome: -46273601.6,
+          period: 'Unit 3 - Flock Performance Statement',
+        },
+        managementReport: {
+          overview: {
+            totalRevenue: 14905597,
+            totalExpenses: 61179198.6,
+            netProfit: -46273601.6,
+            activeBirds: 25500,
+            cogs: 49928801.6,
+            costPerBird: 318.0,
+          },
+          production: {
+            totalEggs: 850080,
+            brokenEggs: 3400,
+            avgEggWeight: 59.9,
+            eggWastageRate: '0.40%',
+            averageLayingRate: '140.20%',
+          },
+          healthMetrics: {
+            mortalityInRange: 0,
+            cullInRange: 0,
+            totalFeedConsumedBags: 9495,
+            totalWaterConsumption: 740000,
+            totalFeedPurchased: 9495,
+            feedConversionRate: 1.50,
+          },
+          additionalMetrics: {
+            flockCount: 1,
+            avgEggPriceInRange: 17.5,
+          },
+          inventoryAlerts: [],
+          flockDetails: [
+            { id: 10, name: 'Unit 3', flockName: 'Unit 3', breed: 'LSL', totalBirds: 25500, birds: 25500, ageWeeks: 26, status: 'Active' },
+          ],
+          salesBreakdown: [
+            { head: 'EGG', amount: 14513022 },
+            { head: 'Manure', amount: 108000 },
+            { head: 'Feed_BAGS', amount: 264625 },
+            { head: 'OTHER', amount: 19950 },
+          ],
+        },
+      },
+    });
+  }
+
+  // All flocks combined
   res.json({
     message: 'success',
     data: {
@@ -608,7 +1369,7 @@ apiRouter.get('/reports/income-statement', (_req: Request, res: Response) => {
   });
 });
 
-// Safe Fallback for any other API sub-route to prevent any 404s
+// Safe Fallback for any other API sub-route
 apiRouter.use('*', (_req: Request, res: Response) => {
   res.json({
     message: 'success',
