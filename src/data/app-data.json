@@ -1,0 +1,2282 @@
+{
+  "flockItems": [
+    {
+      "id": 8,
+      "farmId": 9,
+      "flockName": "Unit 1",
+      "breed": "LSL",
+      "totalBirds": 25000,
+      "originalTotalBirds": 24786,
+      "cost": 8125000,
+      "isActive": true,
+      "ageWeeks": 38,
+      "ageInWeeks": 38,
+      "acquiredDate": "2026-02-25T00:00:00.000Z",
+      "exitDate": null,
+      "mortality": 0,
+      "notes": "Unit 1 LSL Commercial Layers",
+      "farm": {
+        "id": 9,
+        "name": "GreenOva",
+        "code": "GVF2025",
+        "location": "Multan, Punjab"
+      }
+    },
+    {
+      "id": 9,
+      "farmId": 9,
+      "flockName": "Unit 2",
+      "breed": "LSL",
+      "totalBirds": 35000,
+      "originalTotalBirds": 31739,
+      "cost": 8750000,
+      "isActive": true,
+      "ageWeeks": 32,
+      "ageInWeeks": 32,
+      "acquiredDate": "2025-01-01T00:00:00.000Z",
+      "exitDate": null,
+      "mortality": 0,
+      "notes": "Unit 2 Main Production",
+      "farm": {
+        "id": 9,
+        "name": "GreenOva",
+        "code": "GVF2025",
+        "location": "Multan, Punjab"
+      }
+    },
+    {
+      "id": 10,
+      "farmId": 9,
+      "flockName": "Unit 3",
+      "breed": "LSL",
+      "totalBirds": 25500,
+      "originalTotalBirds": 25189,
+      "cost": 7650000,
+      "isActive": true,
+      "ageWeeks": 26,
+      "ageInWeeks": 26,
+      "acquiredDate": "2025-06-01T00:00:00.000Z",
+      "exitDate": null,
+      "mortality": 0,
+      "notes": "Unit 3 Layer Batch",
+      "farm": {
+        "id": 9,
+        "name": "GreenOva",
+        "code": "GVF2025",
+        "location": "Multan, Punjab"
+      }
+    }
+  ],
+  "farmList": [
+    {
+      "id": 9,
+      "name": "GreenOva",
+      "code": "GVF2025",
+      "location": "Multan, Punjab",
+      "description": "Main Processing Facility",
+      "active": true,
+      "createdAt": "2026-05-08T17:37:25.635Z",
+      "updatedAt": "2026-05-08T17:37:25.635Z"
+    },
+    {
+      "id": 1,
+      "name": "A&A Proteins",
+      "code": "GVF-01",
+      "location": "Multan, Punjab",
+      "description": "Breeding Wing",
+      "active": false,
+      "createdAt": "2026-03-29T18:46:51.378Z",
+      "updatedAt": "2026-05-05T07:16:18.775Z"
+    }
+  ],
+  "rawExpenses": [
+    {
+      "id": 1216,
+      "expenseDate": "2026-10-15T09:58:30.207Z",
+      "challanNo": "1451",
+      "attachment": null,
+      "flockId": 8,
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      },
+      "expenseCost": 121000.4,
+      "head": "FEED",
+      "notes": "Feed purchase for layers",
+      "isUserAdded": true,
+      "createdAt": "2026-10-15T09:58:30.208Z",
+      "updatedAt": "2026-10-15T09:58:30.208Z"
+    },
+    {
+      "id": 1215,
+      "expenseDate": "2026-10-11T00:00:00.000Z",
+      "challanNo": "1443",
+      "attachment": null,
+      "flockId": 8,
+      "expenseCost": 4950,
+      "head": "POL",
+      "notes": "gas filling",
+      "createdAt": "2026-10-12T01:15:07.346Z",
+      "updatedAt": "2026-10-12T01:15:07.346Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 1214,
+      "expenseDate": "2026-10-11T00:00:00.000Z",
+      "challanNo": "1443",
+      "attachment": null,
+      "flockId": 9,
+      "expenseCost": 1000,
+      "head": "MEETING_REFRESHMENT",
+      "notes": "office refreshment ",
+      "createdAt": "2026-10-12T01:14:43.795Z",
+      "updatedAt": "2026-10-12T01:14:43.795Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 1213,
+      "expenseDate": "2026-10-11T00:00:00.000Z",
+      "challanNo": "1443",
+      "attachment": null,
+      "flockId": 10,
+      "expenseCost": 100,
+      "head": "MESS",
+      "notes": "ice ",
+      "createdAt": "2026-10-12T01:14:14.848Z",
+      "updatedAt": "2026-10-12T01:14:14.848Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 1212,
+      "expenseDate": "2026-10-10T00:00:00.000Z",
+      "challanNo": "1442",
+      "attachment": null,
+      "flockId": 8,
+      "expenseCost": 100,
+      "head": "TP",
+      "notes": "tube ",
+      "createdAt": "2026-10-12T01:13:24.383Z",
+      "updatedAt": "2026-10-12T01:13:24.383Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 1211,
+      "expenseDate": "2026-10-10T00:00:00.000Z",
+      "challanNo": "1442",
+      "attachment": null,
+      "flockId": 9,
+      "expenseCost": 130,
+      "head": "MESS",
+      "notes": "ice",
+      "createdAt": "2026-10-12T01:12:54.343Z",
+      "updatedAt": "2026-10-12T01:12:54.343Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 1210,
+      "expenseDate": "2026-10-10T00:00:00.000Z",
+      "challanNo": "1442",
+      "attachment": null,
+      "flockId": 10,
+      "expenseCost": 200,
+      "head": "POL",
+      "notes": "petrol",
+      "createdAt": "2026-10-12T01:12:31.366Z",
+      "updatedAt": "2026-10-12T01:12:31.366Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 1209,
+      "expenseDate": "2026-10-10T00:00:00.000Z",
+      "challanNo": "1441",
+      "attachment": null,
+      "flockId": 8,
+      "expenseCost": 24110,
+      "head": "POL",
+      "notes": "diesel 60L ",
+      "createdAt": "2026-10-12T01:11:57.073Z",
+      "updatedAt": "2026-10-12T01:11:57.073Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 1208,
+      "expenseDate": "2026-10-10T00:00:00.000Z",
+      "challanNo": "1440",
+      "attachment": null,
+      "flockId": 9,
+      "expenseCost": 554704,
+      "head": "FEED",
+      "notes": "100 bags 13c3 unit 2 D.O :3535",
+      "createdAt": "2026-10-12T01:10:27.308Z",
+      "updatedAt": "2026-10-12T01:10:27.308Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 1207,
+      "expenseDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "1439",
+      "attachment": null,
+      "flockId": 10,
+      "expenseCost": 3830,
+      "head": "MESS",
+      "notes": "meat + ice + roti lgwai ",
+      "createdAt": "2026-10-12T01:09:10.653Z",
+      "updatedAt": "2026-10-12T01:09:10.653Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 1206,
+      "expenseDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "1439",
+      "attachment": null,
+      "flockId": 8,
+      "expenseCost": 500,
+      "head": "POL",
+      "notes": "PETROL",
+      "createdAt": "2026-10-12T01:03:56.547Z",
+      "updatedAt": "2026-10-12T01:03:56.547Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 1205,
+      "expenseDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "1438",
+      "attachment": null,
+      "flockId": 9,
+      "expenseCost": 554704,
+      "head": "FEED",
+      "notes": "100 bags 13c3 unit 2 D.O.:3499",
+      "createdAt": "2026-10-12T01:03:04.941Z",
+      "updatedAt": "2026-10-12T01:03:04.941Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 1204,
+      "expenseDate": "2026-10-08T00:00:00.000Z",
+      "challanNo": "200",
+      "attachment": null,
+      "flockId": 10,
+      "expenseCost": 200,
+      "head": "REPAIR_MAINTENANCE",
+      "notes": "cart puncture ",
+      "createdAt": "2026-10-12T01:01:02.806Z",
+      "updatedAt": "2026-10-12T01:01:02.806Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 1203,
+      "expenseDate": "2026-10-08T00:00:00.000Z",
+      "challanNo": "1437",
+      "attachment": null,
+      "flockId": 8,
+      "expenseCost": 100,
+      "head": "OFFICE_EXPENSES",
+      "notes": "office lehsan and ginger",
+      "createdAt": "2026-10-12T01:00:29.728Z",
+      "updatedAt": "2026-10-12T01:00:29.728Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 1202,
+      "expenseDate": "2026-10-08T00:00:00.000Z",
+      "challanNo": "1437",
+      "attachment": null,
+      "flockId": 9,
+      "expenseCost": 400,
+      "head": "POL",
+      "notes": "petrol",
+      "createdAt": "2026-10-12T00:59:53.679Z",
+      "updatedAt": "2026-10-12T00:59:53.679Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 1201,
+      "expenseDate": "2026-10-08T00:00:00.000Z",
+      "challanNo": "1437",
+      "attachment": null,
+      "flockId": 10,
+      "expenseCost": 130,
+      "head": "MESS",
+      "notes": "ice",
+      "createdAt": "2026-10-12T00:59:24.931Z",
+      "updatedAt": "2026-10-12T00:59:24.931Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 1198,
+      "expenseDate": "2026-10-07T00:00:00.000Z",
+      "challanNo": "1436",
+      "attachment": null,
+      "flockId": 8,
+      "expenseCost": 2000,
+      "head": "OFFICE_EXPENSES",
+      "notes": "hasnain package mobile ",
+      "createdAt": "2026-10-08T02:09:38.214Z",
+      "updatedAt": "2026-10-08T02:09:38.214Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 1197,
+      "expenseDate": "2026-10-07T00:00:00.000Z",
+      "challanNo": "1436",
+      "attachment": null,
+      "flockId": 9,
+      "expenseCost": 4930,
+      "head": "MESS",
+      "notes": "ice + slipper 8",
+      "createdAt": "2026-10-08T02:08:58.620Z",
+      "updatedAt": "2026-10-08T02:08:58.620Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 1196,
+      "expenseDate": "2026-10-07T00:00:00.000Z",
+      "challanNo": "1436",
+      "attachment": null,
+      "flockId": 10,
+      "expenseCost": 400,
+      "head": "POL",
+      "notes": "petrol",
+      "createdAt": "2026-10-08T02:08:18.678Z",
+      "updatedAt": "2026-10-08T02:08:18.678Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 1195,
+      "expenseDate": "2026-10-07T00:00:00.000Z",
+      "challanNo": "1435",
+      "attachment": null,
+      "flockId": 8,
+      "expenseCost": 24210,
+      "head": "POL",
+      "notes": "diesel 60l ",
+      "createdAt": "2026-10-08T02:07:49.085Z",
+      "updatedAt": "2026-10-08T02:07:49.085Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 1194,
+      "expenseDate": "2026-10-06T00:00:00.000Z",
+      "challanNo": "1434",
+      "attachment": null,
+      "flockId": 9,
+      "expenseCost": 64000,
+      "head": "PACKING_MATERIAL",
+      "notes": "cardboard 22 number 80 bundle",
+      "createdAt": "2026-10-08T02:07:01.505Z",
+      "updatedAt": "2026-10-08T02:07:01.505Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    }
+  ],
+  "rawStocks": [
+    {
+      "id": 146,
+      "date": "2026-10-10T00:00:00.000Z",
+      "challanNo": "1440",
+      "Type": "13",
+      "flockId": 9,
+      "head": "FEED",
+      "quantity": 100,
+      "notes": "100 bags 13c3 unit 2 D.O :3535",
+      "attachment": null,
+      "amountPaid": 554704,
+      "paymentType": "CASH",
+      "expenseId": 1208,
+      "createdAt": "2026-10-12T01:10:27.311Z",
+      "updatedAt": "2026-10-12T01:10:27.311Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 145,
+      "date": "2026-10-09T00:00:00.000Z",
+      "challanNo": "1438",
+      "Type": "13",
+      "flockId": 9,
+      "head": "FEED",
+      "quantity": 100,
+      "notes": "100 bags 13c3 unit 2 D.O.:3499",
+      "attachment": null,
+      "amountPaid": 554704,
+      "paymentType": "CASH",
+      "expenseId": 1205,
+      "createdAt": "2026-10-12T01:03:04.943Z",
+      "updatedAt": "2026-10-12T01:03:04.943Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 144,
+      "date": "2026-10-06T00:00:00.000Z",
+      "challanNo": "1432",
+      "Type": "13",
+      "flockId": 9,
+      "head": "FEED",
+      "quantity": 200,
+      "notes": "200 bags 13c3 unit 2 D.O :3362",
+      "attachment": null,
+      "amountPaid": 1109408,
+      "paymentType": "CASH",
+      "expenseId": 1188,
+      "createdAt": "2026-10-08T02:00:59.096Z",
+      "updatedAt": "2026-10-08T02:00:59.096Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 140,
+      "date": "2026-10-04T00:00:00.000Z",
+      "challanNo": "192",
+      "Type": "13",
+      "flockId": 8,
+      "head": "FEED",
+      "quantity": 100,
+      "notes": "100 bags 13c1 unit 1 D.O NO:3341",
+      "attachment": null,
+      "amountPaid": 566970,
+      "paymentType": "CASH",
+      "expenseId": 1157,
+      "createdAt": "2026-10-05T01:56:05.021Z",
+      "updatedAt": "2026-10-05T01:56:05.021Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 143,
+      "date": "2026-10-03T00:00:00.000Z",
+      "challanNo": "1428",
+      "Type": "13",
+      "flockId": 9,
+      "head": "FEED",
+      "quantity": 100,
+      "notes": "100 bags 13c3 unit 2 D.O :3341",
+      "attachment": null,
+      "amountPaid": 554704,
+      "paymentType": "CASH",
+      "expenseId": 1180,
+      "createdAt": "2026-10-08T01:50:15.109Z",
+      "updatedAt": "2026-10-08T01:50:15.109Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 142,
+      "date": "2026-10-02T00:00:00.000Z",
+      "challanNo": "1426",
+      "Type": "13",
+      "flockId": 9,
+      "head": "FEED",
+      "quantity": 20,
+      "notes": "20 bags 13c3 unit 2 D.O:2 ",
+      "attachment": null,
+      "amountPaid": 110941,
+      "paymentType": "CASH",
+      "expenseId": 1175,
+      "createdAt": "2026-10-08T01:45:15.938Z",
+      "updatedAt": "2026-10-08T01:45:15.938Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 141,
+      "date": "2026-10-02T00:00:00.000Z",
+      "challanNo": "1425",
+      "Type": "13",
+      "flockId": 9,
+      "head": "FEED",
+      "quantity": 200,
+      "notes": "200 bags 13c3 unit 2 D.O NO:3268",
+      "attachment": null,
+      "amountPaid": 1109408,
+      "paymentType": "CASH",
+      "expenseId": 1174,
+      "createdAt": "2026-10-08T01:43:43.073Z",
+      "updatedAt": "2026-10-08T01:43:43.073Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 139,
+      "date": "2026-10-01T00:00:00.000Z",
+      "challanNo": "270",
+      "Type": "13",
+      "flockId": 10,
+      "head": "FEED",
+      "quantity": 300,
+      "notes": "300 bags MF-13C unit 3 D.o;5412",
+      "attachment": null,
+      "amountPaid": 1677705,
+      "paymentType": "CASH",
+      "expenseId": 1154,
+      "createdAt": "2026-10-04T05:48:33.695Z",
+      "updatedAt": "2026-10-04T05:48:33.695Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 137,
+      "date": "2026-09-30T00:00:00.000Z",
+      "challanNo": "188",
+      "Type": "13",
+      "flockId": 8,
+      "head": "FEED",
+      "quantity": 200,
+      "notes": "200 bags 13c1 unit 1 D.O NO:3216",
+      "attachment": null,
+      "amountPaid": 1133940,
+      "paymentType": "CASH",
+      "expenseId": 1128,
+      "createdAt": "2026-10-01T01:23:08.866Z",
+      "updatedAt": "2026-10-01T01:23:08.866Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 138,
+      "date": "2026-09-27T00:00:00.000Z",
+      "challanNo": "1415",
+      "Type": "13",
+      "flockId": 9,
+      "head": "FEED",
+      "quantity": 200,
+      "notes": "200 bags 13c3 unit 2 D.O NO:3173",
+      "attachment": null,
+      "amountPaid": 1109408,
+      "paymentType": "CASH",
+      "expenseId": 1131,
+      "createdAt": "2026-10-01T01:29:42.509Z",
+      "updatedAt": "2026-10-01T01:29:42.509Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 136,
+      "date": "2026-09-26T00:00:00.000Z",
+      "challanNo": "184",
+      "Type": "13",
+      "flockId": 8,
+      "head": "FEED",
+      "quantity": 200,
+      "notes": "200 bags 13c1 unit 1 D.O NO:3142",
+      "attachment": null,
+      "amountPaid": 1133940,
+      "paymentType": "CASH",
+      "expenseId": 1124,
+      "createdAt": "2026-10-01T01:15:15.881Z",
+      "updatedAt": "2026-10-01T01:15:15.881Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 134,
+      "date": "2026-09-25T00:00:00.000Z",
+      "challanNo": "264",
+      "Type": "13",
+      "flockId": 10,
+      "head": "FEED",
+      "quantity": 300,
+      "notes": "300 bags MF-13C unit 3 D.O no: 5071",
+      "attachment": null,
+      "amountPaid": 1677705,
+      "paymentType": "CASH",
+      "expenseId": 1110,
+      "createdAt": "2026-09-27T04:41:26.756Z",
+      "updatedAt": "2026-09-27T04:41:26.756Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 135,
+      "date": "2026-09-24T00:00:00.000Z",
+      "challanNo": "1409",
+      "Type": "13",
+      "flockId": 9,
+      "head": "FEED",
+      "quantity": 200,
+      "notes": "200 bags 13c3 unit 2 DO NO:3085",
+      "attachment": null,
+      "amountPaid": 1109408,
+      "paymentType": "CASH",
+      "expenseId": 1113,
+      "createdAt": "2026-09-27T04:48:16.330Z",
+      "updatedAt": "2026-09-27T04:48:16.330Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 132,
+      "date": "2026-09-22T00:00:00.000Z",
+      "challanNo": "183",
+      "Type": "13",
+      "flockId": 8,
+      "head": "FEED",
+      "quantity": 150,
+      "notes": "150 bags 13c1 unit 1 D.o no: 3015",
+      "attachment": null,
+      "amountPaid": 850455,
+      "paymentType": "CASH",
+      "expenseId": 1107,
+      "createdAt": "2026-09-24T01:27:02.167Z",
+      "updatedAt": "2026-09-24T01:27:02.167Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 130,
+      "date": "2026-09-21T00:00:00.000Z",
+      "challanNo": "1406",
+      "Type": "13",
+      "flockId": 9,
+      "head": "FEED",
+      "quantity": 150,
+      "notes": "150 bags 13c3 unit 2 D.O NO:2962",
+      "attachment": null,
+      "amountPaid": 832056,
+      "paymentType": "CASH",
+      "expenseId": 1099,
+      "createdAt": "2026-09-24T01:12:40.539Z",
+      "updatedAt": "2026-09-24T01:12:40.539Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 131,
+      "date": "2026-09-19T00:00:00.000Z",
+      "challanNo": "180",
+      "Type": "13",
+      "flockId": 8,
+      "head": "FEED",
+      "quantity": 150,
+      "notes": "120 bags 13c1 unit 1 D.o no:2884",
+      "attachment": null,
+      "amountPaid": 850455,
+      "paymentType": "CASH",
+      "expenseId": 1104,
+      "createdAt": "2026-09-24T01:22:18.995Z",
+      "updatedAt": "2026-09-24T01:22:18.995Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 133,
+      "date": "2026-09-18T00:00:00.000Z",
+      "challanNo": "260",
+      "Type": "13",
+      "flockId": 10,
+      "head": "FEED",
+      "quantity": 300,
+      "notes": "300 bags MF-13C unit 3 D.O NO:4716",
+      "attachment": null,
+      "amountPaid": 1677705,
+      "paymentType": "CASH",
+      "expenseId": 1109,
+      "createdAt": "2026-09-27T04:34:37.875Z",
+      "updatedAt": "2026-09-27T04:34:37.875Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 127,
+      "date": "2026-09-18T00:00:00.000Z",
+      "challanNo": "1399",
+      "Type": "13",
+      "flockId": 9,
+      "head": "FEED",
+      "quantity": 200,
+      "notes": "200 bags 13c3 unit 2 D.O NO:2851",
+      "attachment": null,
+      "amountPaid": 1109408,
+      "paymentType": "CASH",
+      "expenseId": 1060,
+      "createdAt": "2026-09-20T04:26:46.732Z",
+      "updatedAt": "2026-09-20T04:26:46.732Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 125,
+      "date": "2026-09-16T00:00:00.000Z",
+      "challanNo": "178",
+      "Type": "13",
+      "flockId": 8,
+      "head": "FEED",
+      "quantity": 150,
+      "notes": "150 bags 13c1 unit 1 D.O NO:2766",
+      "attachment": null,
+      "amountPaid": 850455,
+      "paymentType": "CASH",
+      "expenseId": 1041,
+      "createdAt": "2026-09-17T01:18:37.483Z",
+      "updatedAt": "2026-10-04T16:27:42.476Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 126,
+      "date": "2026-09-13T00:00:00.000Z",
+      "challanNo": "257",
+      "Type": "13",
+      "flockId": 10,
+      "head": "FEED",
+      "quantity": 200,
+      "notes": "200 bags MF-13C unit 3 D.O NO:4427",
+      "attachment": null,
+      "amountPaid": 1118470,
+      "paymentType": "CASH",
+      "expenseId": 1050,
+      "createdAt": "2026-09-17T02:02:28.709Z",
+      "updatedAt": "2026-09-17T02:02:28.709Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    }
+  ],
+  "rawSales": [
+    {
+      "id": 677,
+      "saleDate": "2026-10-10T00:00:00.000Z",
+      "challanNo": "2061",
+      "flockId": 9,
+      "itemsSold": 14400,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 260000,
+      "notes": "40p @6500",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 0,
+      "onlinePayment": 260000,
+      "vehicleNumber": "ABC",
+      "partyName": "m shah",
+      "createdAt": "2026-10-11T03:24:34.655Z",
+      "updatedAt": "2026-10-11T03:24:34.655Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 676,
+      "saleDate": "2026-10-10T00:00:00.000Z",
+      "challanNo": "2060",
+      "flockId": 9,
+      "itemsSold": 360,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 6700,
+      "notes": "1p @6700",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 6700,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "Imran shop ",
+      "createdAt": "2026-10-11T03:22:16.821Z",
+      "updatedAt": "2026-10-11T03:22:16.821Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 675,
+      "saleDate": "2026-10-10T00:00:00.000Z",
+      "challanNo": "2059",
+      "flockId": 9,
+      "itemsSold": 180,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 3240,
+      "notes": "6c @3600 broken + 12kg @120 liquid ",
+      "grade": "started",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 3240,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "Saleem Broken",
+      "createdAt": "2026-10-11T03:20:13.387Z",
+      "updatedAt": "2026-10-11T03:20:13.387Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 663,
+      "saleDate": "2026-10-10T00:00:00.000Z",
+      "challanNo": "51",
+      "flockId": 10,
+      "itemsSold": 1860,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 31700,
+      "notes": "2c @7200 + 5p @6100",
+      "grade": "started",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 25000,
+      "onlinePayment": 6700,
+      "vehicleNumber": "ABC",
+      "partyName": "gulfan ali ",
+      "createdAt": "2026-10-11T02:52:09.456Z",
+      "updatedAt": "2026-10-11T02:52:09.456Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 680,
+      "saleDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "20",
+      "flockId": 8,
+      "itemsSold": 14400,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 244000,
+      "notes": "40p @6100",
+      "grade": "started",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 144000,
+      "onlinePayment": 100000,
+      "vehicleNumber": "ABC",
+      "partyName": "rana Tasleem",
+      "createdAt": "2026-10-11T03:31:30.526Z",
+      "updatedAt": "2026-10-11T03:31:30.526Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 674,
+      "saleDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "2058",
+      "flockId": 9,
+      "itemsSold": 3600,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 61000,
+      "notes": "10p @6100",
+      "grade": "started",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 61000,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "rana Tasleem",
+      "createdAt": "2026-10-11T03:17:08.268Z",
+      "updatedAt": "2026-10-11T03:17:08.268Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 673,
+      "saleDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "2057",
+      "flockId": 9,
+      "itemsSold": 2160,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 39000,
+      "notes": "6p @6500",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 39000,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "shahbaz",
+      "createdAt": "2026-10-11T03:15:34.841Z",
+      "updatedAt": "2026-10-11T03:15:34.841Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 672,
+      "saleDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "2056",
+      "flockId": 9,
+      "itemsSold": 360,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 6700,
+      "notes": "1p @6700",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 6700,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "Imran shop ",
+      "createdAt": "2026-10-11T03:12:56.211Z",
+      "updatedAt": "2026-10-11T03:12:56.211Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 671,
+      "saleDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "2055",
+      "flockId": 9,
+      "itemsSold": 1800,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 32750,
+      "notes": "5p @6550",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 32750,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "nadeem",
+      "createdAt": "2026-10-11T03:11:48.612Z",
+      "updatedAt": "2026-10-11T03:11:48.612Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 662,
+      "saleDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "50",
+      "flockId": 10,
+      "itemsSold": 1440,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 24400,
+      "notes": "4p @6100",
+      "grade": "started",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 24400,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "nadeem bhai",
+      "createdAt": "2026-10-11T02:49:06.059Z",
+      "updatedAt": "2026-10-11T02:49:06.059Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 661,
+      "saleDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "49",
+      "flockId": 10,
+      "itemsSold": 0,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 361200,
+      "notes": "2c @7200+ 60p @6000",
+      "grade": "started",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 264000,
+      "onlinePayment": 97200,
+      "vehicleNumber": "ABC",
+      "partyName": "latif",
+      "createdAt": "2026-10-11T02:47:36.848Z",
+      "updatedAt": "2026-10-11T02:47:36.848Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 660,
+      "saleDate": "2026-10-09T00:00:00.000Z",
+      "challanNo": "48",
+      "flockId": 10,
+      "itemsSold": 10800,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 183000,
+      "notes": "30p @6100",
+      "grade": "started",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 0,
+      "onlinePayment": 183000,
+      "vehicleNumber": "ABC",
+      "partyName": "azeem ahmad",
+      "createdAt": "2026-10-11T02:45:52.627Z",
+      "updatedAt": "2026-10-11T02:45:52.627Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 679,
+      "saleDate": "2026-10-08T00:00:00.000Z",
+      "challanNo": "19",
+      "flockId": 8,
+      "itemsSold": 43200,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 768000,
+      "notes": "120p @6400",
+      "grade": "started",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 0,
+      "onlinePayment": 768000,
+      "vehicleNumber": "ABC",
+      "partyName": "Tariq",
+      "createdAt": "2026-10-11T03:29:13.177Z",
+      "updatedAt": "2026-10-11T03:29:13.177Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 670,
+      "saleDate": "2026-10-08T00:00:00.000Z",
+      "challanNo": "2054",
+      "flockId": 9,
+      "itemsSold": 90,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 0,
+      "notes": "3c @Amjad nawaz F.O.C ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 0,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "Amjad Nawaz",
+      "createdAt": "2026-10-11T03:06:10.031Z",
+      "updatedAt": "2026-10-11T03:06:10.031Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 669,
+      "saleDate": "2026-10-08T00:00:00.000Z",
+      "challanNo": "2053",
+      "flockId": 9,
+      "itemsSold": 36000,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 630000,
+      "notes": "100p @6300",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 0,
+      "onlinePayment": 630000,
+      "vehicleNumber": "ABC",
+      "partyName": "Masood",
+      "createdAt": "2026-10-11T03:04:39.793Z",
+      "updatedAt": "2026-10-11T03:04:39.793Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 668,
+      "saleDate": "2026-10-08T00:00:00.000Z",
+      "challanNo": "2052",
+      "flockId": 9,
+      "itemsSold": 720,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 13300,
+      "notes": "1p @6700 + 1p @6600",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 13300,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "sajjad ",
+      "createdAt": "2026-10-11T03:02:59.416Z",
+      "updatedAt": "2026-10-11T03:02:59.416Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 659,
+      "saleDate": "2026-10-08T00:00:00.000Z",
+      "challanNo": "47",
+      "flockId": 10,
+      "itemsSold": 1950,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 28450,
+      "notes": "3p @5000 + 5c @3000+ 2p @6100",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 28450,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "Saleem Broken",
+      "createdAt": "2026-10-11T02:44:01.381Z",
+      "updatedAt": "2026-10-11T02:44:01.381Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 658,
+      "saleDate": "2026-10-08T00:00:00.000Z",
+      "challanNo": "46",
+      "flockId": 10,
+      "itemsSold": 54030,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 870600,
+      "notes": "150p @5800+ 1c @7200 double ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 600,
+      "onlinePayment": 870000,
+      "vehicleNumber": "ABC",
+      "partyName": "Abdul jabar ",
+      "createdAt": "2026-10-11T02:41:47.082Z",
+      "updatedAt": "2026-10-11T02:41:47.082Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 678,
+      "saleDate": "2026-10-07T00:00:00.000Z",
+      "challanNo": "18",
+      "flockId": 8,
+      "itemsSold": 420,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 7800,
+      "notes": "2c @7200 + 1p @6600",
+      "grade": "started",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 1200,
+      "onlinePayment": 6600,
+      "vehicleNumber": "ABC",
+      "partyName": "gulfam ali ",
+      "createdAt": "2026-10-11T03:27:51.533Z",
+      "updatedAt": "2026-10-11T03:27:51.533Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 667,
+      "saleDate": "2026-10-07T00:00:00.000Z",
+      "challanNo": "2051",
+      "flockId": 9,
+      "itemsSold": 360,
+      "attachment": null,
+      "head": "EGG",
+      "totalAmount": 6800,
+      "notes": "1p @6800",
+      "grade": "standard",
+      "averageWeight": 60,
+      "weight": null,
+      "cashPayment": 6800,
+      "onlinePayment": 0,
+      "vehicleNumber": "ABC",
+      "partyName": "Imran shop ",
+      "createdAt": "2026-10-11T03:00:49.537Z",
+      "updatedAt": "2026-10-11T03:00:49.537Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    }
+  ],
+  "rawEggProductions": [
+    {
+      "id": 336,
+      "date": "2026-10-11T00:00:00.000Z",
+      "flockId": 9,
+      "totalEggs": 26550,
+      "brokenEggs": 90,
+      "birds": 35000,
+      "notes": "81.49% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-12T01:17:08.059Z",
+      "updatedAt": "2026-10-12T01:17:08.059Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 335,
+      "date": "2026-10-11T00:00:00.000Z",
+      "flockId": 8,
+      "totalEggs": 22470,
+      "brokenEggs": 0,
+      "birds": 25000,
+      "notes": "92.65% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-12T01:16:25.108Z",
+      "updatedAt": "2026-10-12T01:16:25.108Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 334,
+      "date": "2026-10-10T00:00:00.000Z",
+      "flockId": 10,
+      "totalEggs": 20220,
+      "brokenEggs": 0,
+      "birds": 25500,
+      "notes": "87.57% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:37:39.240Z",
+      "updatedAt": "2026-10-11T02:37:39.240Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 330,
+      "date": "2026-10-10T00:00:00.000Z",
+      "flockId": 9,
+      "totalEggs": 26760,
+      "brokenEggs": 60,
+      "birds": 35000,
+      "notes": "82.04% production",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:30:54.987Z",
+      "updatedAt": "2026-10-11T02:30:54.987Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 329,
+      "date": "2026-10-10T00:00:00.000Z",
+      "flockId": 8,
+      "totalEggs": 22290,
+      "brokenEggs": 0,
+      "birds": 25000,
+      "notes": "91.89% production",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:28:43.152Z",
+      "updatedAt": "2026-10-11T02:28:43.152Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 333,
+      "date": "2026-10-09T00:00:00.000Z",
+      "flockId": 10,
+      "totalEggs": 20250,
+      "brokenEggs": 0,
+      "birds": 25500,
+      "notes": "87.44% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:36:37.527Z",
+      "updatedAt": "2026-10-11T02:36:37.527Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 328,
+      "date": "2026-10-09T00:00:00.000Z",
+      "flockId": 9,
+      "totalEggs": 26790,
+      "brokenEggs": 30,
+      "birds": 35000,
+      "notes": "81.94% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:26:23.888Z",
+      "updatedAt": "2026-10-11T02:26:23.888Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 327,
+      "date": "2026-10-09T00:00:00.000Z",
+      "flockId": 8,
+      "totalEggs": 22140,
+      "brokenEggs": 0,
+      "birds": 25000,
+      "notes": "91.25% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:24:04.639Z",
+      "updatedAt": "2026-10-11T02:24:04.639Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 332,
+      "date": "2026-10-08T00:00:00.000Z",
+      "flockId": 10,
+      "totalEggs": 20370,
+      "brokenEggs": 0,
+      "birds": 25500,
+      "notes": "87.95% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:34:36.568Z",
+      "updatedAt": "2026-10-11T02:34:36.568Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 326,
+      "date": "2026-10-08T00:00:00.000Z",
+      "flockId": 9,
+      "totalEggs": 26760,
+      "brokenEggs": 60,
+      "birds": 35000,
+      "notes": "81.35% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:21:29.872Z",
+      "updatedAt": "2026-10-11T02:21:29.872Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 325,
+      "date": "2026-10-08T00:00:00.000Z",
+      "flockId": 8,
+      "totalEggs": 22350,
+      "brokenEggs": 0,
+      "birds": 25000,
+      "notes": "92.11% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:19:48.631Z",
+      "updatedAt": "2026-10-11T02:19:48.631Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 331,
+      "date": "2026-10-07T00:00:00.000Z",
+      "flockId": 10,
+      "totalEggs": 20220,
+      "brokenEggs": 0,
+      "birds": 25500,
+      "notes": "87.16% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:33:09.227Z",
+      "updatedAt": "2026-10-11T02:33:09.227Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 324,
+      "date": "2026-10-07T00:00:00.000Z",
+      "flockId": 9,
+      "totalEggs": 25980,
+      "brokenEggs": 90,
+      "birds": 35000,
+      "notes": "81.74% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:18:03.834Z",
+      "updatedAt": "2026-10-11T02:18:03.834Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 323,
+      "date": "2026-10-07T00:00:00.000Z",
+      "flockId": 8,
+      "totalEggs": 22410,
+      "brokenEggs": 0,
+      "birds": 25000,
+      "notes": "92.34% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-11T02:16:31.840Z",
+      "updatedAt": "2026-10-11T02:16:31.840Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 322,
+      "date": "2026-10-06T00:00:00.000Z",
+      "flockId": 10,
+      "totalEggs": 20310,
+      "brokenEggs": 0,
+      "birds": 25500,
+      "notes": "87.67% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-07T00:56:12.045Z",
+      "updatedAt": "2026-10-07T00:56:12.045Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 318,
+      "date": "2026-10-06T00:00:00.000Z",
+      "flockId": 9,
+      "totalEggs": 26220,
+      "brokenEggs": 60,
+      "birds": 35000,
+      "notes": "81.45% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-07T00:50:12.168Z",
+      "updatedAt": "2026-10-07T00:50:12.168Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 317,
+      "date": "2026-10-06T00:00:00.000Z",
+      "flockId": 8,
+      "totalEggs": 22410,
+      "brokenEggs": 0,
+      "birds": 25000,
+      "notes": "92.33% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-07T00:49:01.837Z",
+      "updatedAt": "2026-10-07T00:49:01.837Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    },
+    {
+      "id": 321,
+      "date": "2026-10-05T00:00:00.000Z",
+      "flockId": 10,
+      "totalEggs": 20160,
+      "brokenEggs": 0,
+      "birds": 25500,
+      "notes": "87.02% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-07T00:55:03.826Z",
+      "updatedAt": "2026-10-07T00:55:03.826Z",
+      "flock": {
+        "flockName": "Unit 3",
+        "id": 10
+      }
+    },
+    {
+      "id": 316,
+      "date": "2026-10-05T00:00:00.000Z",
+      "flockId": 9,
+      "totalEggs": 26340,
+      "brokenEggs": 150,
+      "birds": 35000,
+      "notes": "80.98% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-07T00:47:25.414Z",
+      "updatedAt": "2026-10-07T00:47:25.414Z",
+      "flock": {
+        "flockName": "Unit 2",
+        "id": 9
+      }
+    },
+    {
+      "id": 315,
+      "date": "2026-10-05T00:00:00.000Z",
+      "flockId": 8,
+      "totalEggs": 22470,
+      "brokenEggs": 0,
+      "birds": 25000,
+      "notes": "92.57% production ",
+      "grade": "standard",
+      "averageWeight": 60,
+      "createdAt": "2026-10-07T00:45:58.944Z",
+      "updatedAt": "2026-10-07T00:45:58.944Z",
+      "flock": {
+        "flockName": "Unit 1",
+        "id": 8
+      }
+    }
+  ],
+  "rawSalaries": [
+    {
+      "id": 40,
+      "employeeName": "ziyaad ",
+      "designation": "security guard",
+      "flockId": 8,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 3000,
+      "penaltyReward": null,
+      "total": 40000,
+      "remarks": "ziyaad security guard advance unit 2 challan 1308",
+      "createdAt": "2026-08-12T06:38:34.713Z",
+      "updatedAt": "2026-08-12T06:38:34.713Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 39,
+      "employeeName": "ziyaad ",
+      "designation": "security guard",
+      "flockId": 9,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 33000,
+      "penaltyReward": null,
+      "total": 40000,
+      "remarks": "ziyaad security guard advance unit 3 challan 209",
+      "createdAt": "2026-08-01T04:25:34.865Z",
+      "updatedAt": "2026-08-01T04:25:34.865Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 38,
+      "employeeName": "aqeeq",
+      "designation": "worker",
+      "flockId": 10,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 10000,
+      "penaltyReward": null,
+      "total": 30000,
+      "remarks": "aqeeq advance 10000 unit 2 challan 1282",
+      "createdAt": "2026-08-01T03:36:50.752Z",
+      "updatedAt": "2026-08-01T03:36:50.752Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 37,
+      "employeeName": "Mustafa",
+      "designation": "worker ",
+      "flockId": 8,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 50000,
+      "penaltyReward": null,
+      "total": 60000,
+      "remarks": "mustafa advacnce 50000 unit 2 challan 1281",
+      "createdAt": "2026-07-30T05:22:25.861Z",
+      "updatedAt": "2026-07-30T05:22:25.861Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 36,
+      "employeeName": "yahya",
+      "designation": "worker",
+      "flockId": 9,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 10000,
+      "penaltyReward": null,
+      "total": 30000,
+      "remarks": "yahya worker advance unit 2 challan 1279",
+      "createdAt": "2026-07-28T04:55:55.795Z",
+      "updatedAt": "2026-07-28T04:55:55.795Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 35,
+      "employeeName": "aqeeq",
+      "designation": "sweeper ",
+      "flockId": 10,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 1000,
+      "penaltyReward": null,
+      "total": 20000,
+      "remarks": "aqeeq advance 1000 unit 2 challan 1275",
+      "createdAt": "2026-07-27T15:06:46.876Z",
+      "updatedAt": "2026-07-27T15:06:46.876Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 34,
+      "employeeName": "aqeeq",
+      "designation": "worker ",
+      "flockId": 8,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 5000,
+      "penaltyReward": null,
+      "total": 30000,
+      "remarks": "aqeeq advance 5000 unit 2 challan 1267",
+      "createdAt": "2026-07-23T05:14:45.087Z",
+      "updatedAt": "2026-07-23T05:14:45.087Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 33,
+      "employeeName": "waqas",
+      "designation": "worker",
+      "flockId": 9,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 3000,
+      "penaltyReward": null,
+      "total": 30000,
+      "remarks": "waqas worker advance 3000 unit 2 challan 1253",
+      "createdAt": "2026-07-13T17:33:32.610Z",
+      "updatedAt": "2026-07-13T17:33:32.610Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 32,
+      "employeeName": "asif ",
+      "designation": "worker ",
+      "flockId": 10,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 5000,
+      "penaltyReward": null,
+      "total": 30000,
+      "remarks": "asif worker advance 5000 challan 1253 unit 2",
+      "createdAt": "2026-07-13T17:32:37.777Z",
+      "updatedAt": "2026-07-13T17:32:37.777Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 31,
+      "employeeName": "Aqiq ",
+      "designation": "sweeper ",
+      "flockId": 8,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 1000,
+      "penaltyReward": null,
+      "total": 20000,
+      "remarks": "Aqiq sweeper advance 1000 challan 1246 unit 2",
+      "createdAt": "2026-07-13T17:00:26.426Z",
+      "updatedAt": "2026-07-13T17:00:26.426Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 30,
+      "employeeName": "rafiq ",
+      "designation": "worker",
+      "flockId": 9,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 2000,
+      "penaltyReward": null,
+      "total": 30000,
+      "remarks": "rafiq worker advance unit 3 challan 193",
+      "createdAt": "2026-07-10T18:26:44.462Z",
+      "updatedAt": "2026-07-10T18:26:44.462Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 29,
+      "employeeName": "sadam",
+      "designation": "Supervisor",
+      "flockId": 10,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 10000,
+      "penaltyReward": null,
+      "total": 40000,
+      "remarks": "saddam supervisor advance paid 10000 unit 3 challan 188",
+      "createdAt": "2026-07-05T18:31:12.861Z",
+      "updatedAt": "2026-07-05T18:31:12.861Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 28,
+      "employeeName": "Mustafa",
+      "designation": "worker",
+      "flockId": 8,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 1000,
+      "penaltyReward": null,
+      "total": 40000,
+      "remarks": "mustafa advance 1000 unit 2 challan 1234",
+      "createdAt": "2026-07-05T18:26:35.567Z",
+      "updatedAt": "2026-07-05T18:26:35.567Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 27,
+      "employeeName": "yahya",
+      "designation": "worker",
+      "flockId": 9,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 500,
+      "penaltyReward": null,
+      "total": 30000,
+      "remarks": "yahya worker advance",
+      "createdAt": "2026-07-05T18:20:02.789Z",
+      "updatedAt": "2026-07-05T18:20:02.789Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 26,
+      "employeeName": "sikander",
+      "designation": "worker",
+      "flockId": 10,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 10000,
+      "penaltyReward": null,
+      "total": 21000,
+      "remarks": "sikandar worker advance 10000",
+      "createdAt": "2026-07-01T08:47:31.535Z",
+      "updatedAt": "2026-07-01T08:47:31.535Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 25,
+      "employeeName": "ziyaad ",
+      "designation": "security guard",
+      "flockId": 8,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 1000,
+      "penaltyReward": null,
+      "total": 30000,
+      "remarks": "ziyaad security guard advance 1000 unit 3 challan 180",
+      "createdAt": "2026-07-01T08:36:01.377Z",
+      "updatedAt": "2026-07-01T08:36:01.377Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 24,
+      "employeeName": "akram",
+      "designation": "labour",
+      "flockId": 9,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 30000,
+      "advance": null,
+      "penaltyReward": null,
+      "total": 30000,
+      "remarks": "30 days wage akram laborer for cage fitting",
+      "createdAt": "2026-07-01T08:29:28.447Z",
+      "updatedAt": "2026-07-01T08:29:28.447Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    },
+    {
+      "id": 23,
+      "employeeName": "sikander",
+      "designation": "worker",
+      "flockId": 10,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 3000,
+      "penaltyReward": null,
+      "total": 21000,
+      "remarks": "sikander worker advance 3000 25 june challan 1218",
+      "createdAt": "2026-06-27T18:10:41.755Z",
+      "updatedAt": "2026-06-27T18:10:41.755Z",
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      }
+    },
+    {
+      "id": 22,
+      "employeeName": "qadeer ",
+      "designation": "security guard",
+      "flockId": 8,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 2930,
+      "penaltyReward": null,
+      "total": 25000,
+      "remarks": "advance 2930 security guard 24 june challan 1216",
+      "createdAt": "2026-06-25T07:25:45.601Z",
+      "updatedAt": "2026-06-25T07:25:45.601Z",
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      }
+    },
+    {
+      "id": 21,
+      "employeeName": "Mustafa",
+      "designation": "Supervisor",
+      "flockId": 9,
+      "attendance": null,
+      "basicSalary": null,
+      "salaryAmount": 0,
+      "advance": 2000,
+      "penaltyReward": null,
+      "total": 40000,
+      "remarks": "mustafa advance rs. 2000 date 16 june voucher 1199",
+      "createdAt": "2026-06-18T17:06:15.511Z",
+      "updatedAt": "2026-06-18T17:06:15.511Z",
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      }
+    }
+  ],
+  "birdHealthItems": [
+    {
+      "id": 1,
+      "date": "2026-10-12T00:00:00.000Z",
+      "flockId": 8,
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      },
+      "openingBirds": 24786,
+      "mortality": 0,
+      "cull": 0,
+      "feedId": "13",
+      "feedConsumed": 80,
+      "waterConsumption": 4000,
+      "lightHours": 16,
+      "lightLux": 30,
+      "temperature": 24,
+      "humidity": 60
+    },
+    {
+      "id": 2,
+      "date": "2026-10-11T00:00:00.000Z",
+      "flockId": 8,
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      },
+      "openingBirds": 24786,
+      "mortality": 0,
+      "cull": 0,
+      "feedId": "13",
+      "feedConsumed": 80,
+      "waterConsumption": 3950,
+      "lightHours": 16,
+      "lightLux": 30,
+      "temperature": 24,
+      "humidity": 60
+    },
+    {
+      "id": 3,
+      "date": "2026-10-12T00:00:00.000Z",
+      "flockId": 9,
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      },
+      "openingBirds": 31739,
+      "mortality": 0,
+      "cull": 0,
+      "feedId": "13",
+      "feedConsumed": 100,
+      "waterConsumption": 5000,
+      "lightHours": 16,
+      "lightLux": 30,
+      "temperature": 24,
+      "humidity": 60
+    },
+    {
+      "id": 4,
+      "date": "2026-10-12T00:00:00.000Z",
+      "flockId": 10,
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      },
+      "openingBirds": 25189,
+      "mortality": 0,
+      "cull": 0,
+      "feedId": "13",
+      "feedConsumed": 85,
+      "waterConsumption": 4200,
+      "lightHours": 16,
+      "lightLux": 30,
+      "temperature": 24,
+      "humidity": 60
+    }
+  ],
+  "allConsumptions": [
+    {
+      "id": 1,
+      "date": "2026-10-12T00:00:00.000Z",
+      "flockId": 8,
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      },
+      "feedConsumed": 70,
+      "waterConsumed": 4000,
+      "medicineConsumed": 2,
+      "vaccineConsumed": 1
+    },
+    {
+      "id": 2,
+      "date": "2026-10-11T00:00:00.000Z",
+      "flockId": 8,
+      "flock": {
+        "id": 8,
+        "flockName": "Unit 1"
+      },
+      "feedConsumed": 68,
+      "waterConsumed": 3900,
+      "medicineConsumed": 0,
+      "vaccineConsumed": 0
+    },
+    {
+      "id": 3,
+      "date": "2026-10-12T00:00:00.000Z",
+      "flockId": 9,
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      },
+      "feedConsumed": 105,
+      "waterConsumed": 5200,
+      "medicineConsumed": 3,
+      "vaccineConsumed": 1
+    },
+    {
+      "id": 4,
+      "date": "2026-10-12T00:00:00.000Z",
+      "flockId": 10,
+      "flock": {
+        "id": 10,
+        "flockName": "Unit 3"
+      },
+      "feedConsumed": 80,
+      "waterConsumed": 4200,
+      "medicineConsumed": 1,
+      "vaccineConsumed": 0
+    }
+  ],
+  "stockStoreData": {
+    "feeds": [
+      {
+        "id": 1,
+        "Type": "11",
+        "name": "FEED 11",
+        "quantity": 15000,
+        "currentStock": 15000,
+        "head": "FEED",
+        "unit": "bags"
+      },
+      {
+        "id": 2,
+        "Type": "12",
+        "name": "FEED 12",
+        "quantity": 15000,
+        "currentStock": 15000,
+        "head": "FEED",
+        "unit": "bags"
+      },
+      {
+        "id": 3,
+        "Type": "13",
+        "name": "FEED 13",
+        "quantity": 15000,
+        "currentStock": 15000,
+        "head": "FEED",
+        "unit": "bags"
+      },
+      {
+        "id": 4,
+        "Type": "14",
+        "name": "FEED 14",
+        "quantity": 15000,
+        "currentStock": 15000,
+        "head": "FEED",
+        "unit": "bags"
+      }
+    ],
+    "medicines": [
+      {
+        "id": 5,
+        "Type": "Paracetamol",
+        "name": "Paracetamol",
+        "quantity": 500,
+        "currentStock": 500,
+        "head": "MEDICINE",
+        "unit": "packs"
+      },
+      {
+        "id": 6,
+        "Type": "Antibiotic",
+        "name": "Antibiotic",
+        "quantity": 300,
+        "currentStock": 300,
+        "head": "MEDICINE",
+        "unit": "packs"
+      }
+    ],
+    "vaccines": [
+      {
+        "id": 7,
+        "Type": "ND+IB",
+        "name": "ND+IB",
+        "quantity": 200,
+        "currentStock": 200,
+        "head": "VACCINE",
+        "unit": "vials"
+      },
+      {
+        "id": 8,
+        "Type": "Gumboro",
+        "name": "Gumboro",
+        "quantity": 150,
+        "currentStock": 150,
+        "head": "VACCINE",
+        "unit": "vials"
+      }
+    ],
+    "equipment": [
+      {
+        "id": 9,
+        "Type": "Feeder Trays",
+        "name": "Feeder Trays",
+        "quantity": 50,
+        "currentStock": 50,
+        "head": "EQUIPMENT",
+        "unit": "units"
+      },
+      {
+        "id": 10,
+        "Type": "Drinkers",
+        "name": "Drinkers",
+        "quantity": 50,
+        "currentStock": 50,
+        "head": "EQUIPMENT",
+        "unit": "units"
+      }
+    ],
+    "others": [
+      {
+        "id": 11,
+        "Type": "Disinfectant",
+        "name": "Disinfectant",
+        "quantity": 50,
+        "currentStock": 50,
+        "head": "OTHER",
+        "unit": "cans"
+      }
+    ]
+  }
+}
