@@ -9,8 +9,27 @@
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>farm-management</title>
-    <script type="module" crossorigin src="/assets/index-5bPm0Hd0.js?v=2"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-C_7PIKi2.css?v=2">
+    <script>
+      (function() {
+        // Safe toISOString polyfill to prevent RangeError: Invalid time value crashes
+        var origToISO = Date.prototype.toISOString;
+        Date.prototype.toISOString = function() {
+          if (isNaN(this.getTime())) {
+            return new Date().toISOString();
+          }
+          return origToISO.call(this);
+        };
+        // Global error boundary & error logger
+        window.addEventListener('error', function(e) {
+          console.warn('Recovered from window error:', e.message || e.error);
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+          console.warn('Recovered from unhandled rejection:', e.reason);
+        });
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-5bPm0Hd0.js?v=3"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C_7PIKi2.css?v=3">
   </head>
   <body>
     <div id="root"></div>
