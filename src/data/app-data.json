@@ -91,6 +91,40 @@
   ],
   "rawExpenses": [
     {
+      "id": 1218,
+      "expenseDate": "2026-10-15T00:00:00.000Z",
+      "challanNo": "1450",
+      "attachment": null,
+      "flockId": 9,
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      },
+      "expenseCost": 121000.4,
+      "head": "FEED",
+      "notes": "Test feed expense",
+      "isUserAdded": true,
+      "createdAt": "2026-10-16T09:32:16.515Z",
+      "updatedAt": "2026-10-16T09:32:16.515Z"
+    },
+    {
+      "id": 1217,
+      "expenseDate": "2026-10-16T09:31:41.707Z",
+      "challanNo": "1450",
+      "attachment": null,
+      "flockId": 9,
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      },
+      "expenseCost": 0,
+      "head": "FEED",
+      "notes": "",
+      "isUserAdded": true,
+      "createdAt": "2026-10-16T09:31:41.707Z",
+      "updatedAt": "2026-10-16T09:31:41.707Z"
+    },
+    {
       "id": 1216,
       "expenseDate": "2026-10-15T09:58:30.207Z",
       "challanNo": "1451",
@@ -832,6 +866,29 @@
   ],
   "rawSales": [
     {
+      "id": 681,
+      "date": "2026-10-16T09:32:30.990Z",
+      "saleDate": "2026-10-16T09:32:30.990Z",
+      "challanNo": "1440",
+      "flockId": 9,
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      },
+      "partyName": "Ahmed Traders",
+      "vehicleNumber": "MN-1234",
+      "head": "EGG",
+      "grade": "standard",
+      "itemsSold": 3600,
+      "rate": 12,
+      "totalAmount": 43200,
+      "weight": 60,
+      "attachment": null,
+      "isUserAdded": true,
+      "createdAt": "2026-10-16T09:32:30.990Z",
+      "updatedAt": "2026-10-16T09:32:30.990Z"
+    },
+    {
       "id": 677,
       "saleDate": "2026-10-10T00:00:00.000Z",
       "challanNo": "2061",
@@ -1313,6 +1370,26 @@
     }
   ],
   "rawEggProductions": [
+    {
+      "id": 337,
+      "date": "2026-10-16T09:32:30.992Z",
+      "flockId": 9,
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      },
+      "cartons": 0,
+      "trays": 0,
+      "eggs": 0,
+      "totalEggs": 10000,
+      "brokenEggs": 50,
+      "averageWeight": 60,
+      "grade": "standard",
+      "notes": "",
+      "isUserAdded": true,
+      "createdAt": "2026-10-16T09:32:30.992Z",
+      "updatedAt": "2026-10-16T09:32:30.992Z"
+    },
     {
       "id": 336,
       "date": "2026-10-11T00:00:00.000Z",
@@ -2038,6 +2115,26 @@
   ],
   "birdHealthItems": [
     {
+      "id": 5,
+      "date": "2026-10-15T00:00:00.000Z",
+      "flockId": 9,
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      },
+      "openingBirds": 25000,
+      "mortality": 15,
+      "cull": 5,
+      "feedId": "13",
+      "feedConsumed": 70,
+      "waterConsumption": 3500,
+      "lightHours": 16,
+      "lightLux": 30,
+      "temperature": 24,
+      "humidity": 60,
+      "isUserAdded": true
+    },
+    {
       "id": 1,
       "date": "2026-10-12T00:00:00.000Z",
       "flockId": 8,
@@ -2115,6 +2212,20 @@
     }
   ],
   "allConsumptions": [
+    {
+      "id": 5,
+      "date": "2026-10-15T00:00:00.000Z",
+      "flockId": 9,
+      "flock": {
+        "id": 9,
+        "flockName": "Unit 2"
+      },
+      "feedConsumed": 80,
+      "waterConsumed": 4000,
+      "medicineConsumed": 0,
+      "vaccineConsumed": 0,
+      "isUserAdded": true
+    },
     {
       "id": 1,
       "date": "2026-10-12T00:00:00.000Z",
