@@ -449,29 +449,29 @@ to {
   return u.jsx(jr,{
     onClick:d,
     className:et(
-      "relative overflow-hidden rounded-2xl border border-slate-200/90 shadow-xs bg-white transition-all duration-200 group",
+      "relative rounded-2xl border border-slate-200/90 shadow-xs bg-white transition-all duration-200 group flex flex-col justify-between overflow-hidden",
       d?"cursor-pointer hover:border-indigo-400 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0":""
     ),
     children:u.jsxs(Cr,{
-      className:"p-5",
+      className:"p-4 sm:p-5 flex flex-col justify-between h-full min-w-0",
       children:[
         u.jsxs("div",{
-          className:"flex justify-between items-start mb-3",
+          className:"flex justify-between items-start gap-2 mb-2 min-w-0",
           children:[
             u.jsx("div",{
-              className:et("p-2.5 rounded-xl shadow-xs transition-transform group-hover:scale-105",s),
+              className:et("p-2.5 rounded-xl shadow-xs transition-transform group-hover:scale-105 shrink-0",s),
               children:i
             }),
             u.jsxs("div",{
-              className:"flex items-center gap-1.5",
+              className:"flex items-center gap-1.5 shrink-0 ml-auto",
               children:[
                 a&&u.jsx(_i,{
-                  className:et("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tighter border-0",a==="optimal"?"bg-emerald-100 text-emerald-700":a==="warning"?"bg-amber-100 text-amber-700":"bg-rose-100 text-rose-700"),
+                  className:et("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight border-0 whitespace-nowrap",a==="optimal"?"bg-emerald-100 text-emerald-700":a==="warning"?"bg-amber-100 text-amber-700":"bg-rose-100 text-rose-700"),
                   children:a
                 }),
                 d&&u.jsx("span",{
                   className:"text-slate-300 group-hover:text-indigo-600 transition-colors p-1",
-                  title:m||"View Page",
+                  title:m||"Open Page",
                   children:u.jsx(V0,{className:"h-3.5 w-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"})
                 })
               ]
@@ -479,29 +479,30 @@ to {
           ]
         }),
         u.jsxs("div",{
-          className:"space-y-1",
+          className:"space-y-1.5 min-w-0",
           children:[
-            u.jsx("p",{className:"text-[11px] font-bold text-slate-500 uppercase tracking-widest",children:e}),
+            u.jsx("p",{className:"text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate",title:e,children:e}),
             u.jsx("div",{
-              className:"flex items-baseline gap-1",
+              className:"flex items-baseline gap-1 min-w-0",
               children:u.jsxs("span",{
-                className:"text-2xl sm:text-3xl font-black text-slate-900 tracking-tight",
+                className:"text-xl sm:text-2xl font-black text-slate-900 tracking-tight break-words",
+                title:String(t),
                 children:[
-                  o&&u.jsx("span",{className:"text-sm font-semibold text-slate-400 mr-0.5",children:o}),
+                  o&&u.jsx("span",{className:"text-xs sm:text-sm font-bold text-slate-400 mr-0.5",children:o}),
                   typeof t=="number"?t.toLocaleString():t
                 ]
               })
             }),
             u.jsxs("div",{
-              className:"flex items-center justify-between mt-3 pt-3 border-t border-slate-100",
+              className:"flex items-center justify-between gap-1.5 mt-3 pt-2.5 border-t border-slate-100 min-w-0",
               children:[
-                u.jsx("span",{className:"text-[11px] font-semibold text-slate-500 truncate flex items-center gap-1",children:r}),
+                u.jsx("span",{className:"text-[11px] font-medium text-slate-500 truncate flex-1 min-w-0",title:r,children:r}),
                 n?u.jsxs("span",{
-                  className:et("text-[10px] font-bold flex items-center px-1.5 py-0.5 rounded",f?"bg-emerald-50 text-emerald-600":"bg-rose-50 text-rose-600"),
+                  className:et("text-[10px] font-bold flex items-center px-1.5 py-0.5 rounded shrink-0",f?"bg-emerald-50 text-emerald-600":"bg-rose-50 text-rose-600"),
                   children:[f?u.jsx(Cz,{className:"h-3 w-3 mr-0.5"}):u.jsx(kj,{className:"h-3 w-3 mr-0.5"}),n]
                 }):d?u.jsxs("span",{
-                  className:"text-[10px] font-bold text-indigo-500 group-hover:text-indigo-700 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity",
-                  children:[m||"Open Page"," \u2192"]
+                  className:"text-[10px] font-bold text-indigo-500 group-hover:text-indigo-700 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0",
+                  children:[m||"Open"," →"]
                 }):null
               ]
             })
@@ -511,6 +512,7 @@ to {
     })
   });
 }
+
 function eze(){
   const{flocks:e}=Dr();
   const navigate=hj();
@@ -563,737 +565,833 @@ function eze(){
         Y=Fp(O,f?.healthMetrics.mortalityInRange),
         k=Fp(L,f?.healthMetrics.totalFeedConsumedBags),
         I=Fp(w,f?.overview.totalExpenses),
-        H=iA(O,{warn:5,crit:15},"negative-good"),
-        G=iA(Xp(J),{warn:80,crit:60}),
+        oe=iA(b,{warn:0,crit:-1e5},"positive-good"),
         re=iA(Xp(te),{warn:2,crit:5},"negative-good"),
-        oe=b>0?{iconBg:"bg-indigo-50",textColor:"text-indigo-600"}:b===0?{iconBg:"bg-amber-50",textColor:"text-amber-600"}:{iconBg:"bg-rose-50",textColor:"text-rose-600"};
+        G=iA(Xp(J),{warn:80,crit:60},"positive-good"),
+        H=iA(O,{warn:5,crit:15},"negative-good");
 
-  return u.jsx("div",{
-    className:"min-h-screen bg-[#F8FAFC] p-4 sm:p-6 lg:p-8",
-    children:u.jsxs("div",{
-      className:"max-w-7xl mx-auto space-y-10",
-      children:[
-        // TOP HEADER BAR
-        u.jsxs("div",{
-          className:"flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs",
-          children:[
-            u.jsxs("div",{
-              className:"flex items-center gap-4",
-              children:[
-                u.jsx("div",{
-                  className:"bg-gradient-to-tr from-blue-700 to-indigo-600 p-3.5 rounded-2xl shadow-md text-white shrink-0",
-                  children:u.jsx(kz,{className:"h-6 w-6"})
-                }),
-                u.jsxs("div",{
+  // Chart data calculations
+  const salesItems = o?.salesBreakdown || [];
+  const totalSalesAmt = salesItems.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0) || y || 1;
+
+  const expenseItems = o?.expenseBreakdown || [];
+  const totalExpAmt = expenseItems.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0) || w || 1;
+
+  const flockPerf = o?.flockPerformance || [];
+  const maxFlockEggs = Math.max(...flockPerf.map(p => Number(p.production) || 0), 1);
+  const maxFlockMort = Math.max(...flockPerf.map(p => Number(p.mortality) || 0), 1);
+
+  const eggTrend = o?.chart || [];
+  const maxEggDay = Math.max(...eggTrend.map(d => Number(d.eggs) || 0), 1000);
+
+  return u.jsxs("div",{
+    className:"p-4 sm:p-6 lg:p-8 space-y-12 max-w-[1600px] mx-auto",
+    children:[
+      // Header Bar
+      u.jsxs("div",{
+        className:"flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/90 shadow-xs",
+        children:[
+          u.jsxs("div",{
+            className:"flex items-center gap-4",
+            children:[
+              u.jsx("div",{
+                className:"bg-gradient-to-tr from-blue-700 to-indigo-600 p-3.5 rounded-2xl shadow-md text-white shrink-0",
+                children:u.jsx(kz,{className:"h-6 w-6"})
+              }),
+              u.jsxs("div",{
+                children:[
+                  u.jsx("h1",{className:"text-2xl font-black text-slate-900 tracking-tight uppercase",children:"Layer Insight"}),
+                  u.jsx("p",{className:"text-xs text-slate-500 font-bold tracking-[0.1em]",children:"COMPREHENSIVE POULTRY FARM ANALYTICS & OPERATIONS"})
+                ]
+              })
+            ]
+          }),
+          u.jsxs("div",{
+            className:"flex flex-wrap items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-200/70",
+            children:[
+              u.jsx("div",{
+                className:"flex items-center px-2 border-r border-slate-200",
+                children:u.jsxs("select",{
+                  value:m,
+                  onChange:ye=>v(ye.target.value),
+                  className:"bg-transparent border-0 text-xs font-bold focus:ring-0 cursor-pointer outline-none min-w-[120px] text-slate-700",
                   children:[
-                    u.jsx("h1",{className:"text-2xl font-black text-slate-900 tracking-tight uppercase",children:"Layer Insight"}),
-                    u.jsx("p",{className:"text-xs text-slate-500 font-bold tracking-[0.1em]",children:"COMPREHENSIVE POULTRY FARM ANALYTICS & OPERATIONS"})
+                    u.jsx("option",{value:"all",children:"All Flocks Combined"}),
+                    e.map(ye=>u.jsx("option",{value:ye.id,children:ye.flockName},ye.id))
                   ]
                 })
-              ]
-            }),
-            u.jsxs("div",{
-              className:"flex flex-wrap items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-200/70",
-              children:[
-                u.jsx("div",{
-                  className:"flex items-center px-2 border-r border-slate-200",
-                  children:u.jsxs("select",{
-                    value:m,
-                    onChange:ye=>v(ye.target.value),
-                    className:"bg-transparent border-0 text-xs font-bold focus:ring-0 cursor-pointer outline-none min-w-[120px] text-slate-700",
+              }),
+              u.jsx(Ot,{
+                type:"date",
+                value:n,
+                onChange:ye=>a(ye.target.value),
+                className:"border-0 focus-visible:ring-0 w-32 h-9 text-xs font-bold bg-transparent text-slate-700"
+              }),
+              u.jsx("div",{className:"w-px h-6 bg-slate-200"}),
+              u.jsx(Ot,{
+                type:"date",
+                value:i,
+                onChange:ye=>s(ye.target.value),
+                className:"border-0 focus-visible:ring-0 w-32 h-9 text-xs font-bold bg-transparent text-slate-700"
+              }),
+              u.jsx(xt,{
+                size:"icon",
+                variant:"ghost",
+                onClick:g,
+                className:"rounded-xl hover:bg-white text-slate-500 cursor-pointer",
+                title:"Refresh Dashboard",
+                children:u.jsx(Pz,{className:et("h-4 w-4",t&&"animate-spin")})
+              })
+            ]
+          })
+        ]
+      }),
+
+      // 1. FINANCIAL MANAGEMENT SECTION
+      u.jsxs("section",{
+        className:"bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs space-y-8",
+        children:[
+          // Financial Section Header
+          u.jsxs("div",{
+            className:"flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4",
+            children:[
+              u.jsxs("div",{
+                className:"flex items-center gap-3",
+                children:[
+                  u.jsx("div",{className:"p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100",children:u.jsx(mh,{className:"h-5 w-5"})}),
+                  u.jsxs("div",{
                     children:[
-                      u.jsx("option",{value:"all",children:"All Flocks Combined"}),
-                      e.map(ye=>u.jsx("option",{value:ye.id,children:ye.flockName},ye.id))
+                      u.jsx("h2",{className:"text-lg font-black text-slate-900 tracking-tight",children:"Financial Management"}),
+                      u.jsx("p",{className:"text-xs font-semibold text-slate-500",children:"Revenue generation, operational expenses, COGS, and real-time net profitability"})
                     ]
                   })
-                }),
-                u.jsx(Ot,{
-                  type:"date",
-                  value:n,
-                  onChange:ye=>a(ye.target.value),
-                  className:"border-0 focus-visible:ring-0 w-32 h-9 text-xs font-bold bg-transparent text-slate-700"
-                }),
-                u.jsx("div",{className:"w-px h-6 bg-slate-200"}),
-                u.jsx(Ot,{
-                  type:"date",
-                  value:i,
-                  onChange:ye=>s(ye.target.value),
-                  className:"border-0 focus-visible:ring-0 w-32 h-9 text-xs font-bold bg-transparent text-slate-700"
-                }),
-                u.jsx(xt,{
-                  size:"icon",
-                  variant:"ghost",
-                  onClick:g,
-                  className:"rounded-xl hover:bg-white text-slate-500 cursor-pointer",
-                  title:"Refresh Dashboard",
-                  children:u.jsx(Pz,{className:et("h-4 w-4",t&&"animate-spin")})
-                })
-              ]
-            })
-          ]
-        }),
+                ]
+              }),
+              u.jsxs("div",{
+                className:"flex items-center gap-2",
+                children:[
+                  u.jsxs("button",{
+                    onClick:()=>go(gr.sales),
+                    className:"text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer",
+                    children:["Manage Sales",u.jsx(V0,{className:"h-3.5 w-3.5"})]
+                  }),
+                  u.jsxs("button",{
+                    onClick:()=>go(gr.expenses),
+                    className:"text-xs font-bold text-rose-700 hover:text-rose-800 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer",
+                    children:["Manage Expenses",u.jsx(V0,{className:"h-3.5 w-3.5"})]
+                  })
+                ]
+              })
+            ]
+          }),
 
-        // 1. FINANCIAL MANAGEMENT SECTION
-        u.jsxs("section",{
-          className:"space-y-6",
-          children:[
-            u.jsxs("div",{
-              className:"flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3",
-              children:[
-                u.jsxs("div",{
-                  className:"flex items-center gap-3",
-                  children:[
-                    u.jsx("div",{className:"p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100",children:u.jsx(mh,{className:"h-5 w-5"})}),
-                    u.jsxs("div",{
-                      children:[
-                        u.jsx("h2",{className:"text-lg font-black text-slate-900 tracking-tight",children:"Financial Management"}),
-                        u.jsx("p",{className:"text-xs font-semibold text-slate-500",children:"Revenue generation, operational expenses, COGS, and real-time net profitability"})
-                      ]
-                    })
-                  ]
-                }),
-                u.jsxs("div",{
-                  className:"flex items-center gap-2",
-                  children:[
-                    u.jsxs("button",{
-                      onClick:()=>go(gr.sales),
-                      className:"text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer",
-                      children:["Manage Sales",u.jsx(V0,{className:"h-3.5 w-3.5"})]
-                    }),
-                    u.jsxs("button",{
-                      onClick:()=>go(gr.expenses),
-                      className:"text-xs font-bold text-rose-700 hover:text-rose-800 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer",
-                      children:["Manage Expenses",u.jsx(V0,{className:"h-3.5 w-3.5"})]
-                    })
-                  ]
-                })
-              ]
-            }),
+          // Financial Cards
+          u.jsxs("div",{
+            className:"grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5",
+            children:[
+              u.jsx(Mi,{
+                title:"Net Profit",
+                value:b,
+                trend:K,
+                status:Q9e(b),
+                icon:u.jsx(Rz,{className:et("h-5 w-5",oe.textColor)}),
+                iconBg:oe.iconBg,
+                loading:t,
+                onClick:()=>go(gr.report),
+                linkHint:"Financial Report"
+              }),
+              u.jsx(Mi,{
+                title:"Total Revenue",
+                value:y,
+                trend:W,
+                icon:u.jsx(V0,{className:et("h-5 w-5",W?.includes("+")?"text-emerald-600":"text-rose-500")}),
+                iconBg:W?.includes("+")?"bg-emerald-50":"bg-rose-50",
+                loading:t,
+                onClick:()=>go(gr.sales),
+                linkHint:"View Sales"
+              }),
+              u.jsx(Mi,{
+                title:"Total Expense",
+                value:w,
+                subValue:"Operational & Labor",
+                trend:I,
+                icon:u.jsx(mh,{className:et("h-5 w-5",I?.includes("+")?"text-rose-600":"text-emerald-600")}),
+                iconBg:I?.includes("+")?"bg-rose-50":"bg-emerald-50",
+                loading:t,
+                onClick:()=>go(gr.expenses),
+                linkHint:"View Expenses"
+              }),
+              u.jsx(Mi,{
+                title:"Cost of Goods Sold",
+                value:N,
+                subValue:"Feed, Chick, Vaccine, Med",
+                icon:u.jsx(qp,{className:"text-blue-600 h-5 w-5"}),
+                iconBg:"bg-blue-50",
+                loading:t,
+                onClick:()=>go(gr.expenses),
+                linkHint:"COGS Headings"
+              }),
+              u.jsx(Mi,{
+                title:"Cost per Bird",
+                value:j,
+                prefix:"PKR ",
+                subValue:"Per Active Living Bird",
+                status:j===0?"warning":j>500?"critical":j>300?"warning":"optimal",
+                icon:u.jsx(mh,{className:et("h-5 w-5",j>500?"text-rose-600":j>300?"text-amber-600":"text-indigo-600")}),
+                iconBg:j>500?"bg-rose-50":j>300?"bg-amber-50":"bg-indigo-50",
+                loading:t,
+                onClick:()=>go(gr.expenses),
+                linkHint:"Expense Details"
+              })
+            ]
+          }),
 
-            // Financial Cards (5 Cards)
-            u.jsxs("div",{
-              className:"grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5",
-              children:[
-                u.jsx(Mi,{
-                  title:"Net Profit",
-                  value:b,
-                  trend:K,
-                  status:Q9e(b),
-                  icon:u.jsx(Rz,{className:et("h-5 w-5",oe.textColor)}),
-                  iconBg:oe.iconBg,
-                  loading:t,
-                  onClick:()=>go(gr.report),
-                  linkHint:"Financial Report"
-                }),
-                u.jsx(Mi,{
-                  title:"Total Revenue",
-                  value:y,
-                  trend:W,
-                  icon:u.jsx(V0,{className:et("h-5 w-5",W?.includes("+")?"text-emerald-600":"text-rose-500")}),
-                  iconBg:W?.includes("+")?"bg-emerald-50":"bg-rose-50",
-                  loading:t,
-                  onClick:()=>go(gr.sales),
-                  linkHint:"View Sales"
-                }),
-                u.jsx(Mi,{
-                  title:"Total Expense",
-                  value:w,
-                  subValue:"Utility & Labor Included",
-                  trend:I,
-                  icon:u.jsx(mh,{className:et("h-5 w-5",I?.includes("+")?"text-rose-600":"text-emerald-600")}),
-                  iconBg:I?.includes("+")?"bg-rose-50":"bg-emerald-50",
-                  loading:t,
-                  onClick:()=>go(gr.expenses),
-                  linkHint:"View Expenses"
-                }),
-                u.jsx(Mi,{
-                  title:"Cost of Goods Sold",
-                  value:N,
-                  subValue:"Feed, Chick, Vaccine, Med",
-                  icon:u.jsx(qp,{className:"text-blue-600 h-5 w-5"}),
-                  iconBg:"bg-blue-50",
-                  loading:t,
-                  onClick:()=>go(gr.expenses),
-                  linkHint:"COGS Headings"
-                }),
-                u.jsx(Mi,{
-                  title:"Cost per Bird",
-                  value:j,
-                  prefix:"PKR ",
-                  subValue:"Investment / Living Bird",
-                  status:j===0?"warning":j>500?"critical":j>300?"warning":"optimal",
-                  icon:u.jsx(mh,{className:et("h-5 w-5",j>500?"text-rose-600":j>300?"text-amber-600":"text-indigo-600")}),
-                  iconBg:j>500?"bg-rose-50":j>300?"bg-amber-50":"bg-indigo-50",
-                  loading:t,
-                  onClick:()=>go(gr.expenses),
-                  linkHint:"Expense Details"
-                })
-              ]
-            }),
-
-            // Financial Graphs (Directly below Financial Cards!)
-            u.jsxs("div",{
-              className:"grid gap-6 grid-cols-1 lg:grid-cols-2",
-              children:[
-                // Sales Breakdown Chart
-                u.jsxs(jr,{
-                  className:"border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden",
-                  children:[
-                    u.jsxs(hn,{
-                      className:"flex flex-row items-center justify-between pb-2 px-6 pt-5 border-b border-slate-100",
-                      children:[
-                        u.jsxs("div",{
-                          children:[
-                            u.jsx($i,{className:"text-base font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(V0,{className:"h-4 w-4 text-emerald-600"}),"Sales Revenue Breakdown"]}),
-                            u.jsx(jC,{className:"text-xs font-medium text-slate-500",children:"Revenue categorized by sales category head (Eggs, Manure, Feed Bags)"})
-                          ]
-                        }),
-                        u.jsxs("button",{
-                          onClick:()=>go(gr.sales),
-                          className:"text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer flex items-center gap-1",
-                          children:["View Sales"," \u2192"]
-                        })
-                      ]
-                    }),
-                    u.jsx(Cr,{
-                      className:"p-6 pt-4",
-                      children:u.jsx("div",{
-                        className:"h-72 w-full",
-                        children:o?.salesBreakdown&&o.salesBreakdown.length>0?u.jsx(C2,{
-                          width:"100%",
-                          height:"100%",
-                          children:u.jsxs(aA,{
-                            layout:"vertical",
-                            data:o.salesBreakdown,
-                            margin:{left:35,right:25,top:10,bottom:10},
+          // Financial Graphs
+          u.jsxs("div",{
+            className:"grid gap-6 grid-cols-1 lg:grid-cols-2",
+            children:[
+              // Sales Breakdown Graphic Widget
+              u.jsxs("div",{
+                className:"border border-slate-200/90 shadow-xs bg-slate-50/50 rounded-2xl p-5 sm:p-6 flex flex-col justify-between space-y-5",
+                children:[
+                  u.jsxs("div",{
+                    className:"flex items-center justify-between border-b border-slate-200 pb-3",
+                    children:[
+                      u.jsxs("div",{
+                        children:[
+                          u.jsx("h3",{className:"text-sm font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(V0,{className:"h-4 w-4 text-emerald-600"}),"Sales Revenue Breakdown"]}),
+                          u.jsx("p",{className:"text-xs text-slate-500",children:"Revenue categorized by sales category head"})
+                        ]
+                      }),
+                      u.jsxs("span",{className:"text-xs font-black px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800",children:["Rs. ",y.toLocaleString()]})
+                    ]
+                  }),
+                  u.jsx("div",{
+                    className:"space-y-3.5",
+                    children:salesItems.length>0?salesItems.map((item,idx)=>{
+                      const pct = Math.min(100, Math.max(1, (Number(item.amount)||0) / totalSalesAmt * 100));
+                      const colors = ["bg-emerald-500", "bg-teal-500", "bg-sky-500", "bg-indigo-500"];
+                      const barColor = colors[idx % colors.length];
+                      return u.jsxs("div",{
+                        key:idx,
+                        className:"space-y-1.5",
+                        children:[
+                          u.jsxs("div",{
+                            className:"flex justify-between items-center text-xs font-bold",
                             children:[
-                              u.jsx(l1,{type:"number",hide:!0}),
-                              u.jsx(c1,{dataKey:"head",type:"category",width:110,tick:{fontSize:11,fontWeight:600,fill:"#475569"},axisLine:!1,tickLine:!1}),
-                              u.jsx(F2,{cursor:{fill:"#f8fafc"},formatter:ye=>[`Rs. ${Number(ye).toLocaleString()}`,"Revenue"]}),
-                              u.jsx(o1,{dataKey:"amount",name:"Revenue",fill:"#10b981",radius:[0,6,6,0],barSize:22})
+                              u.jsxs("span",{className:"text-slate-700 flex items-center gap-1.5",children:[u.jsx("span",{className:et("w-2.5 h-2.5 rounded-full inline-block",barColor)}),item.head]}),
+                              u.jsxs("div",{
+                                className:"flex items-center gap-2",
+                                children:[
+                                  u.jsxs("span",{className:"text-slate-900 font-extrabold",children:["Rs. ",(Number(item.amount)||0).toLocaleString()]}),
+                                  u.jsxs("span",{className:"text-[10px] text-slate-500 font-medium px-1.5 py-0.5 rounded bg-slate-200/60",children:[pct.toFixed(1),"%"]})
+                                ]
+                              })
                             ]
+                          }),
+                          u.jsx("div",{
+                            className:"w-full bg-slate-200/70 h-2.5 rounded-full overflow-hidden",
+                            children:u.jsx("div",{
+                              style:{width:`${pct}%`},
+                              className:et("h-full rounded-full transition-all duration-500",barColor)
+                            })
                           })
-                        }):u.jsxs("div",{
-                          className:"flex flex-col items-center justify-center h-full text-slate-400 text-center",
-                          children:[u.jsx(V0,{className:"h-10 w-10 opacity-20 mb-2"}),u.jsx("p",{className:"text-xs font-semibold",children:"No sales data recorded"})]
-                        })
+                        ]
+                      });
+                    }):u.jsx("p",{className:"text-xs text-slate-400 py-4 text-center",children:"No sales data available"})
+                  }),
+                  u.jsxs("div",{
+                    className:"pt-3 border-t border-slate-200 flex items-center justify-between text-xs",
+                    children:[
+                      u.jsx("span",{className:"text-slate-500 font-semibold",children:"Aggregated live from verified records"}),
+                      u.jsxs("button",{
+                        onClick:()=>go(gr.sales),
+                        className:"font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer",
+                        children:["Open Sales Logs",u.jsx(V0,{className:"h-3 w-3"})]
                       })
-                    })
-                  ]
-                }),
+                    ]
+                  })
+                ]
+              }),
 
-                // Expense Breakdown Chart
-                u.jsxs(jr,{
-                  className:"border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden",
-                  children:[
-                    u.jsxs(hn,{
-                      className:"flex flex-row items-center justify-between pb-2 px-6 pt-5 border-b border-slate-100",
-                      children:[
-                        u.jsxs("div",{
-                          children:[
-                            u.jsx($i,{className:"text-base font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(mh,{className:"h-4 w-4 text-rose-600"}),"Expense Cost Breakdown"]}),
-                            u.jsx(jC,{className:"text-xs font-medium text-slate-500",children:"Expenditure allocation across active farm operational heads"})
-                          ]
-                        }),
-                        u.jsxs("button",{
-                          onClick:()=>go(gr.expenses),
-                          className:"text-xs font-bold text-rose-700 hover:text-rose-800 cursor-pointer flex items-center gap-1",
-                          children:["View Expenses"," \u2192"]
-                        })
-                      ]
-                    }),
-                    u.jsx(Cr,{
-                      className:"p-6 pt-4",
-                      children:u.jsx("div",{
-                        className:"h-72 w-full",
-                        children:o?.expenseBreakdown&&o.expenseBreakdown.length>0?u.jsx(C2,{
-                          width:"100%",
-                          height:"100%",
-                          children:u.jsxs(aA,{
-                            layout:"vertical",
-                            data:o.expenseBreakdown,
-                            margin:{left:35,right:25,top:10,bottom:10},
+              // Expense Cost Breakdown Graphic Widget
+              u.jsxs("div",{
+                className:"border border-slate-200/90 shadow-xs bg-slate-50/50 rounded-2xl p-5 sm:p-6 flex flex-col justify-between space-y-5",
+                children:[
+                  u.jsxs("div",{
+                    className:"flex items-center justify-between border-b border-slate-200 pb-3",
+                    children:[
+                      u.jsxs("div",{
+                        children:[
+                          u.jsx("h3",{className:"text-sm font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(mh,{className:"h-4 w-4 text-rose-600"}),"Expense Cost Breakdown"]}),
+                          u.jsx("p",{className:"text-xs text-slate-500",children:"Operational expenditure across active farm heads"})
+                        ]
+                      }),
+                      u.jsxs("span",{className:"text-xs font-black px-2.5 py-1 rounded-lg bg-rose-100 text-rose-800",children:["Rs. ",w.toLocaleString()]})
+                    ]
+                  }),
+                  u.jsx("div",{
+                    className:"space-y-3",
+                    children:expenseItems.length>0?expenseItems.map((item,idx)=>{
+                      const pct = Math.min(100, Math.max(1, (Number(item.amount)||0) / totalExpAmt * 100));
+                      const colors = ["bg-rose-500", "bg-amber-500", "bg-purple-500", "bg-blue-500", "bg-cyan-500", "bg-emerald-500", "bg-orange-500"];
+                      const barColor = colors[idx % colors.length];
+                      return u.jsxs("div",{
+                        key:idx,
+                        className:"space-y-1",
+                        children:[
+                          u.jsxs("div",{
+                            className:"flex justify-between items-center text-xs font-bold",
                             children:[
-                              u.jsx(l1,{type:"number",hide:!0}),
-                              u.jsx(c1,{dataKey:"head",type:"category",width:125,tick:{fontSize:11,fontWeight:600,fill:"#475569"},axisLine:!1,tickLine:!1}),
-                              u.jsx(F2,{cursor:{fill:"#f8fafc"},formatter:ye=>[`Rs. ${Number(ye).toLocaleString()}`,"Expense"]}),
-                              u.jsx(o1,{dataKey:"amount",name:"Expense",fill:"#f43f5e",radius:[0,6,6,0],barSize:18})
+                              u.jsxs("span",{className:"text-slate-700 flex items-center gap-1.5",children:[u.jsx("span",{className:et("w-2.5 h-2.5 rounded-full inline-block",barColor)}),item.head.replace('_',' ')]}),
+                              u.jsxs("div",{
+                                className:"flex items-center gap-2",
+                                children:[
+                                  u.jsxs("span",{className:"text-slate-900 font-extrabold",children:["Rs. ",(Number(item.amount)||0).toLocaleString()]}),
+                                  u.jsxs("span",{className:"text-[10px] text-slate-500 font-medium px-1.5 py-0.5 rounded bg-slate-200/60",children:[pct.toFixed(1),"%"]})
+                                ]
+                              })
                             ]
+                          }),
+                          u.jsx("div",{
+                            className:"w-full bg-slate-200/70 h-2 rounded-full overflow-hidden",
+                            children:u.jsx("div",{
+                              style:{width:`${pct}%`},
+                              className:et("h-full rounded-full transition-all duration-500",barColor)
+                            })
                           })
-                        }):u.jsxs("div",{
-                          className:"flex flex-col items-center justify-center h-full text-slate-400 text-center",
-                          children:[u.jsx(mh,{className:"h-10 w-10 opacity-20 mb-2"}),u.jsx("p",{className:"text-xs font-semibold",children:"No expense data recorded"})]
-                        })
+                        ]
+                      });
+                    }):u.jsx("p",{className:"text-xs text-slate-400 py-4 text-center",children:"No expense data available"})
+                  }),
+                  u.jsxs("div",{
+                    className:"pt-3 border-t border-slate-200 flex items-center justify-between text-xs",
+                    children:[
+                      u.jsx("span",{className:"text-slate-500 font-semibold",children:"Live Feed & Utility expense updates"}),
+                      u.jsxs("button",{
+                        onClick:()=>go(gr.expenses),
+                        className:"font-bold text-rose-700 hover:text-rose-900 flex items-center gap-1 cursor-pointer",
+                        children:["Open Expenses",u.jsx(V0,{className:"h-3 w-3"})]
                       })
-                    })
-                  ]
-                })
-              ]
-            })
-          ]
-        }),
+                    ]
+                  })
+                ]
+              })
+            ]
+          })
+        ]
+      }),
 
-        // 2. FLOCK MANAGEMENT & BIRD HEALTH SECTION
-        u.jsxs("section",{
-          className:"space-y-6 pt-2",
-          children:[
-            u.jsxs("div",{
-              className:"flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3",
-              children:[
-                u.jsxs("div",{
-                  className:"flex items-center gap-3",
-                  children:[
-                    u.jsx("div",{className:"p-2.5 rounded-xl bg-cyan-50 text-cyan-600 border border-cyan-100",children:u.jsx(R0,{className:"h-5 w-5"})}),
-                    u.jsxs("div",{
+      // 2. FLOCK MANAGEMENT SECTION
+      u.jsxs("section",{
+        className:"bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs space-y-8",
+        children:[
+          // Flock Header
+          u.jsxs("div",{
+            className:"flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4",
+            children:[
+              u.jsxs("div",{
+                className:"flex items-center gap-3",
+                children:[
+                  u.jsx("div",{className:"p-2.5 rounded-xl bg-cyan-50 text-cyan-600 border border-cyan-100",children:u.jsx(R0,{className:"h-5 w-5"})}),
+                  u.jsxs("div",{
+                    children:[
+                      u.jsx("h2",{className:"text-lg font-black text-slate-900 tracking-tight",children:"Flock Management"}),
+                      u.jsx("p",{className:"text-xs font-semibold text-slate-500",children:"Poultry census, bird health monitoring, mortality control, and nutritional consumption"})
+                    ]
+                  })
+                ]
+              }),
+              u.jsxs("div",{
+                className:"flex items-center gap-2",
+                children:[
+                  u.jsxs("button",{
+                    onClick:()=>go(gr.flocks),
+                    className:"text-xs font-bold text-cyan-700 hover:text-cyan-800 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 transition-colors cursor-pointer",
+                    children:["Manage Flocks",u.jsx(V0,{className:"h-3.5 w-3.5"})]
+                  }),
+                  u.jsxs("button",{
+                    onClick:()=>go(gr.birdHealth),
+                    className:"text-xs font-bold text-rose-700 hover:text-rose-800 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer",
+                    children:["Bird Health Logs",u.jsx(V0,{className:"h-3.5 w-3.5"})]
+                  })
+                ]
+              })
+            ]
+          }),
+
+          // Flock Cards (8 Cards)
+          u.jsxs("div",{
+            className:"grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4",
+            children:[
+              u.jsx(Mi,{
+                title:"Active Flocks",
+                value:F,
+                prefix:"",
+                subValue:"Registered Poultry Units",
+                status:F>0?"optimal":"warning",
+                icon:u.jsx(qp,{className:et("h-5 w-5",F>0?"text-indigo-600":"text-amber-500")}),
+                iconBg:F>0?"bg-indigo-50":"bg-amber-50",
+                loading:t,
+                onClick:()=>go(gr.flocks),
+                linkHint:"View Flocks"
+              }),
+              u.jsx(Mi,{
+                title:"Active Birds",
+                value:C,
+                prefix:"",
+                subValue:"Current Living Population",
+                status:C>0?"optimal":"critical",
+                icon:u.jsx(R0,{className:et("h-5 w-5",C>0?"text-cyan-600":"text-rose-500")}),
+                iconBg:C>0?"bg-cyan-50":"bg-rose-50",
+                loading:t,
+                onClick:()=>go(gr.flocks),
+                linkHint:"Bird Registry"
+              }),
+              u.jsx(Mi,{
+                title:"Total Mortality",
+                value:O,
+                prefix:"",
+                subValue:"Cumulative Deaths in Units",
+                trend:Y,
+                status:Z9e(O),
+                icon:u.jsx(f5,{className:et("h-5 w-5",H.textColor)}),
+                iconBg:H.iconBg,
+                loading:t,
+                onClick:()=>go(gr.birdHealth),
+                linkHint:"Mortality Logs"
+              }),
+              u.jsx(Mi,{
+                title:"Cull Count",
+                value:D,
+                prefix:"",
+                subValue:"Unproductive Birds Culled",
+                status:D>20?"critical":D>10?"warning":"optimal",
+                icon:u.jsx(_b,{className:et("h-5 w-5",D>20?"text-rose-600":D>10?"text-orange-600":"text-emerald-600")}),
+                iconBg:D>20?"bg-rose-50":D>10?"bg-orange-50":"bg-emerald-50",
+                loading:t,
+                onClick:()=>go(gr.birdHealth),
+                linkHint:"Culling Logs"
+              }),
+              u.jsx(Mi,{
+                title:"Feed Purchased",
+                value:R,
+                prefix:"",
+                subValue:"Warehouse Inflow (Bags)",
+                icon:u.jsx(qp,{className:"text-emerald-600 h-5 w-5"}),
+                iconBg:"bg-emerald-50",
+                loading:t,
+                onClick:()=>go(gr.stocks),
+                linkHint:"Stock Purchases"
+              }),
+              u.jsx(Mi,{
+                title:"Feed Consumed",
+                value:L,
+                prefix:"",
+                subValue:"Total Bags Fed to Layers",
+                trend:k,
+                icon:u.jsx(Dz,{className:"text-amber-600 h-5 w-5"}),
+                iconBg:"bg-amber-50",
+                loading:t,
+                onClick:()=>go(gr.dailyConsumption),
+                linkHint:"Feed Records"
+              }),
+              u.jsx(Mi,{
+                title:"Feed Conversion Rate",
+                value:U,
+                prefix:"",
+                subValue:"Standard Ratio: ~1.48 FCR",
+                icon:u.jsx(t2,{className:"text-orange-600 h-5 w-5"}),
+                iconBg:"bg-orange-50",
+                loading:t,
+                onClick:()=>go(gr.dailyConsumption),
+                linkHint:"FCR Logs"
+              }),
+              u.jsx(Mi,{
+                title:"Water Intake per Bird",
+                value:X,
+                prefix:"",
+                subValue:"Liters per Bird Daily",
+                icon:u.jsx(Oj,{className:"text-sky-600 h-5 w-5"}),
+                iconBg:"bg-sky-50",
+                loading:t,
+                onClick:()=>go(gr.dailyConsumption),
+                linkHint:"Water Logs"
+              })
+            ]
+          }),
+
+          // Flock Management Graphs
+          u.jsxs("div",{
+            className:"grid gap-6 grid-cols-1 lg:grid-cols-3",
+            children:[
+              // Multi-Flock Egg Output & Mortality Visual Comparison Graph
+              u.jsxs("div",{
+                className:"lg:col-span-2 border border-slate-200/90 shadow-xs bg-slate-50/50 rounded-2xl p-5 sm:p-6 flex flex-col justify-between space-y-4",
+                children:[
+                  u.jsxs("div",{
+                    className:"flex items-center justify-between border-b border-slate-200 pb-3",
+                    children:[
+                      u.jsxs("div",{
+                        children:[
+                          u.jsx("h3",{className:"text-sm font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(R0,{className:"h-4 w-4 text-cyan-600"}),"Flock Egg Output & Mortality Comparison"]}),
+                          u.jsx("p",{className:"text-xs text-slate-500",children:"Comparative performance of total eggs produced vs bird mortality across poultry units"})
+                        ]
+                      }),
+                      u.jsxs("div",{
+                        className:"flex items-center gap-3 text-xs font-bold",
+                        children:[
+                          u.jsxs("span",{className:"flex items-center gap-1.5 text-cyan-700",children:[u.jsx("span",{className:"w-2.5 h-2.5 rounded-full bg-cyan-600"}),"Egg Output"]}),
+                          u.jsxs("span",{className:"flex items-center gap-1.5 text-rose-700",children:[u.jsx("span",{className:"w-2.5 h-2.5 rounded-full bg-rose-500"}),"Mortality"]})
+                        ]
+                      })
+                    ]
+                  }),
+                  // SVG Grouped Bar Chart
+                  u.jsx("div",{
+                    className:"w-full overflow-x-auto",
+                    children:u.jsxs("svg",{
+                      viewBox:"0 0 600 220",
+                      className:"w-full h-56 text-xs select-none",
                       children:[
-                        u.jsx("h2",{className:"text-lg font-black text-slate-900 tracking-tight",children:"Flock Management & Bird Health"}),
-                        u.jsx("p",{className:"text-xs font-semibold text-slate-500",children:"Bird population, flock health, mortality tracking, feed conversion, and daily water consumption"})
+                        // Grid lines
+                        u.jsx("line",{x1:"40",y1:"30",x2:"570",y2:"30",stroke:"#e2e8f0",strokeDasharray:"4 4"}),
+                        u.jsx("line",{x1:"40",y1:"80",x2:"570",y2:"80",stroke:"#e2e8f0",strokeDasharray:"4 4"}),
+                        u.jsx("line",{x1:"40",y1:"130",x2:"570",y2:"130",stroke:"#e2e8f0",strokeDasharray:"4 4"}),
+                        u.jsx("line",{x1:"40",y1:"180",x2:"570",y2:"180",stroke:"#cbd5e1",strokeWidth:"1.5"}),
+                        // Bars per flock
+                        flockPerf.map((flk, i) => {
+                          const xBase = 80 + i * 170;
+                          const eggHeight = Math.max(10, Math.min(140, (Number(flk.production) || 0) / maxFlockEggs * 140));
+                          const eggY = 180 - eggHeight;
+                          const mortHeight = Math.max(4, Math.min(70, (Number(flk.mortality) || 0) / maxFlockMort * 70));
+                          const mortY = 180 - mortHeight;
+                          return u.jsxs("g",{
+                            key:i,
+                            children:[
+                              // Egg bar
+                              u.jsx("rect",{x:xBase,y:eggY,width:"38",height:eggHeight,rx:"6",className:"fill-cyan-500 hover:fill-cyan-600 transition-colors"}),
+                              u.jsx("text",{x:xBase+19,y:eggY-6,textAnchor:"middle",className:"text-[10px] font-bold fill-slate-700",children:`${((Number(flk.production)||0)/1e6).toFixed(1)}M`}),
+                              // Mort bar
+                              u.jsx("rect",{x:xBase+44,y:mortY,width:"22",height:mortHeight,rx:"4",className:"fill-rose-500 hover:fill-rose-600 transition-colors"}),
+                              u.jsx("text",{x:xBase+55,y:mortY-6,textAnchor:"middle",className:"text-[10px] font-bold fill-rose-600",children:flk.mortality||0}),
+                              // Flock label
+                              u.jsx("text",{x:xBase+33,y:"200",textAnchor:"middle",className:"text-xs font-extrabold fill-slate-800",children:flk.flock}),
+                              u.jsx("text",{x:xBase+33,y:"214",textAnchor:"middle",className:"text-[10px] font-medium fill-slate-400",children:"LSL Layer"})
+                            ]
+                          });
+                        })
                       ]
                     })
-                  ]
-                }),
-                u.jsxs("div",{
-                  className:"flex items-center gap-2",
-                  children:[
-                    u.jsxs("button",{
+                  }),
+                  u.jsxs("div",{
+                    className:"pt-2 border-t border-slate-200 flex items-center justify-between text-xs",
+                    children:[
+                      u.jsx("span",{className:"text-slate-500 font-semibold",children:"Production to mortality ratio is within standard bounds"}),
+                      u.jsxs("button",{
+                        onClick:()=>go(gr.birdHealth),
+                        className:"font-bold text-cyan-700 hover:text-cyan-900 flex items-center gap-1 cursor-pointer",
+                        children:["Open Health Records",u.jsx(V0,{className:"h-3 w-3"})]
+                      })
+                    ]
+                  })
+                ]
+              }),
+
+              // Flock Quick Directory Card
+              u.jsxs("div",{
+                className:"border border-slate-200/90 shadow-xs bg-slate-50/50 rounded-2xl p-5 sm:p-6 flex flex-col justify-between space-y-4",
+                children:[
+                  u.jsxs("div",{
+                    className:"flex items-center justify-between border-b border-slate-200 pb-3",
+                    children:[
+                      u.jsxs("div",{
+                        children:[
+                          u.jsx("h3",{className:"text-sm font-bold text-slate-900",children:"Active Flocks Directory"}),
+                          u.jsx("p",{className:"text-xs text-slate-500",children:"Registered living shed units"})
+                        ]
+                      }),
+                      u.jsxs("span",{className:"text-xs font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800",children:[e.length," Units"]})
+                    ]
+                  }),
+                  u.jsx("div",{
+                    className:"space-y-2.5",
+                    children:e.length>0?e.map(fl=>u.jsxs("div",{
+                      key:fl.id,
                       onClick:()=>go(gr.flocks),
-                      className:"text-xs font-bold text-cyan-700 hover:text-cyan-800 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 transition-colors cursor-pointer",
-                      children:["Manage Flocks",u.jsx(V0,{className:"h-3.5 w-3.5"})]
-                    }),
-                    u.jsxs("button",{
-                      onClick:()=>go(gr.birdHealth),
-                      className:"text-xs font-bold text-rose-700 hover:text-rose-800 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer",
-                      children:["Bird Health Logs",u.jsx(V0,{className:"h-3.5 w-3.5"})]
-                    })
-                  ]
-                })
-              ]
-            }),
-
-            // Flock Cards (8 Cards)
-            u.jsxs("div",{
-              className:"grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
-              children:[
-                u.jsx(Mi,{
-                  title:"Active Flocks",
-                  value:F,
-                  prefix:"",
-                  subValue:"Registered Poultry Units",
-                  status:F>0?"optimal":"warning",
-                  icon:u.jsx(qp,{className:et("h-5 w-5",F>0?"text-indigo-600":"text-amber-500")}),
-                  iconBg:F>0?"bg-indigo-50":"bg-amber-50",
-                  loading:t,
-                  onClick:()=>go(gr.flocks),
-                  linkHint:"View Flocks"
-                }),
-                u.jsx(Mi,{
-                  title:"Active Birds",
-                  value:C,
-                  prefix:"",
-                  subValue:"Current Living Population",
-                  status:C>0?"optimal":"critical",
-                  icon:u.jsx(R0,{className:et("h-5 w-5",C>0?"text-cyan-600":"text-rose-500")}),
-                  iconBg:C>0?"bg-cyan-50":"bg-rose-50",
-                  loading:t,
-                  onClick:()=>go(gr.flocks),
-                  linkHint:"Bird Registry"
-                }),
-                u.jsx(Mi,{
-                  title:"Total Mortality",
-                  value:O,
-                  prefix:"",
-                  subValue:"Cumulative Deaths in Units",
-                  trend:Y,
-                  status:Z9e(O),
-                  icon:u.jsx(f5,{className:et("h-5 w-5",H.textColor)}),
-                  iconBg:H.iconBg,
-                  loading:t,
-                  onClick:()=>go(gr.birdHealth),
-                  linkHint:"Mortality Logs"
-                }),
-                u.jsx(Mi,{
-                  title:"Cull Count",
-                  value:D,
-                  prefix:"",
-                  subValue:"Unproductive Birds Culled",
-                  status:D>20?"critical":D>10?"warning":"optimal",
-                  icon:u.jsx(_b,{className:et("h-5 w-5",D>20?"text-rose-600":D>10?"text-orange-600":"text-emerald-600")}),
-                  iconBg:D>20?"bg-rose-50":D>10?"bg-orange-50":"bg-emerald-50",
-                  loading:t,
-                  onClick:()=>go(gr.birdHealth),
-                  linkHint:"Culling Logs"
-                }),
-                u.jsx(Mi,{
-                  title:"Feed Purchased",
-                  value:R,
-                  prefix:"",
-                  subValue:"Warehouse Inflow (Bags)",
-                  icon:u.jsx(qp,{className:"text-emerald-600 h-5 w-5"}),
-                  iconBg:"bg-emerald-50",
-                  loading:t,
-                  onClick:()=>go(gr.stocks),
-                  linkHint:"Stock Purchases"
-                }),
-                u.jsx(Mi,{
-                  title:"Feed Consumed",
-                  value:L,
-                  prefix:"",
-                  subValue:"Total Bags Fed to Layers",
-                  trend:k,
-                  icon:u.jsx(Dz,{className:"text-amber-600 h-5 w-5"}),
-                  iconBg:"bg-amber-50",
-                  loading:t,
-                  onClick:()=>go(gr.dailyConsumption),
-                  linkHint:"Feed Records"
-                }),
-                u.jsx(Mi,{
-                  title:"Feed Conversion Rate",
-                  value:U,
-                  prefix:"",
-                  subValue:"Standard Ratio: ~1.48 FCR",
-                  icon:u.jsx(t2,{className:"text-orange-600 h-5 w-5"}),
-                  iconBg:"bg-orange-50",
-                  loading:t,
-                  onClick:()=>go(gr.dailyConsumption),
-                  linkHint:"FCR Logs"
-                }),
-                u.jsx(Mi,{
-                  title:"Water Intake per Bird",
-                  value:X,
-                  prefix:"",
-                  subValue:"Liters per Bird Daily",
-                  icon:u.jsx(Oj,{className:"text-sky-600 h-5 w-5"}),
-                  iconBg:"bg-sky-50",
-                  loading:t,
-                  onClick:()=>go(gr.dailyConsumption),
-                  linkHint:"Water Logs"
-                })
-              ]
-            }),
-
-            // Flock Management Graphs (Directly below Flock Cards!)
-            u.jsxs("div",{
-              className:"grid gap-6 grid-cols-1 lg:grid-cols-3",
-              children:[
-                // Flock Performance BarChart
-                u.jsxs(jr,{
-                  className:"lg:col-span-2 border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden",
-                  children:[
-                    u.jsxs(hn,{
-                      className:"flex flex-row items-center justify-between pb-2 px-6 pt-5 border-b border-slate-100",
+                      className:"p-3 rounded-xl bg-white border border-slate-200 hover:border-cyan-400 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between group",
                       children:[
                         u.jsxs("div",{
+                          className:"min-w-0 space-y-0.5",
                           children:[
-                            u.jsx($i,{className:"text-base font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(R0,{className:"h-4 w-4 text-cyan-600"}),"Flock Egg Output & Mortality Comparison"]}),
-                            u.jsx(jC,{className:"text-xs font-medium text-slate-500",children:"Comparative performance of total eggs produced vs bird mortality across poultry units"})
+                            u.jsxs("div",{className:"flex items-center gap-1.5",children:[u.jsx("p",{className:"text-xs font-bold text-slate-900",children:fl.flockName}),u.jsx("span",{className:"text-[10px] font-semibold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-100",children:fl.breed||"LSL"})]}),
+                            u.jsxs("p",{className:"text-[11px] font-medium text-slate-500",children:[`${(Number(fl.totalBirds)||0).toLocaleString()} Living Birds`," · ",`${fl.ageWeeks||fl.ageInWeeks||30} Weeks`]})
                           ]
                         }),
-                        u.jsxs("button",{
-                          onClick:()=>go(gr.flocks),
-                          className:"text-xs font-bold text-cyan-700 hover:text-cyan-800 cursor-pointer flex items-center gap-1",
-                          children:["View Flocks"," \u2192"]
-                        })
+                        u.jsx(V0,{className:"h-4 w-4 text-slate-300 group-hover:text-cyan-600 group-hover:translate-x-0.5 transition-all shrink-0"})
                       ]
-                    }),
-                    u.jsx(Cr,{
-                      className:"p-6 pt-4",
-                      children:u.jsx("div",{
-                        className:"h-72 w-full",
-                        children:o?.flockPerformance&&o.flockPerformance.length>0?u.jsx(C2,{
-                          width:"100%",
-                          height:"100%",
-                          children:u.jsxs(aA,{
-                            data:o.flockPerformance,
-                            margin:{top:15,right:25,left:10,bottom:5},
+                    })):u.jsx("p",{className:"text-xs text-slate-400 py-4 text-center",children:"No flocks registered"})
+                  }),
+                  u.jsx("div",{
+                    className:"pt-2 border-t border-slate-200 text-center",
+                    children:u.jsxs("button",{
+                      onClick:()=>go(gr.flocks),
+                      className:"text-xs font-bold text-cyan-700 hover:text-cyan-900 cursor-pointer inline-flex items-center gap-1",
+                      children:["Open Full Flocks Directory"," →"]
+                    })
+                  })
+                ]
+              })
+            ]
+          })
+        ]
+      }),
+
+      // 3. EGG PRODUCTION & OPERATIONS SECTION
+      u.jsxs("section",{
+        className:"bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs space-y-8",
+        children:[
+          // Section Header
+          u.jsxs("div",{
+            className:"flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4",
+            children:[
+              u.jsxs("div",{
+                className:"flex items-center gap-3",
+                children:[
+                  u.jsx("div",{className:"p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100",children:u.jsx(eD,{className:"h-5 w-5"})}),
+                  u.jsxs("div",{
+                    children:[
+                      u.jsx("h2",{className:"text-lg font-black text-slate-900 tracking-tight",children:"Egg Production & Operations"}),
+                      u.jsx("p",{className:"text-xs font-semibold text-slate-500",children:"Egg collection volume, laying rates (HDP), egg weight grading, wastage rate, and inventory reserves"})
+                    ]
+                  })
+                ]
+              }),
+              u.jsxs("div",{
+                className:"flex items-center gap-2",
+                children:[
+                  u.jsxs("button",{
+                    onClick:()=>go(gr.eggProduction),
+                    className:"text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer",
+                    children:["Egg Production Table",u.jsx(V0,{className:"h-3.5 w-3.5"})]
+                  }),
+                  u.jsxs("button",{
+                    onClick:()=>go(gr.stocks),
+                    className:"text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer",
+                    children:["Feed & Stocks Store",u.jsx(V0,{className:"h-3.5 w-3.5"})]
+                  })
+                ]
+              })
+            ]
+          }),
+
+          // Production Cards (5 Cards)
+          u.jsxs("div",{
+            className:"grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5",
+            children:[
+              u.jsx(Mi,{
+                title:"Total Eggs",
+                value:z,
+                prefix:"",
+                subValue:"Harvested Collections",
+                icon:u.jsx(eD,{className:"text-amber-600 h-5 w-5"}),
+                iconBg:"bg-amber-50",
+                loading:t,
+                onClick:()=>go(gr.eggProduction),
+                linkHint:"Egg Logs"
+              }),
+              u.jsx(Mi,{
+                title:"Laying Rate (HDP)",
+                value:J,
+                prefix:"",
+                subValue:"Hen-Day Production Target",
+                trend:me,
+                status:X9e(J),
+                icon:u.jsx(t2,{className:et("h-5 w-5",G.textColor)}),
+                iconBg:G.iconBg,
+                loading:t,
+                onClick:()=>go(gr.eggProduction),
+                linkHint:"Laying Trends"
+              }),
+              u.jsx(Mi,{
+                title:"Avg Egg Weight",
+                value:ne,
+                prefix:"",
+                subValue:"Grams per Egg Standard",
+                icon:u.jsx(rD,{className:"text-purple-600 h-5 w-5"}),
+                iconBg:"bg-purple-50",
+                loading:t,
+                onClick:()=>go(gr.eggProduction),
+                linkHint:"Weight Logs"
+              }),
+              u.jsx(Mi,{
+                title:"Avg. Egg Price",
+                value:ge,
+                prefix:"PKR ",
+                subValue:"Market Realized Rate",
+                icon:u.jsx(V0,{className:"text-blue-600 h-5 w-5"}),
+                iconBg:"bg-blue-50",
+                loading:t,
+                onClick:()=>go(gr.sales),
+                linkHint:"Egg Sales"
+              }),
+              u.jsx(Mi,{
+                title:"Eggs Wasted",
+                value:te,
+                prefix:"",
+                subValue:`${(Number(Z)||0).toLocaleString()} Broken Eggs`,
+                status:J9e(te),
+                icon:u.jsx(Xc,{className:et("h-5 w-5",re.textColor)}),
+                iconBg:re.iconBg,
+                loading:t,
+                onClick:()=>go(gr.eggProduction),
+                linkHint:"Damage Logs"
+              })
+            ]
+          }),
+
+          // Production Graphs
+          u.jsxs("div",{
+            className:"grid gap-6 grid-cols-1 lg:grid-cols-3",
+            children:[
+              // SVG Area & Trend Line Chart for Daily Egg Production
+              u.jsxs("div",{
+                className:"lg:col-span-2 border border-slate-200/90 shadow-xs bg-slate-50/50 rounded-2xl p-5 sm:p-6 flex flex-col justify-between space-y-4",
+                children:[
+                  u.jsxs("div",{
+                    className:"flex items-center justify-between border-b border-slate-200 pb-3",
+                    children:[
+                      u.jsxs("div",{
+                        children:[
+                          u.jsx("h3",{className:"text-sm font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(t2,{className:"h-4 w-4 text-indigo-600"}),"Daily Egg Production Trend"]}),
+                          u.jsx("p",{className:"text-xs text-slate-500",children:"Daily egg collection trajectory across active units"})
+                        ]
+                      }),
+                      u.jsxs("span",{className:"text-xs font-bold px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-800",children:["Recent High: ",Math.max(...eggTrend.map(x=>Number(x.eggs)||0),0).toLocaleString()," Eggs"]})
+                    ]
+                  }),
+                  // SVG Area Chart
+                  u.jsx("div",{
+                    className:"w-full overflow-x-auto",
+                    children:u.jsxs("svg",{
+                      viewBox:"0 0 650 200",
+                      className:"w-full h-56 select-none",
+                      children:[
+                        u.jsx("defs",{
+                          children:u.jsxs("linearGradient",{
+                            id:"eggAreaGrad",
+                            x1:"0",y1:"0",x2:"0",y2:"1",
                             children:[
-                              u.jsx(Z3,{strokeDasharray:"3 3",vertical:!1,stroke:"#f1f5f9"}),
-                              u.jsx(l1,{dataKey:"flock",axisLine:!1,tickLine:!1,tick:{fontSize:11,fontWeight:600,fill:"#475569"}}),
-                              u.jsx(c1,{axisLine:!1,tickLine:!1,tick:{fontSize:11,fill:"#94a3b8"}}),
-                              u.jsx(F2,{cursor:{fill:"#f8fafc"},formatter:(val,name)=>[Number(val).toLocaleString(),name]}),
-                              u.jsx(wY,{verticalAlign:"top",height:32,wrapperStyle:{fontSize:"11px",fontWeight:"600"}}),
-                              u.jsx(o1,{dataKey:"production",name:"Egg Production",fill:"#0284c7",radius:[6,6,0,0],barSize:26}),
-                              u.jsx(o1,{dataKey:"mortality",name:"Mortality",fill:"#ef4444",radius:[6,6,0,0],barSize:26})
+                              u.jsx("stop",{offset:"0%",stopColor:"#6366f1",stopOpacity:0.35}),
+                              u.jsx("stop",{offset:"100%",stopColor:"#6366f1",stopOpacity:0.02})
                             ]
                           })
-                        }):u.jsxs("div",{
-                          className:"flex flex-col items-center justify-center h-full text-slate-400 text-center",
-                          children:[u.jsx(R0,{className:"h-10 w-10 opacity-20 mb-2"}),u.jsx("p",{className:"text-xs font-semibold",children:"No flock performance data recorded"})]
-                        })
-                      })
-                    })
-                  ]
-                }),
-
-                // Active Flock Units List Card
-                u.jsxs(jr,{
-                  className:"border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden flex flex-col justify-between",
-                  children:[
-                    u.jsxs(hn,{
-                      className:"pb-2 px-6 pt-5 border-b border-slate-100",
-                      children:[
-                        u.jsx($i,{className:"text-base font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(qp,{className:"h-4 w-4 text-indigo-600"}),"Active Units Status"]}),
-                        u.jsx(jC,{className:"text-xs font-medium text-slate-500",children:"Click any unit to inspect batch specifications"})
-                      ]
-                    }),
-                    u.jsx(Cr,{
-                      className:"p-6 pt-4 space-y-3",
-                      children:e&&e.length>0?e.map(fl=>u.jsxs("div",{
-                        key:fl.id,
-                        onClick:()=>go(gr.flocks),
-                        className:"p-3 rounded-xl border border-slate-100 bg-slate-50/80 hover:bg-white hover:border-indigo-300 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between group",
-                        children:[
-                          u.jsxs("div",{
+                        }),
+                        // Horizontal Gridlines
+                        u.jsx("line",{x1:"40",y1:"25",x2:"620",y2:"25",stroke:"#e2e8f0",strokeDasharray:"4 4"}),
+                        u.jsx("line",{x1:"40",y1:"75",x2:"620",y2:"75",stroke:"#e2e8f0",strokeDasharray:"4 4"}),
+                        u.jsx("line",{x1:"40",y1:"125",x2:"620",y2:"125",stroke:"#e2e8f0",strokeDasharray:"4 4"}),
+                        u.jsx("line",{x1:"40",y1:"165",x2:"620",y2:"165",stroke:"#cbd5e1",strokeWidth:"1.5"}),
+                        // Area and line path calculation
+                        (()=>{
+                          if(!eggTrend || eggTrend.length===0) return null;
+                          const points = eggTrend.map((pt, idx)=>{
+                            const x = 55 + (idx / Math.max(1, eggTrend.length - 1)) * 550;
+                            const y = 165 - ((Number(pt.eggs)||0) / maxEggDay) * 135;
+                            return {x, y, date: pt.date, eggs: pt.eggs};
+                          });
+                          const pathD = points.reduce((acc, p, idx)=> `${acc} ${idx===0?'M':'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`, "");
+                          const areaD = `${pathD} L ${points[points.length-1].x.toFixed(1)} 165 L ${points[0].x.toFixed(1)} 165 Z`;
+                          return u.jsxs("g",{
                             children:[
-                              u.jsxs("p",{className:"text-sm font-bold text-slate-900 flex items-center gap-1.5",children:[fl.flockName,u.jsx("span",{className:"text-[10px] font-semibold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-100",children:fl.breed||"LSL"})]}),
-                              u.jsxs("p",{className:"text-xs font-medium text-slate-500",children:[`${(Number(fl.totalBirds)||0).toLocaleString()} Living Birds`," · ",`${fl.ageWeeks||fl.ageInWeeks||30} Weeks`]})
+                              u.jsx("path",{d:areaD,fill:"url(#eggAreaGrad)"}),
+                              u.jsx("path",{d:pathD,fill:"none",stroke:"#6366f1",strokeWidth:"3",strokeLinecap:"round"}),
+                              points.map((p, idx)=>u.jsxs("g",{
+                                key:idx,
+                                children:[
+                                  u.jsx("circle",{cx:p.x,cy:p.y,r:"4.5",className:"fill-white stroke-indigo-600 stroke-2 hover:r-6 transition-all"}),
+                                  u.jsx("text",{x:p.x,y:p.y-8,textAnchor:"middle",className:"text-[9px] font-bold fill-indigo-900",children:`${Math.round((p.eggs||0)/1000)}k`}),
+                                  u.jsx("text",{x:p.x,y:"182",textAnchor:"middle",className:"text-[10px] font-semibold fill-slate-500",children:p.date})
+                                ]
+                              }))
                             ]
-                          }),
-                          u.jsx(V0,{className:"h-4 w-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all"})
-                        ]
-                      })):u.jsx("p",{className:"text-xs text-slate-400",children:"No flocks registered"})
-                    }),
-                    u.jsx("div",{
-                      className:"p-4 bg-slate-50 border-t border-slate-100 text-center",
-                      children:u.jsxs("button",{
-                        onClick:()=>go(gr.flocks),
-                        className:"text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer inline-flex items-center gap-1",
-                        children:["Open Full Flocks Directory"," \u2192"]
-                      })
-                    })
-                  ]
-                })
-              ]
-            })
-          ]
-        }),
-
-        // 3. EGG PRODUCTION & OPERATIONS SECTION
-        u.jsxs("section",{
-          className:"space-y-6 pt-2 pb-6",
-          children:[
-            u.jsxs("div",{
-              className:"flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3",
-              children:[
-                u.jsxs("div",{
-                  className:"flex items-center gap-3",
-                  children:[
-                    u.jsx("div",{className:"p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100",children:u.jsx(eD,{className:"h-5 w-5"})}),
-                    u.jsxs("div",{
-                      children:[
-                        u.jsx("h2",{className:"text-lg font-black text-slate-900 tracking-tight",children:"Egg Production & Operations"}),
-                        u.jsx("p",{className:"text-xs font-semibold text-slate-500",children:"Egg collection volume, laying rates (HDP), egg weight grading, wastage rate, and inventory reserves"})
+                          });
+                        })()
                       ]
                     })
-                  ]
-                }),
-                u.jsxs("div",{
-                  className:"flex items-center gap-2",
-                  children:[
-                    u.jsxs("button",{
-                      onClick:()=>go(gr.eggProduction),
-                      className:"text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer",
-                      children:["Egg Production Table",u.jsx(V0,{className:"h-3.5 w-3.5"})]
-                    }),
-                    u.jsxs("button",{
+                  }),
+                  u.jsxs("div",{
+                    className:"pt-2 border-t border-slate-200 flex items-center justify-between text-xs",
+                    children:[
+                      u.jsx("span",{className:"text-slate-500 font-semibold",children:"Trajectory shows steady collection efficiency"}),
+                      u.jsxs("button",{
+                        onClick:()=>go(gr.eggProduction),
+                        className:"font-bold text-indigo-700 hover:text-indigo-900 flex items-center gap-1 cursor-pointer",
+                        children:["Open Egg Production Logs",u.jsx(V0,{className:"h-3 w-3"})]
+                      })
+                    ]
+                  })
+                ]
+              }),
+
+              // Warehouse Stock Levels
+              u.jsxs("div",{
+                className:"border border-slate-200/90 shadow-xs bg-slate-50/50 rounded-2xl p-5 sm:p-6 flex flex-col justify-between space-y-4",
+                children:[
+                  u.jsxs("div",{
+                    className:"flex items-center justify-between border-b border-slate-200 pb-3",
+                    children:[
+                      u.jsxs("div",{
+                        children:[
+                          u.jsx("h3",{className:"text-sm font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(qp,{className:"h-4 w-4 text-amber-500"}),"Inventory & Stock Levels"]}),
+                          u.jsx("p",{className:"text-xs text-slate-500",children:"Critical feed and vaccine supplies"})
+                        ]
+                      }),
+                      u.jsx(_b,{className:"h-4 w-4 text-amber-500"})
+                    ]
+                  }),
+                  u.jsx("div",{
+                    className:"space-y-3",
+                    children:o?.inventoryAlerts&&o.inventoryAlerts.length>0?o.inventoryAlerts.map((ye,ce)=>u.jsxs("div",{
+                      key:ce,
                       onClick:()=>go(gr.stocks),
-                      className:"text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer",
-                      children:["Feed & Stocks Store",u.jsx(V0,{className:"h-3.5 w-3.5"})]
-                    })
-                  ]
-                })
-              ]
-            }),
-
-            // Production Cards (5 Cards)
-            u.jsxs("div",{
-              className:"grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5",
-              children:[
-                u.jsx(Mi,{
-                  title:"Total Eggs",
-                  value:z,
-                  prefix:"",
-                  subValue:"Harvested Collections (Units)",
-                  icon:u.jsx(eD,{className:"text-amber-600 h-5 w-5"}),
-                  iconBg:"bg-amber-50",
-                  loading:t,
-                  onClick:()=>go(gr.eggProduction),
-                  linkHint:"Egg Logs"
-                }),
-                u.jsx(Mi,{
-                  title:"Laying Rate (HDP)",
-                  value:J,
-                  prefix:"",
-                  subValue:"Hen-Day Production Target",
-                  trend:me,
-                  status:X9e(J),
-                  icon:u.jsx(t2,{className:et("h-5 w-5",G.textColor)}),
-                  iconBg:G.iconBg,
-                  loading:t,
-                  onClick:()=>go(gr.eggProduction),
-                  linkHint:"Laying Trends"
-                }),
-                u.jsx(Mi,{
-                  title:"Avg Egg Weight",
-                  value:ne,
-                  prefix:"",
-                  subValue:"Grams per Egg",
-                  icon:u.jsx(rD,{className:"text-purple-600 h-5 w-5"}),
-                  iconBg:"bg-purple-50",
-                  loading:t,
-                  onClick:()=>go(gr.eggProduction),
-                  linkHint:"Weight Logs"
-                }),
-                u.jsx(Mi,{
-                  title:"Avg. Egg Price",
-                  value:ge,
-                  prefix:"PKR ",
-                  subValue:"Market Realized Rate",
-                  icon:u.jsx(V0,{className:"text-blue-600 h-5 w-5"}),
-                  iconBg:"bg-blue-50",
-                  loading:t,
-                  onClick:()=>go(gr.sales),
-                  linkHint:"Egg Sales"
-                }),
-                u.jsx(Mi,{
-                  title:"Eggs Wasted",
-                  value:te,
-                  prefix:"",
-                  subValue:`${(Number(Z)||0).toLocaleString()} Broken Eggs`,
-                  status:J9e(te),
-                  icon:u.jsx(Xc,{className:et("h-5 w-5",re.textColor)}),
-                  iconBg:re.iconBg,
-                  loading:t,
-                  onClick:()=>go(gr.eggProduction),
-                  linkHint:"Damage Logs"
-                })
-              ]
-            }),
-
-            // Production Graphs (Directly below Production Cards!)
-            u.jsxs("div",{
-              className:"grid gap-6 grid-cols-1 lg:grid-cols-3",
-              children:[
-                // Daily Production Volume Trend Area Chart
-                u.jsxs(jr,{
-                  className:"lg:col-span-2 border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden",
-                  children:[
-                    u.jsxs(hn,{
-                      className:"flex flex-row items-center justify-between pb-2 px-6 pt-5 border-b border-slate-100",
+                      className:"p-3 rounded-xl bg-white border border-slate-200 hover:border-amber-400 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between group",
                       children:[
                         u.jsxs("div",{
+                          className:"min-w-0 space-y-0.5",
                           children:[
-                            u.jsx($i,{className:"text-base font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(t2,{className:"h-4 w-4 text-indigo-600"}),"Daily Egg Production Trend"]}),
-                            u.jsx(jC,{className:"text-xs font-medium text-slate-500",children:"Daily egg collection trajectory across active units"})
+                            u.jsx("p",{className:"text-xs font-bold text-slate-900 truncate",children:ye.item}),
+                            u.jsx("p",{className:"text-[10px] font-medium text-slate-500",children:ye.head})
                           ]
                         }),
-                        u.jsxs("button",{
-                          onClick:()=>go(gr.eggProduction),
-                          className:"text-xs font-bold text-indigo-700 hover:text-indigo-800 cursor-pointer flex items-center gap-1",
-                          children:["Egg Production Logs"," \u2192"]
-                        })
-                      ]
-                    }),
-                    u.jsx(Cr,{
-                      className:"p-6 pt-4",
-                      children:u.jsx("div",{
-                        className:"h-72 w-full",
-                        children:o?.chart&&o.chart.length>0?u.jsx(C2,{
-                          width:"100%",
-                          height:"100%",
-                          children:u.jsxs(Y9e,{
-                            data:o.chart,
-                            margin:{top:15,right:25,left:10,bottom:5},
-                            children:[
-                              u.jsx("defs",{
-                                children:u.jsxs("linearGradient",{
-                                  id:"colorEggsRevamp",
-                                  x1:"0",
-                                  y1:"0",
-                                  x2:"0",
-                                  y2:"1",
-                                  children:[
-                                    u.jsx("stop",{offset:"5%",stopColor:"#6366f1",stopOpacity:.35}),
-                                    u.jsx("stop",{offset:"95%",stopColor:"#6366f1",stopOpacity:0})
-                                  ]
-                                })
-                              }),
-                              u.jsx(Z3,{strokeDasharray:"3 3",vertical:!1,stroke:"#f1f5f9"}),
-                              u.jsx(l1,{dataKey:"date",axisLine:!1,tickLine:!1,tick:{fontSize:11,fontWeight:600,fill:"#475569"}}),
-                              u.jsx(c1,{axisLine:!1,tickLine:!1,tick:{fontSize:11,fill:"#94a3b8"}}),
-                              u.jsx(F2,{
-                                contentStyle:{borderRadius:"12px",border:"1px solid #e2e8f0",boxShadow:"0 10px 25px -5px rgba(0,0,0,0.1)"},
-                                formatter:ye=>[`${Number(ye).toLocaleString()} Eggs`,"Collection"]
-                              }),
-                              u.jsx(IZ,{type:"monotone",dataKey:"eggs",name:"Eggs Harvested",stroke:"#6366f1",fillOpacity:1,fill:"url(#colorEggsRevamp)",strokeWidth:2.5})
-                            ]
-                          })
-                        }):u.jsxs("div",{
-                          className:"flex flex-col items-center justify-center h-full text-slate-400 text-center",
-                          children:[u.jsx(t2,{className:"h-10 w-10 opacity-20 mb-2"}),u.jsx("p",{className:"text-xs font-semibold",children:"No egg production data recorded"})]
-                        })
-                      })
-                    })
-                  ]
-                }),
-
-                // Warehouse Stock Alerts Card
-                u.jsxs(jr,{
-                  className:"border border-slate-200/90 shadow-xs bg-white rounded-2xl overflow-hidden flex flex-col justify-between",
-                  children:[
-                    u.jsxs(hn,{
-                      className:"flex flex-row items-center justify-between pb-2 px-6 pt-5 border-b border-slate-100",
-                      children:[
                         u.jsxs("div",{
+                          className:"text-right shrink-0",
                           children:[
-                            u.jsx($i,{className:"text-base font-bold text-slate-900 flex items-center gap-2",children:[u.jsx(qp,{className:"h-4 w-4 text-amber-500"}),"Inventory & Stock Levels"]}),
-                            u.jsx(jC,{className:"text-xs font-medium text-slate-500",children:"Critical feed and vaccine supplies"})
+                            u.jsxs("p",{className:et("text-xs font-black",ye.stock<20?"text-rose-600":"text-amber-600"),children:[ye.stock," ",ye.unit||"Units"]}),
+                            u.jsx("span",{className:et("text-[9px] font-bold px-1.5 py-0.2 rounded inline-block",ye.stock<20?"bg-rose-100 text-rose-700":"bg-amber-100 text-amber-700"),children:ye.stock<20?"Critical":"Adequate"})
                           ]
-                        }),
-                        u.jsx(_b,{className:"h-4 w-4 text-amber-500"})
+                        })
                       ]
-                    }),
-                    u.jsx(Cr,{
-                      className:"p-6 pt-4 space-y-3",
-                      children:o?.inventoryAlerts&&o.inventoryAlerts.length>0?o.inventoryAlerts.map((ye,ce)=>u.jsxs("div",{
-                        key:ce,
-                        onClick:()=>go(gr.stocks),
-                        className:"p-3 rounded-xl border border-slate-100 bg-slate-50/80 hover:bg-white hover:border-amber-300 hover:shadow-xs transition-all cursor-pointer flex items-center justify-between group",
-                        children:[
-                          u.jsxs("div",{
-                            children:[
-                              u.jsx("p",{className:"text-sm font-bold text-slate-900",children:ye.item}),
-                              u.jsx("p",{className:"text-xs font-medium text-slate-500",children:ye.head})
-                            ]
-                          }),
-                          u.jsxs("div",{
-                            className:"text-right",
-                            children:[
-                              u.jsxs("p",{className:et("text-sm font-black",ye.stock<20?"text-rose-600":"text-amber-600"),children:[ye.stock," ",ye.unit||"Units"]}),
-                              u.jsx("span",{className:et("text-[10px] font-bold px-1.5 py-0.2 rounded",ye.stock<20?"bg-rose-100 text-rose-700":"bg-amber-100 text-amber-700"),children:ye.stock<20?"Critical":"Adequate"})
-                            ]
-                          })
-                        ]
-                      })):u.jsxs("div",{
-                        className:"text-center py-8 text-slate-400",
-                        children:[u.jsx(qp,{className:"h-10 w-10 mx-auto opacity-20 mb-2"}),u.jsx("p",{className:"text-xs font-semibold",children:"All stock levels normal"})]
-                      })
-                    }),
-                    u.jsx("div",{
-                      className:"p-4 bg-slate-50 border-t border-slate-100 text-center",
-                      children:u.jsxs("button",{
-                        onClick:()=>go(gr.stocks),
-                        className:"text-xs font-bold text-emerald-600 hover:text-emerald-800 cursor-pointer inline-flex items-center gap-1",
-                        children:["Open Warehouse & Stocks Store"," \u2192"]
-                      })
+                    })):u.jsxs("div",{
+                      className:"text-center py-6 text-slate-400",
+                      children:[u.jsx(qp,{className:"h-8 w-8 mx-auto opacity-20 mb-1"}),u.jsx("p",{className:"text-xs font-semibold",children:"All stock levels normal"})]
                     })
-                  ]
-                })
-              ]
-            })
-          ]
-        })
-      ]
-    })
+                  }),
+                  u.jsx("div",{
+                    className:"pt-2 border-t border-slate-200 text-center",
+                    children:u.jsxs("button",{
+                      onClick:()=>go(gr.stocks),
+                      className:"text-xs font-bold text-amber-700 hover:text-amber-900 cursor-pointer inline-flex items-center gap-1",
+                      children:["Open Warehouse & Stocks Store"," →"]
+                    })
+                  })
+                ]
+              })
+            ]
+          })
+        ]
+      })
+    ]
   });
 }
 const tze=e=>u.jsx("div",{className:"min-h-screen flex items-center justify-center bg-background px-4",children:u.jsxs("div",{className:"w-full max-w-md space-y-8 p-8 bg-card rounded-xl shadow-lg border",children:[u.jsxs("div",{className:"text-center",children:[u.jsx("h2",{className:"text-3xl font-bold tracking-tight",children:e.showOtpForm?"Enter OTP":"Forgot Password"}),u.jsx("p",{className:"mt-2 text-sm text-muted-foreground",children:e.showOtpForm?`We sent a 6-digit OTP to ${e.emailSentTo}`:"Enter your email and we'll send you a reset OTP"})]}),e.showOtpForm?u.jsx(ize,{onSubmit:e.handleVerifyOtp,onResend:e.handleResendOtp,isLoading:e.isLoading,timer:e.timer}):u.jsx(aze,{onSubmit:e.handleSendEmail,isLoading:e.isLoading}),u.jsxs("div",{className:"text-center text-sm space-y-2",children:[u.jsx(Mu,{to:gr.login,className:"text-primary hover:underline block",children:"Back to Login"}),e.showOtpForm&&u.jsx("button",{type:"button",onClick:e.hideOtpForm,className:"text-primary hover:underline",children:"Change Email"})]})]})}),rze=Aa({email:sr().email("Invalid email address").required("Email is required")}),nze=Aa({otp:sr().required("OTP is required")}),aze=({onSubmit:e,isLoading:t})=>{const r=Ls({initialValues:{email:""},validationSchema:rze,onSubmit:async n=>await e(n.email)});return u.jsxs("form",{onSubmit:r.handleSubmit,className:"space-y-6",children:[u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"email",children:"Email address"}),u.jsx(Ot,{id:"email",name:"email",type:"email",placeholder:"name@example.com",value:r.values.email,onChange:r.handleChange,onBlur:r.handleBlur,disabled:t,className:et(r.touched.email&&r.errors.email&&"border-destructive")}),r.touched.email&&r.errors.email&&u.jsx("p",{className:"text-sm text-destructive",children:r.errors.email})]}),u.jsx(xt,{type:"submit",className:"w-full",disabled:t||!r.isValid,children:t?"Sending...":"Send OTP"})]})},ize=({onSubmit:e,onResend:t,isLoading:r,timer:n})=>{const a=Ls({initialValues:{otp:""},validationSchema:nze,onSubmit:async i=>await e(i.otp)});return u.jsxs("form",{onSubmit:a.handleSubmit,className:"space-y-6",children:[u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"otp",children:"Enter 6-digit OTP"}),u.jsx(Ot,{id:"otp",name:"otp",type:"text",maxLength:6,placeholder:"123456",value:a.values.otp,onChange:i=>{const s=i.target.value.replace(/\D/g,"");a.setFieldValue("otp",s)},onBlur:a.handleBlur,disabled:r,className:et(a.touched.otp&&a.errors.otp&&"border-destructive")}),a.touched.otp&&a.errors.otp&&u.jsx("p",{className:"text-sm text-destructive",children:a.errors.otp})]}),u.jsx(xt,{type:"submit",className:"w-full",disabled:r||!a.isValid,children:r?"Verifying...":"Verify OTP"}),u.jsx("div",{className:"text-center text-sm",children:n>0?u.jsxs("p",{className:"text-muted-foreground",children:["Resend in ",u.jsxs("span",{className:"font-medium",children:[n,"s"]})]}):u.jsx("button",{type:"button",onClick:t,disabled:r,className:et("text-primary hover:underline",r&&"opacity-50 cursor-not-allowed"),children:"Resend OTP"})})]})},sze=()=>{const[e,t]=S.useState(!1),[r,n]=S.useState(!1),[a,i]=S.useState(""),[s,o]=S.useState(60),{login:c}=Dr();S.useEffect(()=>{if(!r||s<=0)return;const v=setInterval(()=>{o(g=>g<=1?(clearInterval(v),0):g-1)},1e3);return()=>clearInterval(v)},[r,s]);const f=async v=>{t(!0);try{const g=await YEe(v);g.message?.toLowerCase().includes("success")?(pt.success("OTP sent to your email"),i(v),n(!0),o(60)):pt.error(g.message||"Failed to send OTP")}catch(g){pt.error(g.message||"Something went wrong. Try again.")}finally{t(!1)}},d=async v=>{t(!0);try{const g=await KEe(a,v);g.message?.toLowerCase().includes("success")?(pt.success("Email verified! Redirecting..."),c(g.data.token),globalThis.authToken=g.data.token,window.location.replace(`${gr.changePassword}?type=otp`)):pt.error(g.message||"Invalid OTP")}catch(g){pt.error(g.message||"Verification failed")}finally{t(!1)}},m=async()=>{s>0||e||await f(a)};return u.jsx(tze,{showOtpForm:r,isLoading:e,emailSentTo:a,timer:s,handleSendEmail:f,handleVerifyOtp:d,handleResendOtp:m,hideOtpForm:()=>n(!1)})},oze=Aa({oldPassword:sr().min(8,"Password must be at least 8 characters").required(),newPassword:sr().min(8,"Password must be at least 8 characters").required("New password is required"),confirmPassword:sr().oneOf([Uq("newPassword")],"Passwords must match").required("Confirm password is required")}),lze=Aa({newPassword:sr().min(8,"Password must be at least 8 characters").required("New password is required"),confirmPassword:sr().oneOf([Uq("newPassword")],"Passwords must match").required("Confirm password is required")}),cze=e=>{const t=Ls({initialValues:e.type==="password"?{oldPassword:"",newPassword:"",confirmPassword:""}:{newPassword:"",confirmPassword:""},validationSchema:e.type==="password"?oze:lze,onSubmit:async r=>{await e.changePassword(r)}});return u.jsx("div",{className:"min-h-screen flex items-center justify-center bg-background px-4",children:u.jsxs("div",{className:"w-full max-w-md space-y-8",children:[u.jsxs("div",{className:"text-center",children:[u.jsx("h2",{className:"text-3xl font-bold tracking-tight",children:"Set New Password"}),u.jsx("p",{className:"mt-2 text-sm text-muted-foreground",children:"Choose a strong password for your account"})]}),u.jsxs("form",{onSubmit:t.handleSubmit,className:"space-y-6",children:[e.type==="password"&&u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"newPassword",children:"Old Password"}),u.jsx(Ot,{id:"oldPassword",name:"oldPassword",type:"password",placeholder:"••••••••",value:t.values.oldPassword,onChange:t.handleChange,onBlur:t.handleBlur,disabled:e.isLoading,className:et(t.touched.newPassword&&t.errors.newPassword&&"border-destructive")}),t.touched.oldPassword&&t.errors.oldPassword&&u.jsx("p",{className:"text-sm text-destructive",children:t.errors.oldPassword})]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"newPassword",children:"New Password"}),u.jsx(Ot,{id:"newPassword",name:"newPassword",type:"password",placeholder:"••••••••",value:t.values.newPassword,onChange:t.handleChange,onBlur:t.handleBlur,disabled:e.isLoading,className:et(t.touched.newPassword&&t.errors.newPassword&&"border-destructive")}),t.touched.newPassword&&t.errors.newPassword&&u.jsx("p",{className:"text-sm text-destructive",children:t.errors.newPassword})]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"confirmPassword",children:"Confirm Password"}),u.jsx(Ot,{id:"confirmPassword",name:"confirmPassword",type:"password",placeholder:"••••••••",value:t.values.confirmPassword,onChange:t.handleChange,onBlur:t.handleBlur,disabled:e.isLoading,className:et(t.touched.confirmPassword&&t.errors.confirmPassword&&"border-destructive")}),t.touched.confirmPassword&&t.errors.confirmPassword&&u.jsx("p",{className:"text-sm text-destructive",children:t.errors.confirmPassword})]}),u.jsx(xt,{type:"submit",className:"w-full",disabled:e.isLoading||!t.isValid,children:e.isLoading?"Changing...":"Change Password"})]}),u.jsx("div",{className:"text-center text-sm",children:u.jsx(Mu,{to:gr.login,className:"text-primary hover:underline",children:"Back to Login"})})]})})},uze=()=>{const[e,t]=S.useState(!1),{navigateTo:r}=Am(),n=Hu(),i=new URLSearchParams(n.search).get("type")??"password",s=async o=>{t(!0);try{const c=await XEe(o.newPassword);c.message?.toLowerCase().includes("success")?(pt.success("Password changed successfully"),r(gr.dashboard)):pt.error(c.message||"Failed to change password")}catch(c){pt.error(er(c)||"Something went wrong")}finally{t(!1)}};return u.jsx(cze,{type:i,isLoading:e,changePassword:s})},fze=e=>u.jsx("div",{className:"min-h-screen flex items-center justify-center bg-background px-4",children:u.jsxs("div",{className:"w-full max-w-md space-y-8 p-8 bg-card rounded-xl shadow-lg border",children:[u.jsxs("div",{className:"text-center",children:[u.jsx("h2",{className:"text-3xl font-bold tracking-tight",children:e.showOtpForm?"Enter OTP":"Send Email"}),u.jsx("p",{className:"mt-2 text-sm text-muted-foreground",children:e.showOtpForm?`We sent a 6-digit OTP to ${e.emailSentTo}`:"Send OTP to verify your email"})]}),e.showOtpForm?u.jsx(hze,{onSubmit:e.handleVerifyOtp,onResend:e.handleResendOtp,isLoading:e.isLoading,timer:e.timer}):u.jsx("div",{children:u.jsx(xt,{className:"w-full",onClick:()=>e.handleSendEmail(),children:"Send Email"})})]})}),dze=Aa({otp:sr().required("OTP is required")}),hze=({onSubmit:e,onResend:t,isLoading:r,timer:n})=>{const a=Ls({initialValues:{otp:""},validationSchema:dze,onSubmit:async i=>await e(i.otp)});return u.jsxs("form",{onSubmit:a.handleSubmit,className:"space-y-6",children:[u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"otp",children:"Enter 6-digit OTP"}),u.jsx(Ot,{id:"otp",name:"otp",type:"text",maxLength:6,placeholder:"123456",value:a.values.otp,onChange:i=>{const s=i.target.value.replace(/\D/g,"");a.setFieldValue("otp",s)},onBlur:a.handleBlur,disabled:r,className:et(a.touched.otp&&a.errors.otp&&"border-destructive")}),a.touched.otp&&a.errors.otp&&u.jsx("p",{className:"text-sm text-destructive",children:a.errors.otp})]}),u.jsx(xt,{type:"submit",className:"w-full",disabled:r||!a.isValid,children:r?"Verifying...":"Verify OTP"}),u.jsx("div",{className:"text-center text-sm",children:n>0?u.jsxs("p",{className:"text-muted-foreground",children:["Resend in ",u.jsxs("span",{className:"font-medium",children:[n,"s"]})]}):u.jsx("button",{type:"button",onClick:t,disabled:r,className:et("text-primary hover:underline",r&&"opacity-50 cursor-not-allowed"),children:"Resend OTP"})})]})},mze=()=>{const[e,t]=S.useState(!1),[r,n]=S.useState(!1),[a,i]=S.useState(60),{user:s,setUser:o}=Dr();S.useEffect(()=>{if(!r||a<=0)return;const m=setInterval(()=>{i(v=>v<=1?(clearInterval(m),0):v-1)},1e3);return()=>clearInterval(m)},[r,a]);const c=async()=>{try{if(!s)return;(await ZEe(s.email)).message.toLowerCase()==="success"&&(pt.success("OTP sent to your email"),n(!0),i(60))}catch(m){console.log(er(m)),pt.error(er(m))}},f=async m=>{t(!0);try{if(!s)return;const v=await JEe(s.email,m);v.message?.toLowerCase().includes("success")?(pt.success("Email verified! Redirecting..."),s.isEmailVerified=!0,o(s),window.location.replace(`${gr.dashboard}`)):pt.error(v.message||"Invalid OTP")}catch(v){pt.error(er(v)||"Something went wrong")}finally{t(!1)}},d=async()=>{a>0||e||await c()};return u.jsx(fze,{showOtpForm:r,isLoading:e,emailSentTo:s?.email??"sample@gmail.com",timer:a,handleSendEmail:c,handleVerifyOtp:f,handleResendOtp:d,hideOtpForm:()=>n(!1)})},pze=Aa({name:sr().min(2,"Name must be at least 2 characters").max(50,"Name is too long").optional(),email:sr().email("Invalid email address").required("Email is required")}),gze=e=>{const t=Ls({initialValues:{name:"",email:""},validationSchema:pze,onSubmit:async r=>{e.onSubmit(r.email,r.name)}});return u.jsx("div",{className:"min-h-screen flex items-center justify-center bg-background px-4",children:u.jsxs("div",{className:"w-full max-w-md space-y-8 p-8 bg-card rounded-xl shadow-lg border",children:[u.jsxs("div",{className:"text-center",children:[u.jsx("h2",{className:"text-3xl font-bold tracking-tight",children:"Update Profile"}),u.jsx("p",{className:"mt-2 text-sm text-muted-foreground",children:"Update your name and email address"})]}),u.jsxs("form",{onSubmit:t.handleSubmit,className:"space-y-6",children:[u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"name",children:"Name"}),u.jsx(Ot,{id:"name",name:"name",type:"text",placeholder:"Your full name",value:t.values.name,onChange:t.handleChange,onBlur:t.handleBlur,disabled:e.isLoading,className:et(t.touched.name&&t.errors.name&&"border-destructive")}),t.touched.name&&t.errors.name&&u.jsx("p",{className:"text-sm text-destructive",children:t.errors.name})]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"email",children:"Email address *"}),u.jsx(Ot,{id:"email",name:"email",type:"email",placeholder:"name@example.com",value:t.values.email,onChange:t.handleChange,onBlur:t.handleBlur,disabled:e.isLoading,className:et(t.touched.email&&t.errors.email&&"border-destructive")}),t.touched.email&&t.errors.email&&u.jsx("p",{className:"text-sm text-destructive",children:t.errors.email})]}),u.jsxs("div",{className:"flex flex-col gap-4",children:[u.jsx(xt,{type:"submit",className:"w-full",disabled:e.isLoading||!t.isValid,children:e.isLoading?"Updating...":"Update Profile"}),u.jsx(xt,{type:"button",variant:"outline",className:"w-full",disabled:e.isLoading,onClick:e.onCancel,children:"Cancel"})]})]})]})})},vze=()=>{const[e,t]=S.useState(!1),{navigateTo:r}=Am(),{setUser:n}=Dr(),a=async(i,s)=>{t(!0);try{let o=await QEe(i,s&&s.length>0?s:void 0);o.message?.toLowerCase().includes("success")?(pt.success("Profile updated successfully"),n(o.data),o.data?.isEmailVerified?r(gr.dashboard):r(gr.verifyEmail)):pt.error(o.message||"Failed to update profile")}catch(o){pt.error(er(o)||"Something went wrong")}finally{t(!1)}};return u.jsx(gze,{isLoading:e,onSubmit:a,onCancel:()=>r(gr.dashboard)})},xze=Aa({name:sr().min(1,"Farm name is required").max(100,"Max 100 characters").required("Farm name is required"),code:sr().min(1,"Farm code is required").max(50,"Max 50 characters").required("Farm code is required"),location:sr().optional(),description:sr().optional()});function tJ({initialValues:e,onSubmit:t,isLoading:r,className:n}){const a=Ls({initialValues:{name:e?.name||"",code:e?.code||"",location:e?.location||"",description:e?.description||""},validationSchema:xze,enableReinitialize:!0,onSubmit:async s=>{await t(s),a.resetForm()}}),i=s=>a.touched[s]&&a.errors[s]?u.jsx("p",{className:"text-xs text-red-600 mt-1",children:a.errors[s]}):null;return u.jsxs("form",{onSubmit:a.handleSubmit,className:et("flex flex-col gap-6",n),children:[u.jsxs("div",{className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:[u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"name",children:"Farm Name *"}),u.jsx(Ot,{id:"name",name:"name",placeholder:"e.g. Green Valley Farm",value:a.values.name,onChange:a.handleChange,onBlur:a.handleBlur,disabled:r}),i("name")]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"code",children:"Farm Code *"}),u.jsx(Ot,{id:"code",name:"code",placeholder:"e.g. GVF-01",value:a.values.code,onChange:a.handleChange,onBlur:a.handleBlur,disabled:r}),i("code")]}),u.jsxs("div",{className:"space-y-2 md:col-span-2",children:[u.jsx(bt,{htmlFor:"location",children:"Location"}),u.jsx(Ot,{id:"location",name:"location",placeholder:"e.g. Lahore, Punjab",value:a.values.location,onChange:a.handleChange,onBlur:a.handleBlur,disabled:r}),i("location")]}),u.jsxs("div",{className:"space-y-2 md:col-span-2",children:[u.jsx(bt,{htmlFor:"description",children:"Description"}),u.jsx(dd,{id:"description",name:"description",placeholder:"Additional details about the farm...",rows:3,value:a.values.description,onChange:a.handleChange,onBlur:a.handleBlur,disabled:r}),i("description")]})]}),u.jsx("div",{className:"flex justify-end",children:u.jsx(xt,{type:"submit",disabled:r||!a.isValid||!a.dirty,children:r?"Saving...":"Save Farm"})})]})}function yze(e){return u.jsx("div",{className:"bg-background",children:e.showForm?u.jsx("section",{className:"max-w-3xl mx-auto p-6",children:u.jsxs(hd,{Header:{title:"Add New Farm",desc:"Create and manage your poultry farms"},Body:{title:"Farm Details",desc:"Enter farm information below"},Footer:{title:"Farms help track production and expenses"},children:[u.jsx(tJ,{onSubmit:e.onCreate,isLoading:e.isLoading}),u.jsx(xt,{className:"mt-6 w-full",onClick:e.toggleForm,children:"View All Farms"})]})}):u.jsx("section",{className:"max-w-7xl mx-auto p-6",children:u.jsx(bze,{farms:e.farms,isLoading:e.isLoading,isUpdating:e.isUpdating,onEdit:e.onEdit,onDelete:e.onDelete,toggleForm:e.toggleForm})})})}function bze({farms:e,isLoading:t,isUpdating:r,onEdit:n,onDelete:a,toggleForm:i}){return t?u.jsx("div",{children:"Loading farms..."}):u.jsxs("div",{className:"space-y-6",children:[u.jsxs("div",{className:"flex justify-between items-center",children:[u.jsx("h2",{className:"text-2xl font-bold",children:"Farm Records"}),u.jsx(xt,{variant:"outline",onClick:i,children:"+ Add Farm"})]}),u.jsx("div",{className:"border rounded-xl overflow-hidden shadow-sm",children:e.length>0?u.jsxs(Ei,{children:[u.jsx(Gi,{children:u.jsxs(tn,{children:[u.jsx(tt,{children:"Name"}),u.jsx(tt,{children:"Code"}),u.jsx(tt,{children:"Location"}),u.jsx(tt,{children:"Description"}),u.jsx(tt,{className:"text-right",children:"Actions"})]})}),u.jsx(Ai,{children:e.map(s=>u.jsx(wze,{farm:s,onDelete:a,onEdit:n,isUpdating:r},s.id))})]}):u.jsxs("div",{className:"text-center py-16 space-y-4",children:[u.jsx("h2",{className:"text-xl font-semibold text-muted-foreground",children:"No farms added yet"}),u.jsx(xt,{onClick:i,children:"+ Add First Farm"})]})})]})}const wze=({farm:e,isUpdating:t,onEdit:r,onDelete:n})=>{const{user:a}=Dr(),[i,s]=S.useState(!1),[o,c]=S.useState(!1);return u.jsxs(u.Fragment,{children:[u.jsxs(tn,{className:"hover:bg-muted/30",children:[u.jsx(Qe,{className:"font-medium",children:e.name}),u.jsx(Qe,{children:e.code}),u.jsx(Qe,{children:e.location||"-"}),u.jsx(Qe,{className:"max-w-xs truncate",children:e.description||"-"}),a?.role==="super_admin"&&u.jsxs(Qe,{className:"text-right space-x-2",children:[u.jsx(xt,{variant:"ghost",size:"icon",onClick:()=>c(!0),children:u.jsx(ad,{className:"h-4 w-4"})}),u.jsx(xt,{variant:"ghost",size:"icon",className:"text-destructive",onClick:()=>s(!0),children:u.jsx(Xc,{className:"h-4 w-4"})})]})]}),a?.role==="super_admin"&&u.jsxs(u.Fragment,{children:[u.jsx(cd,{open:i,title:"Delete Farm",desc:"Are you sure you want to delete this farm?",onClick:f=>{f&&n(e.id),s(!1)}}),u.jsx(ud,{title:"Edit Farm",desc:"Update farm details",open:o,onOpenChange:()=>c(!1),children:u.jsx(tJ,{initialValues:e,onSubmit:async f=>{await r(e.id,f),c(!1)},isLoading:t})})]})]})},Sze=async()=>{let e=rr.getFarms,{data:t}=await Tg(e,nr.Get);return t},Nze=async e=>{let t=rr.farms,{data:r}=await dr(t,nr.Post,e);return r},_ze=async e=>{let t=`${rr.farms}/${e}`,{data:r}=await dr(t,nr.Delete);return r},Eze=async(e,t)=>{let r=`${rr.farms}/${e}`,{data:n}=await dr(r,nr.Put,t);return n},Aze=()=>{const{farms:e,setFarms:t}=Dr(),[r,n]=S.useState(!1),[a,i]=S.useState(!1),[s,o]=S.useState(!1),c=S.useCallback(()=>{n(v=>!v)},[]),f=async v=>{try{i(!0);const g=await Nze(v);g.message.toLowerCase()==="success"&&(t([g.data,...e]),pt.success("Farm created successfully"),n(!1))}catch(g){pt.error(er(g))}finally{i(!1)}},d=async(v,g)=>{try{o(!0),(await Eze(v,g)).message.toLowerCase()==="success"&&(t(e.map(y=>y.id===v?{...y,...g}:y)),pt.success("Farm updated successfully"))}catch(b){pt.error(er(b))}finally{o(!1)}},m=async v=>{try{(await _ze(v)).message.toLowerCase()==="success"&&(t(e.filter(b=>b.id!==v)),pt.success("Farm deleted"))}catch(g){pt.error(er(g))}};return u.jsx(yze,{farms:e,showForm:r,isLoading:a,isUpdating:s,onCreate:f,onEdit:d,onDelete:m,toggleForm:c})},jze=Aa({acquiredDate:sr().required("date is required").matches(/^\d{4}-\d{2}-\d{2}$/,"Invalid date format (YYYY-MM-DD)").test("no-future-date","Date cannot be in the future",e=>{if(!e)return!1;const[t,r,n]=e.split("-").map(Number),a=new Date(t,r-1,n),i=new Date;return i.setHours(0,0,0,0),a<=i}),exitDate:sr().ensure().test("format-or-empty","Invalid date format",e=>!e||e.length===0?!0:/^\d{4}-\d{2}-\d{2}$/.test(e)).test("no-future-date","Date cannot be in the future",e=>{if(!e||e.length===0)return!0;const[t,r,n]=e.split("-").map(Number),a=new Date(t,r-1,n),i=new Date;return i.setHours(0,0,0,0),a<=i}),flockName:sr().required("Flock name is required"),farmId:Hr().positive("Select a farm").required("Farm is required"),totalBirds:Hr().integer("Must be a whole number").min(0,"Cannot be negative").required("Required"),mortality:Hr().integer("Must be a whole number").min(0,"Cannot be negative").test("mortality-less-than-total","Mortality cannot exceed total birds",function(e){const{totalBirds:t}=this.parent;return e==null?!0:e<=t}).optional(),breed:sr().required("breed is required"),cost:Hr().integer().positive("Cost should be positive").required("Cost is required"),notes:sr().optional()});function rJ({initialValues:e={},onSubmit:t,isLoading:r,className:n}){const{farms:a}=Dr(),i=Ls({initialValues:{acquiredDate:e?.acquiredDate?new Date(e?.acquiredDate).toISOString().split("T")[0]:"",exitDate:e.exitDate?new Date(e.exitDate).toISOString().split("T")[0]:"",flockName:e.flockName||"",farmId:e.farmId||0,totalBirds:e.totalBirds||0,mortality:e?.mortality||0,breed:e?.breed||"",cost:e.cost||0,notes:e?.notes||""},validationSchema:jze,enableReinitialize:!0,onSubmit:async o=>{const c={...o,farmId:Number(o.farmId),exitDate:o.exitDate.length>0?new Date(o.exitDate):void 0,totalBirds:Number(o.totalBirds)-o.mortality,placedDate:new Date(o.acquiredDate)};await t(c),i.resetForm()}}),s=o=>i.touched[o]&&i.errors[o]?u.jsx("p",{className:"text-xs text-red-600 mt-1",children:i.errors[o]}):null;return u.jsxs("form",{onSubmit:i.handleSubmit,className:et("flex flex-col gap-6",n),children:[u.jsxs("div",{className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:[u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"acquiredDate",children:"Acquired Date"}),u.jsx(Ot,{id:"acquiredDate",name:"acquiredDate",type:"date",value:i.values.acquiredDate,onChange:i.handleChange,onBlur:i.handleBlur,disabled:r}),s("acquiredDate")]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"expenseDate",children:"Exit Date"}),u.jsx(Ot,{id:"exitDate",name:"exitDate",type:"date",value:i.values.exitDate,onChange:i.handleChange,onBlur:i.handleBlur,disabled:r}),s("exitDate")]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"flockName",children:"Flock Name *"}),u.jsx(Ot,{id:"flockName",name:"flockName",value:i.values.flockName,onChange:i.handleChange,onBlur:i.handleBlur,disabled:r}),s("flockName")]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"farmId",children:"Farm *"}),u.jsxs(Xs,{name:"farmId",value:i.values.farmId?i.values.farmId.toString():"",onValueChange:o=>i.setFieldValue("farmId",Number(o)),disabled:r||a.length===0,children:[u.jsx(ks,{children:u.jsx(Zs,{placeholder:a.length===0?"No farms":"Select farm"})}),u.jsx(Ps,{children:a.map(o=>u.jsxs(en,{value:o.id.toString(),children:[o.name," ",o.code&&`(${o.code})`]},o.id))})]}),s("farmId")]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"openingMale",children:"Total Birds *"}),u.jsx(Ot,{id:"totalBirds",name:"totalBirds",type:"number",value:i.values.totalBirds,onChange:i.handleChange,onBlur:i.handleBlur,disabled:r}),s("totalBirds")]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"mortality",children:"Mortality"}),u.jsx(Ot,{id:"mortality",name:"mortality",type:"number",value:i.values.mortality,onChange:i.handleChange,onBlur:i.handleBlur,disabled:r}),s("mortality")]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"cost",children:"Cost of flock"}),u.jsx(Ot,{id:"cost",name:"cost",type:"number",value:i.values.cost,onChange:i.handleChange,onBlur:i.handleBlur,disabled:r}),s("cost")]}),u.jsxs("div",{className:"col-span-1 md:col-span-2 space-y-2",children:[u.jsx(bt,{htmlFor:"breed",children:"Breed"}),u.jsx(Ot,{id:"breed",name:"breed",value:i.values.breed,onChange:i.handleChange,onBlur:i.handleBlur,disabled:r}),s("breed")]}),u.jsxs("div",{className:"col-span-1 md:col-span-2 space-y-2",children:[u.jsx(bt,{htmlFor:"notes",children:"Notes"}),u.jsx(dd,{id:"notes",name:"notes",rows:3,value:i.values.notes,onChange:i.handleChange,onBlur:i.handleBlur,disabled:r}),s("notes")]})]}),u.jsx("div",{className:"flex justify-end mt-4",children:u.jsx(xt,{type:"submit",disabled:r||!i.isValid||!i.dirty,children:r?"Saving...":"Save"})})]})}function Cze(){const e=Array.from({length:5});return u.jsxs("div",{className:"space-y-6",children:[u.jsxs("div",{className:"flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4",children:[u.jsx("div",{className:"h-6 w-40 bg-gray-300 rounded animate-pulse"}),u.jsx("div",{className:"flex gap-3",children:u.jsx("div",{className:"h-9 w-28 bg-gray-300 rounded animate-pulse"})})]}),u.jsx("div",{className:"border rounded-xl overflow-hidden shadow-sm",children:u.jsx("div",{className:"w-full overflow-x-auto",children:u.jsxs("table",{className:"w-full table-auto",children:[u.jsx("thead",{className:"bg-muted/50",children:u.jsxs("tr",{children:[u.jsx("th",{className:"p-3 text-left text-sm font-medium",children:"Batch Name"}),u.jsx("th",{className:"p-3 text-left text-sm font-medium",children:"Farm"}),u.jsx("th",{className:"p-3 text-left text-sm font-medium",children:"Opening"}),u.jsx("th",{className:"p-3 text-left text-sm font-medium",children:"Current"}),u.jsx("th",{className:"p-3 text-left text-sm font-medium",children:"Mortality"}),u.jsx("th",{className:"p-3 text-right text-sm font-medium",children:"Actions"})]})}),u.jsx("tbody",{className:"divide-y",children:e.map((t,r)=>u.jsx("tr",{className:"animate-pulse",children:Array.from({length:6}).map((n,a)=>u.jsx("td",{className:"p-3",children:u.jsx("div",{className:"h-4 bg-gray-200 rounded w-full"})},a))},r))})]})})}),u.jsxs("div",{className:"flex justify-between items-center pt-4",children:[u.jsx("div",{className:"h-10 w-28 bg-gray-300 rounded animate-pulse"}),u.jsx("div",{className:"h-4 w-24 bg-gray-300 rounded animate-pulse"}),u.jsx("div",{className:"h-10 w-28 bg-gray-300 rounded animate-pulse"})]})]})}function Tze({totalFlocks:e,totalBirds:t,totalMortality:r,activeFlocks:n,inactiveFlocks:a}){return u.jsxs(jr,{className:"bg-background border shadow-sm",children:[u.jsxs(hn,{children:[u.jsx($i,{children:"Flock Summary"}),u.jsx(jC,{children:"Overview of your flock status"})]}),u.jsxs(Cr,{className:"grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6",children:[u.jsxs("div",{className:"space-y-1",children:[u.jsx("p",{className:"text-sm text-muted-foreground",children:"Total Flocks"}),u.jsx("p",{className:"text-lg font-semibold",children:e??0})]}),u.jsxs("div",{className:"space-y-1",children:[u.jsx("p",{className:"text-sm text-muted-foreground",children:"Active Flocks"}),u.jsx("p",{className:"text-lg font-semibold",children:n??0})]}),u.jsxs("div",{className:"space-y-1",children:[u.jsx("p",{className:"text-sm text-muted-foreground",children:"Inactive Flocks"}),u.jsx("p",{className:"text-lg font-semibold",children:a??0})]}),u.jsxs("div",{className:"space-y-1",children:[u.jsx("p",{className:"text-sm text-muted-foreground",children:"Total Birds"}),u.jsx("p",{className:"text-lg font-semibold",children:t??0})]}),u.jsxs("div",{className:"space-y-1",children:[u.jsx("p",{className:"text-sm text-muted-foreground",children:"Total Mortality"}),u.jsx("p",{className:"text-lg font-semibold",children:r??0})]})]})]})}function Oze(){return u.jsxs("div",{className:"grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 p-6 bg-white rounded-xl shadow-sm animate-pulse",children:[u.jsxs("div",{className:"space-y-2",children:[u.jsx("div",{className:"h-4 bg-gray-300 rounded w-3/4"}),u.jsx("div",{className:"h-6 bg-gray-200 rounded w-full"})]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx("div",{className:"h-4 bg-gray-300 rounded w-3/4"}),u.jsx("div",{className:"h-6 bg-gray-200 rounded w-full"})]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx("div",{className:"h-4 bg-gray-300 rounded w-3/4"}),u.jsx("div",{className:"h-6 bg-gray-200 rounded w-full"})]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx("div",{className:"h-4 bg-gray-300 rounded w-3/4"}),u.jsx("div",{className:"h-6 bg-gray-200 rounded w-full"})]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx("div",{className:"h-4 bg-gray-300 rounded w-3/4"}),u.jsx("div",{className:"h-6 bg-gray-200 rounded w-full"})]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx("div",{className:"h-4 bg-gray-300 rounded w-3/4"}),u.jsx("div",{className:"h-6 bg-gray-200 rounded w-full"})]})]})}function kze(e){const{farms:t}=Dr(),r=async()=>{const a=await e.getAllRecordsWithoutPagination(),i=e.startDate&&e.endDate?`From ${Kt(new Date(e.startDate),"dd MMM yyyy")} To ${Kt(new Date(e.endDate),"dd MMM yyyy")}`:"All Time Records";if(a.length===0){pt.error("No records available to export");return}Rze(a,e.summary,i)},n=async()=>{const a=await e.getAllRecordsWithoutPagination();if(a.length===0){pt.error("No records available to export");return}const i=q_e(a),s=`Flock_${Kt(new Date,"yyyy-MM-dd")}`;_m(i,s,"Flocks")};return u.jsxs("div",{className:"bg-background",children:[u.jsx("section",{className:"p-6 border-b",children:u.jsxs("div",{className:"max-w-7xl mx-auto space-y-6",children:[u.jsxs("div",{className:"flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6",children:[u.jsx("h2",{className:"text-2xl font-bold tracking-tight",children:"Flock Summary"}),u.jsxs("div",{className:"flex flex-wrap items-center gap-4",children:[u.jsxs("div",{className:"flex items-center gap-2",children:[u.jsx(bt,{htmlFor:"startDate",className:"text-sm font-medium text-muted-foreground whitespace-nowrap",children:"Start"}),u.jsx(Ot,{id:"startDate",type:"date",value:e.startDate||"",disabled:e.isLoadingSummary,onChange:a=>e.onSelectStartDate(a.target.value),className:"h-9 w-40"})]}),u.jsxs("div",{className:"flex items-center gap-2",children:[u.jsx(bt,{htmlFor:"endDate",className:"text-sm font-medium text-muted-foreground whitespace-nowrap",children:"End"}),u.jsx(Ot,{id:"endDate",type:"date",value:e.endDate||"",disabled:e.isLoadingSummary,onChange:a=>e.onSelectEndDate(a.target.value),className:"h-9 w-40"})]}),u.jsxs("div",{className:"flex items-center gap-2",children:[u.jsx(bt,{htmlFor:"farmFilter",className:"text-sm font-medium text-muted-foreground whitespace-nowrap",children:"Farm"}),u.jsxs("select",{id:"farmFilter",value:e.selectedFarmId??"",onChange:a=>e.onSelectFarmId(a.target.value),disabled:e.isLoadingSummary,className:et("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm","focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"),children:[u.jsx("option",{value:"",children:"All Farms"}),t.map(a=>u.jsx("option",{value:a.id,children:a.name},a.id))]})]})]})]}),e.summary?u.jsx(Tze,{...e.summary}):e.isLoadingSummary?u.jsx(Oze,{}):u.jsx("div",{className:"text-center py-12 text-muted-foreground",children:"No flock summary available yet"})]})}),e.showForm?u.jsx("section",{className:"max-w-3xl mx-auto p-6",children:u.jsxs(hd,{Header:{title:"Add New Flock",desc:"Record flock details for a specific farm"},Body:{title:"Flock Details",desc:"Enter flock information below"},Footer:{title:"Tracking flocks helps monitor farm performance"},children:[u.jsx(rJ,{onSubmit:e.onCreate,isLoading:e.isLoading}),u.jsx(xt,{className:"mt-6 w-full",onClick:e.toggleForm,children:"View All Flocks"})]})}):u.jsx("section",{className:"max-w-7xl mx-auto p-6",children:(()=>{const a=e.records.slice((e.pageNumber-1)*10,e.pageNumber*10);return u.jsx(Pze,{records:a,onDelete:e.onDelete,onEdit:e.onEdit,isLoading:e.isLoading,isUpdating:e.isUpdating,toggleForm:e.toggleForm,pageNumber:e.pageNumber,totalPages:e.totalPages,onNextClick:e.onNextClick,onPrevClick:e.onPrevClick})})()}),u.jsxs("div",{className:"flex justify-end gap-2",children:[u.jsxs(xt,{variant:"outline",size:"sm",onClick:n,disabled:e.records.length===0,className:"flex items-center gap-2",children:[u.jsx(dm,{className:"h-4 w-4"}),"Export Excel"]}),u.jsxs(xt,{variant:"outline",size:"sm",onClick:r,disabled:e.records.length===0,className:"flex items-center gap-2",children:[u.jsx(Ph,{className:"h-4 w-4"}),"Export PDF"]})]})]})}function Pze({records:e,isLoading:t,isUpdating:r,pageNumber:n,totalPages:a,onEdit:i,onDelete:s,toggleForm:o,onNextClick:c,onPrevClick:f}){const{user:d}=Dr();return t?u.jsx(Cze,{}):u.jsxs("div",{className:"space-y-6",children:[u.jsxs("div",{className:"flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4",children:[u.jsx("h2",{className:"text-2xl font-bold tracking-tight",children:"Flocks"}),u.jsx("div",{className:"flex flex-wrap items-center gap-3",children:u.jsx(xt,{variant:"outline",size:"sm",onClick:o,children:"+ Add New Flock"})})]}),u.jsx("div",{className:"border rounded-xl overflow-hidden shadow-sm",children:e.length>0?u.jsxs(Ei,{children:[u.jsx(Gi,{children:u.jsxs(tn,{className:"bg-muted/50",children:[u.jsx(tt,{children:"Id"}),u.jsx(tt,{children:"Flock Name"}),u.jsx(tt,{children:"Acquired Date"}),u.jsx(tt,{children:"Farm"}),u.jsx(tt,{children:"Total birds "}),u.jsx(tt,{children:"Age"}),u.jsx(tt,{children:"Status"}),u.jsx(tt,{children:"Mortality"}),d?.role==="super_admin"&&u.jsx(tt,{className:"text-right",children:"Actions"})]})}),u.jsx(Ai,{children:e.map(m=>u.jsx(Dze,{record:m,isUpdating:r,onDelete:s,onEdit:i},m.id))})]}):u.jsxs("div",{className:"text-center py-16 space-y-6",children:[u.jsx("h2",{className:"text-2xl font-bold text-muted-foreground",children:"No flocks yet"}),u.jsx("p",{className:"text-muted-foreground",children:"Add your first flock record"}),u.jsx(xt,{size:"lg",onClick:o,children:"+ Add Flock"})]})}),u.jsxs("div",{className:"flex justify-between items-center pt-4",children:[u.jsx(xt,{size:"lg",disabled:t||r||n<=1,onClick:f,children:"Prev Page"}),u.jsxs("span",{className:"text-sm text-muted-foreground",children:["Page ",n," of ",a]}),u.jsx(xt,{size:"lg",disabled:t||r||n>=a,onClick:c,children:"Next Page"})]})]})}const Dze=({record:e,isUpdating:t,onEdit:r,onDelete:n})=>{const{user:a}=Dr(),[i,s]=S.useState(!1),[o,c]=S.useState(!1);return u.jsxs(u.Fragment,{children:[u.jsxs(tn,{className:"hover:bg-muted/30",children:[u.jsx(Qe,{children:e.id}),u.jsx(Qe,{className:"font-medium",children:e.flockName}),u.jsx(Qe,{children:(e.acquiredDate?new Date(e.acquiredDate).toISOString().split("T")[0]:"-")}),u.jsx(Qe,{children:e.farm?.name||"N/A"}),u.jsx(Qe,{children:e.totalBirds}),u.jsx(Qe,{children:e.ageInWeeks}),u.jsx(Qe,{children:e.isActive?"Active":"Inactive"}),u.jsx(Qe,{children:e.mortality}),a?.role==="super_admin"&&u.jsxs(Qe,{className:"text-right space-x-2",children:[u.jsx(xt,{variant:"ghost",size:"icon",onClick:()=>c(!0),children:u.jsx(ad,{className:"h-4 w-4"})}),u.jsx(xt,{variant:"ghost",size:"icon",className:"text-destructive hover:text-destructive/90",onClick:()=>s(!0),children:u.jsx(Xc,{className:"h-4 w-4"})})]})]}),a?.role==="super_admin"&&u.jsxs(u.Fragment,{children:[u.jsx(cd,{open:i,title:"Delete Flock",desc:"Are you sure you want to delete this flock?",onClick:async f=>{f&&n(e.id),s(!1)}}),u.jsx(ud,{title:"Edit Flock",desc:"Update flock details below",open:o,onOpenChange:()=>c(!1),children:u.jsx(rJ,{initialValues:e,onSubmit:async f=>{await r(e.id,f),c(!1)},isLoading:t})})]})]})},Rze=(e,t,r)=>{const n=new Yt({orientation:"landscape"});n.setFontSize(18),n.text("Flock Inventory Report",148,15,{align:"center"}),n.setFontSize(10),n.setTextColor(100),n.text(`Report Period: ${r}`,148,22,{align:"center"}),n.setLineWidth(.5),n.line(10,28,287,28);let a=38;t&&(n.setFontSize(14),n.setTextColor(0),n.text("Flock Summary",15,a),a+=6,Ba(n,{startY:a,head:[["Metric","Value"]],body:[["Total Flocks",t.totalFlocks?.toString()||"0"],["Total Birds",t.totalBirds?.toLocaleString()||"0"]],theme:"grid",headStyles:{fillColor:[59,130,246]},styles:{fontSize:10},columnStyles:{0:{cellWidth:60}}}),a=n.lastAutoTable.finalY+15),n.setFontSize(14),n.setTextColor(0),n.text("Detailed Flock Records",15,a),a+=6;const i=e.map(s=>[s.id,s.flockName,s.breed||"-",s.totalBirds?.toLocaleString()||"0",s.ageInWeeks||"-",s.isActive?"Active":"Inactive",s.cost||0,s.acquiredDate?Kt(new Date(s.acquiredDate),"dd MMM yyyy"):"-",s.exitDate?Kt(new Date(s.exitDate),"dd MMM yyyy"):"-",s.mortality,s.notes||"-"]);Ba(n,{startY:a,head:[["Flock ID","Flock Name","Breed","Total Birds","Age (Weeks)","Status","Cost","Acquired Date","Exit Date","Mortality","Notes"]],body:i,theme:"striped",headStyles:{fillColor:[31,41,55]},styles:{fontSize:8},columnStyles:{0:{cellWidth:20},1:{cellWidth:26},2:{cellWidth:24},3:{cellWidth:22},4:{cellWidth:22},5:{cellWidth:20},6:{cellWidth:20},7:{cellWidth:26},8:{cellWidth:24},9:{cellWidth:22},10:{cellWidth:31}},margin:{left:10,right:10},didDrawPage:()=>{n.setFontSize(8),n.setTextColor(150);const s=n.internal.getNumberOfPages(),o=n.internal.getCurrentPageInfo().pageNumber;n.text(`Generated on: ${Kt(new Date,"dd MMM yyyy HH:mm")} | Page ${o} of ${s}`,148,205,{align:"center"})}}),n.save(`Flock_Report_${Kt(new Date,"yyyy-MM-dd")}.pdf`)},mB=async(e,t,r)=>{let n=e&&t?`page=${e}&limit=${t}`:"";const a=`${rr.flock}${n.length||r?.length?"?":""}${n}${r||""}`,{data:i}=await dr(a,nr.Get);return i},Mze=async e=>{const t=rr.flock,{data:r}=await dr(t,nr.Post,e);return r},Lze=async(e,t)=>{const r=`${rr.flock}/${e}`,{data:n}=await dr(r,nr.Put,t);return n},Fze=async e=>{const t=`${rr.flock}/${e}`,{data:r}=await dr(t,nr.Delete);return r},Ize=async e=>{const t=`${rr.flockSummary}${e||""}`,{data:r}=await dr(t,nr.Get);return r},Bze=()=>{const{setFlocks:e}=Dr(),[t,r]=S.useState(!0),[n,a]=S.useState(!1),[i,s]=S.useState([]),o=S.useRef(1),[c,f]=S.useState(!1),[d,m]=S.useState(""),[v,g]=S.useState(null),[b,y]=S.useState(!0),[w,N]=S.useState(""),[j,C]=S.useState(""),O=S.useRef(!0),D=S.useRef(0);S.useEffect(()=>{o.current=1,O.current=!0,s([]),R()},[d,w,j]),S.useEffect(()=>{z(d,w,j)},[d,w,j]);const L=async()=>{try{let W=await XC();W.message.toLowerCase()==="success"&&e(W.data.items)}catch(W){pt.error(er(W))}},R=async()=>{try{if(!O.current)return;r(!0);let W="&";w?.trim()&&(W+=`startDate=${encodeURIComponent(w.trim())}&`),j?.trim()&&(W+=`endDate=${encodeURIComponent(j.trim())}&`),d&&(W+=`farmId=${d}&`);const me=await mB(o.current,10,W);me.message.toLowerCase()==="success"&&me.data&&(O.current=o.current<me.data.pagination.pages&&me.data.pagination.pages>0,D.current=me.data.pagination.pages,s(Y=>[...Y,...me.data.items]))}catch(W){pt.error(er(W))}finally{r(!1)}},U=async W=>{try{r(!0);const me=await Mze(W);me.message.toLowerCase()==="success"&&(s(Y=>[me.data,...Y]),z(),L(),a(!1),pt.success("Flock created successfully"))}catch(me){pt.error(er(me))}finally{r(!1)}},B=async(W,me)=>{try{f(!0);const Y=await Lze(W,me);Y.message.toLowerCase()==="success"&&Y.data&&(s(k=>{const I=k.findIndex(H=>H.id===W);return I<0?k:(k[I]={...k[I],...Y.data},[...k])}),z(),L())}catch(Y){pt.error(er(Y))}finally{f(!1)}},X=async()=>{try{let W="";return w?.trim()&&(W+=`&startDate=${encodeURIComponent(w.trim())}`),j?.trim()&&(W+=`&endDate=${encodeURIComponent(j.trim())}`),W.endsWith("&")&&(W=W.slice(0,-1)),(await mB(void 0,void 0,W)).data.items}catch(W){return pt.error(er(W)),[]}},F=async W=>{try{(await Fze(W)).message.toLowerCase()==="success"&&(s(Y=>Y.filter(k=>k.id!==W)),z(),L())}catch(me){pt.error(er(me))}},z=async(W,me,Y)=>{try{y(!0);let k="?";me&&(k+=`startDate=${me}&`),Y&&(k+=`endDate=${Y}&`),W&&(k+=`farmId=${W}&`),k.endsWith("&")&&(k=k.slice(0,-1));const I=await Ize(k.length>1?k:void 0);I.message.toLowerCase()==="success"&&g(I.data)}catch(k){pt.error(er(k))}finally{y(!1)}},J=S.useCallback(()=>a(W=>!W),[]),ne=S.useCallback(W=>m(W),[]),ge=S.useCallback(W=>N(W),[]),te=S.useCallback(W=>C(W),[]),Z=S.useCallback(()=>{o.current+=1,O.current=o.current<=D.current,R()},[D.current,d,w,j]),K=S.useCallback(()=>{o.current-=1,O.current=o.current>0,R()},[d,w,j,D.current]);return u.jsx(kze,{showForm:n,records:i,isLoading:t,isUpdating:c,summary:v,selectedFarmId:d,startDate:w,endDate:j,isLoadingSummary:b,pageNumber:o.current,totalPages:D.current,onSelectStartDate:ge,onSelectEndDate:te,onSelectFarmId:ne,onCreate:U,onDelete:F,onEdit:B,toggleForm:J,onNextClick:Z,onPrevClick:K,getAllRecordsWithoutPagination:X})},pB=async(e,t,r)=>{let n=e&&t?`page=${e}&limit=${t}`:"";const a=`${rr.consumptions}${n.length||r?.length?"?":""}${n}${r||""}`,{data:i}=await dr(a,nr.Get);return i},zze=async e=>{const t=rr.consumptions,{data:r}=await dr(t,nr.Post,e);return r},Uze=async(e,t)=>{const r=`${rr.consumptions}/${e}`,{data:n}=await dr(r,nr.Put,t);return n},$ze=async e=>{const t=`${rr.consumptions}/${e}`,{data:r}=await dr(t,nr.Delete);return r},Hze=async e=>{const t=`${rr.consumptionsSummary}${e||""}`,{data:r}=await dr(t,nr.Get);return r},qze=e=>Aa({date:sr().required("Date is required").matches(/^\d{4}-\d{2}-\d{2}$/,"Invalid date format (YYYY-MM-DD)").test("no-future-date","Date cannot be in the future",t=>{if(!t)return!1;const[r,n,a]=t.split("-").map(Number),i=new Date(r,n-1,a),s=new Date;return s.setHours(0,0,0,0),i<=s}),flockId:Hr().typeError("Selecting a flock is required").required("Selecting a flock is required"),feeds:zp().of(Aa({type:sr().required("Required"),quantity:Hr().typeError("Must be a number").min(.01,"Qty must be > 0").required("Required").test("stock-limit","Exceeds available stock",function(t){if(t==null)return!0;const r=e?.feeds?.find(n=>n.Type===this.parent.type)?.quantity??0;return t<=r})})),medicines:zp().of(Aa({type:sr().required("Required"),quantity:Hr().typeError("Must be a number").min(.01,"Qty must be > 0").required("Required").test("stock-limit","Exceeds available stock",function(t){if(t==null)return!0;const r=e?.medicines?.find(n=>n.Type===this.parent.type)?.quantity??0;return t<=r})})),vaccines:zp().of(Aa({type:sr().required("Required"),quantity:Hr().typeError("Must be a number").min(.01,"Qty must be > 0").required("Required").test("stock-limit","Exceeds available stock",function(t){if(t==null)return!0;const r=e?.vaccines?.find(n=>n.Type===this.parent.type)?.quantity??0;return t<=r})})),equipment:zp().of(Aa({type:sr().required("Required"),quantity:Hr().typeError("Must be a number").min(.01,"Qty must be > 0").required("Required").test("stock-limit","Exceeds available stock",function(t){if(t==null)return!0;const r=e?.equipment?.find(n=>n.Type===this.parent.type)?.quantity??0;return t<=r})})),others:zp().of(Aa({type:sr().required("Required"),quantity:Hr().typeError("Must be a number").min(.01,"Qty must be > 0").required("Required").test("stock-limit","Exceeds available stock",function(t){if(t==null)return!0;const r=e?.others?.find(n=>n.Type===this.parent.type)?.quantity??0;return t<=r})}))});function nJ({initialValues:e={},onSubmit:t,isLoading:r,className:n}){const{stocks:a,flocks:i}=Dr(),s=Ls({initialValues:{date:e.date?new Date(e.date).toISOString().split("T")[0]:new Date().toISOString().split("T")[0],flockName:e.flockName||"",flockId:e?.flockId||"",feeds:e.feeds||[],medicines:e.medicines||[],vaccines:e.vaccines||[],equipment:e.equipment||[],notes:e.notes||""},validationSchema:qze(a),enableReinitialize:!0,onSubmit:async c=>{const f={...c,flockId:Number(c.flockId),feeds:c.feeds.map(d=>({...d,head:"FEED"})),medicines:c.medicines.map(d=>({...d,head:"MEDICINE"})),vaccines:c.vaccines.map(d=>({...d,head:"VACCINE"})),equipment:c.equipment.map(d=>({...d,head:"EQUIPMENT"}))};await t(f),s.resetForm()}}),o=(c,f,d)=>u.jsxs("div",{className:"space-y-4 p-4 border rounded-xl bg-muted/20 border-slate-200",children:[u.jsxs("div",{className:"flex justify-between items-center",children:[u.jsxs("h3",{className:"text-xs font-bold uppercase tracking-widest text-slate-500",children:[f," Usage"]}),u.jsxs(xt,{type:"button",variant:"outline",size:"sm",className:"h-8 text-xs bg-white",onClick:()=>s.setFieldValue(c,[...s.values[c],{type:"",quantity:0}]),children:[u.jsx(dle,{className:"w-3 h-3 mr-1"})," Add ",f]})]}),u.jsx("div",{className:"space-y-3",children:s.values[c].map((m,v)=>{const g=s.errors[c]?.[v],b=s.touched[c]?.[v];return u.jsxs("div",{className:"flex gap-2 items-start animate-in fade-in slide-in-from-top-1",children:[u.jsxs("div",{className:"flex-1",children:[u.jsxs("select",{name:`${c}.${v}.type`,value:m.type,onChange:s.handleChange,className:"flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-400",children:[u.jsxs("option",{value:"",children:["Select ",f,"..."]}),a?.[d]?.map(y=>u.jsxs("option",{value:y.Type,children:[y.Type," (Avail: ",y.quantity,")"]},y.Type))]}),b?.type&&g?.type&&u.jsx("p",{className:"text-[10px] text-red-500 mt-1",children:g.type})]}),u.jsxs("div",{className:"w-28",children:[u.jsx(Ot,{type:"number",placeholder:"Qty",name:`${c}.${v}.quantity`,value:m.quantity,onChange:s.handleChange,className:et("h-9 bg-white",b?.quantity&&g?.quantity&&"border-red-500")}),b?.quantity&&g?.quantity&&u.jsx("p",{className:"text-[10px] text-red-500 mt-1",children:g.quantity})]}),u.jsx(xt,{type:"button",variant:"ghost",size:"icon",className:"h-9 w-9 text-slate-400 hover:text-red-500",onClick:()=>{const y=[...s.values[c]];y.splice(v,1),s.setFieldValue(c,y)},children:u.jsx(Xc,{className:"w-4 h-4"})})]},v)})})]});return u.jsx(X1e,{value:s,children:u.jsxs("form",{onSubmit:s.handleSubmit,className:et("bg-white p-6 rounded-2xl shadow-sm border space-y-8",n),children:[u.jsxs("div",{className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:[u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{className:"text-slate-600",children:"Consumption Date"}),u.jsx(Ot,{type:"date",name:"date",value:s.values.date,onChange:s.handleChange,className:"focus:ring-slate-400"})]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{htmlFor:"flockId",children:"Select Flock *"}),u.jsxs(Xs,{value:s.values.flockId.toString(),onValueChange:c=>s.setFieldValue("flockId",c),disabled:r,children:[u.jsx(ks,{className:et(s.errors.flockId&&"border-red-500"),children:u.jsx(Zs,{placeholder:"Select a flock"})}),u.jsx(Ps,{children:i.map(c=>u.jsx(en,{value:c.id.toString(),children:c.flockName},c.id))})]}),s.touched.flockId&&s.errors.flockId&&u.jsx("p",{className:"text-xs text-red-500",children:s.errors.flockId})]})]}),a&&u.jsxs("div",{className:"grid grid-cols-1 gap-6",children:[a?.feeds?.length>0&&o("feeds","Feed","feeds"),a?.medicines?.length>0&&o("medicines","Medicine","medicines"),a?.vaccines?.length>0&&o("vaccines","Vaccine","vaccines"),a?.equipment?.length>0&&o("vaccines","Vaccine","vaccines")]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{className:"text-slate-600",children:"Daily Observations / Notes"}),u.jsx(dd,{name:"notes",placeholder:"E.g. Mortality count...",value:s.values.notes,onChange:s.handleChange,className:"min-h-[100px] focus:ring-slate-400"})]}),u.jsxs("div",{className:"flex items-center justify-end gap-3 pt-4 border-t",children:[u.jsx(xt,{type:"button",variant:"outline",onClick:()=>s.resetForm(),disabled:r,children:"Reset"}),u.jsx(xt,{type:"submit",disabled:!s.isValid,children:r?"Saving...":"Save"})]})]})})}const aJ=S.forwardRef(({className:e,children:t,...r},n)=>u.jsxs(iH,{ref:n,className:et("relative overflow-hidden",e),...r,children:[u.jsx(B0e,{className:"h-full w-full rounded-[inherit]",children:t}),u.jsx(iJ,{}),u.jsx(z0e,{})]}));aJ.displayName=iH.displayName;const iJ=S.forwardRef(({className:e,orientation:t="vertical",...r},n)=>u.jsx(cC,{ref:n,orientation:t,className:et("flex touch-none select-none transition-colors",t==="vertical"&&"h-full w-2.5 border-l border-l-transparent p-[1px]",t==="horizontal"&&"h-2.5 flex-col border-t border-t-transparent p-[1px]",e),...r,children:u.jsx(eH,{className:"relative flex-1 rounded-full bg-border"})}));iJ.displayName=cC.displayName;function Wze({open:e,onOpenChange:t,record:r}){return r?u.jsx(Dh,{open:e,onOpenChange:t,children:u.jsxs(id,{className:"max-w-md",children:[u.jsxs(sd,{children:[u.jsx(od,{children:"Consumption Details"}),u.jsx(ld,{children:r.date?Kt(new Date(r.date),"dd MMMM yyyy"):""})]}),u.jsxs("div",{className:"space-y-6 py-4",children:[u.jsxs("div",{className:"flex justify-between items-center bg-muted/30 p-3 rounded-lg",children:[u.jsxs("div",{children:[u.jsx("p",{className:"text-xs text-muted-foreground uppercase font-semibold",children:"Flock"}),u.jsx("p",{className:"font-medium",children:r.flock?.flockName||"-"})]}),u.jsxs("div",{className:"text-right",children:[u.jsx("p",{className:"text-xs text-muted-foreground uppercase font-semibold",children:"Record ID"}),u.jsxs("p",{className:"font-medium",children:["#",r.id]})]})]}),u.jsx(aJ,{className:"max-h-[40vh] pr-4",children:u.jsxs("div",{className:"space-y-4",children:[r.feeds?.length>0&&u.jsx(sA,{title:"Feeds Used",items:r.feeds}),r.medicines?.length>0&&u.jsx(sA,{title:"Medicines Used",items:r.medicines}),r.vaccines?.length>0&&u.jsx(sA,{title:"Vaccines Used",items:r.vaccines})]})}),r.notes&&u.jsxs("div",{className:"border-t pt-4",children:[u.jsx("p",{className:"text-xs text-muted-foreground uppercase font-semibold mb-2",children:"Observations"}),u.jsxs("div",{className:"bg-slate-50 border p-3 rounded-md text-sm italic text-slate-600",children:['"',r.notes,'"']})]})]}),u.jsx("div",{className:"flex justify-end gap-3 border-t pt-4",children:u.jsx(xt,{variant:"outline",onClick:()=>t(!1),children:"Close"})})]})}):null}function sA({title:e,items:t}){return u.jsxs("div",{children:[u.jsx("h4",{className:"text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2",children:e}),u.jsx("div",{className:"space-y-1",children:t.map((r,n)=>u.jsxs("div",{className:"flex justify-between text-sm border-b border-dashed pb-1",children:[u.jsx("span",{className:"text-slate-700",children:r.type}),u.jsxs("span",{className:"font-semibold",children:[r.quantity," units"]})]},n))})]})}function Vze(e){const{flocks:t}=Dr(),r=async()=>{const a=e.startDate&&e.endDate?`From ${Kt(new Date(e.startDate),"dd MMM yyyy")} To ${Kt(new Date(e.endDate),"dd MMM yyyy")}`:"All Time Records",i=await e.getAllRecordsWithoutPagination();if(i.length===0){pt.error("No records available to export");return}Zze(i,e.summary,a)},n=async()=>{const a=await e.getAllRecordsWithoutPagination();if(a.length===0){pt.error("No records available to export");return}const i=W_e(a),s=`Consumption_${Kt(new Date,"yyyy-MM-dd")}`;_m(i,s,"Consumption")};return u.jsxs("div",{className:"bg-background",children:[u.jsx("section",{className:"p-6 border-b",children:u.jsxs("div",{className:"max-w-7xl mx-auto space-y-6",children:[u.jsxs("div",{className:"flex flex-col sm:flex-row justify-between gap-6",children:[u.jsx("h2",{className:"text-2xl font-bold",children:"Consumption Summary"}),u.jsxs("div",{className:"flex flex-wrap items-center gap-4",children:[u.jsxs("div",{className:"flex items-center gap-2",children:[u.jsx(bt,{htmlFor:"startDate",className:"text-sm font-medium text-muted-foreground whitespace-nowrap",children:"Start Date"}),u.jsx(Ot,{id:"startDate",type:"date",value:e.startDate||"",onChange:a=>e.onSelectStartDate(a.target.value)})]}),u.jsxs("div",{className:"flex items-center gap-2",children:[u.jsx(bt,{htmlFor:"endDate",className:"text-sm font-medium text-muted-foreground whitespace-nowrap",children:"End Date"}),u.jsx(Ot,{type:"date",id:"endDate",value:e.endDate||"",onChange:a=>e.onSelectEndDate(a.target.value)})]}),u.jsxs("div",{className:"flex items-center gap-2",children:[u.jsx(bt,{className:"text-xs text-muted-foreground uppercase",children:"Filter by Flock"}),u.jsxs(Xs,{value:e.selectedFlockId,onValueChange:e.onSelectFlockId,children:[u.jsx(ks,{className:"h-9 w-48 bg-white",children:u.jsx(Zs,{placeholder:"All Flocks"})}),u.jsxs(Ps,{children:[u.jsx(en,{value:"all",children:"All Flocks"}),t.map(a=>u.jsx(en,{value:a.id.toString(),children:a.flockName},a.id))]})]})]})]})]}),e.isLoadingSummary?u.jsx(Kze,{}):e.summary?u.jsxs("div",{className:"grid grid-cols-1 sm:grid-cols-3 gap-4",children:[u.jsx(oA,{title:"Feed (Consumption page only)",value:e.summary.totalFeed,unit:"bags"}),u.jsx(oA,{title:"Total Medicine",value:e.summary.totalMedicine,unit:"units"}),u.jsx(oA,{title:"Total Vaccine",value:e.summary.totalVaccine,unit:"doses"})]}):u.jsx("div",{className:"text-center py-10 text-muted-foreground",children:"No summary available"})]})}),e.showForm?u.jsx("section",{className:"max-w-3xl mx-auto p-6",children:u.jsxs(hd,{Header:{title:"Add Consumption Record",desc:"Record consumption for flocks"},Body:{title:"Consumption Details",desc:"Enter usage of feed, meds, and vaccines"},Footer:{title:"Records update your stock inventory automatically"},children:[u.jsx(nJ,{onSubmit:e.onCreate,isLoading:e.isLoading}),u.jsx(xt,{variant:"outline",className:"mt-6 w-full",onClick:e.toggleForm,children:"Back to Records"})]})}):u.jsx("section",{className:"max-w-7xl mx-auto p-6",children:(()=>{const a=e.records.slice((e.pageNumber-1)*10,e.pageNumber*10);return u.jsx(Gze,{...e,records:a})})()}),u.jsxs("div",{className:"flex justify-end gap-2 p-6 max-w-7xl mx-auto",children:[u.jsxs(xt,{variant:"outline",onClick:n,disabled:e.records.length===0,className:"flex items-center gap-2",children:[u.jsx(dm,{className:"h-4 w-4"}),"Export Excel"]}),u.jsxs(xt,{variant:"outline",onClick:r,disabled:e.records.length===0,className:"flex items-center gap-2",children:[u.jsx(Ph,{className:"h-4 w-4"}),"Export PDF"]})]})]})}function Gze({records:e,isLoading:t,isUpdating:r,pageNumber:n,totalPages:a,onEdit:i,onDelete:s,toggleForm:o,onNextClick:c,onPrevClick:f}){return t?u.jsx(Xze,{}):u.jsxs("div",{className:"space-y-6",children:[u.jsxs("div",{className:"flex justify-between items-center",children:[u.jsx("h2",{className:"text-2xl font-bold",children:"Daily Logs"}),u.jsx(xt,{onClick:o,children:"+ Add Record"})]}),u.jsx("div",{className:"border rounded-xl overflow-hidden bg-white",children:e.length>0?u.jsxs(Ei,{children:[u.jsx(Gi,{children:u.jsxs(tn,{children:[u.jsx(tt,{children:"Date"}),u.jsx(tt,{children:"Flock"}),u.jsx(tt,{children:"Feed Qty"}),u.jsx(tt,{children:"Meds Qty"}),u.jsx(tt,{children:"Notes"}),u.jsx(tt,{className:"text-right",children:"Actions"})]})}),u.jsx(Ai,{children:e.map(d=>u.jsx(Yze,{record:d,onEdit:i,onDelete:s,isUpdating:r},d.id))})]}):u.jsx("div",{className:"text-center py-16 text-muted-foreground",children:"No records found"})}),u.jsxs("div",{className:"flex justify-between items-center",children:[u.jsx(xt,{variant:"outline",disabled:n<=1,onClick:f,children:"Prev"}),u.jsxs("span",{className:"text-sm font-medium",children:["Page ",n," of ",a]}),u.jsx(xt,{variant:"outline",disabled:n>=a,onClick:c,children:"Next"})]})]})}function Yze({record:e,onEdit:t,onDelete:r,isUpdating:n}){const{user:a}=Dr(),[i,s]=S.useState(!1),[o,c]=S.useState(!1),[f,d]=S.useState(!1),m=v=>v?.reduce((g,b)=>g+(Number(b.quantity)||0),0)||0;return u.jsxs(u.Fragment,{children:[u.jsxs(tn,{children:[u.jsx(Qe,{className:"font-medium",children:Kt(new Date(e.date),"dd MMM yyyy")}),u.jsx(Qe,{children:e.flock?.flockName||"N/A"}),u.jsx(Qe,{children:m(e.feeds)}),u.jsx(Qe,{children:m(e.medicines)}),u.jsx(Qe,{className:"max-w-[200px] truncate text-muted-foreground",children:e.notes||"-"}),u.jsx(Qe,{className:"text-right",children:u.jsxs($g,{children:[u.jsx(Hg,{asChild:!0,children:u.jsx(xt,{variant:"ghost",size:"icon",children:u.jsx(dx,{className:"h-4 w-4"})})}),u.jsxs(Em,{align:"end",children:[a?.role==="super_admin"&&u.jsxs(ii,{onClick:()=>c(!0),children:[u.jsx(ad,{className:"mr-2 h-4 w-4"})," Edit"]}),a?.role==="super_admin"&&u.jsxs(ii,{className:"text-destructive",onClick:()=>s(!0),children:[u.jsx(Xc,{className:"mr-2 h-4 w-4"})," Delete"]}),u.jsxs(ii,{onClick:()=>d(!0),children:[u.jsx(hx,{className:"mr-2 h-4 w-4"})," Details"]})]})]})})]}),a?.role==="super_admin"&&u.jsx(cd,{open:i,title:"Delete Record",desc:"This will return the items to your stock inventory. Continue?",onClick:v=>{v&&r(e.id),s(!1)}}),a?.role==="super_admin"&&u.jsx(ud,{title:"Update Record",desc:"Adjust consumption values",open:o,onOpenChange:()=>c(!1),children:u.jsx(nJ,{initialValues:e,onSubmit:async v=>{await t(e.id,v),c(!1)},isLoading:n})}),u.jsx(Wze,{record:e,open:f,onOpenChange:()=>d(!1)})]})}function oA({title:e,value:t,unit:r}){return u.jsxs("div",{className:"p-4 border rounded-xl bg-white shadow-sm",children:[u.jsx("p",{className:"text-xs font-medium text-muted-foreground uppercase tracking-wider",children:e}),u.jsxs("h3",{className:"text-xl font-bold mt-1",children:[t?.toLocaleString()??0," ",u.jsx("span",{className:"text-sm font-normal text-muted-foreground",children:r})]})]})}function Kze(){return u.jsx("div",{className:"grid grid-cols-1 sm:grid-cols-3 gap-4",children:Array.from({length:3}).map((e,t)=>u.jsxs("div",{className:"p-4 border rounded-xl bg-white",children:[u.jsx(ke,{className:"h-3 w-12 mb-2"}),u.jsx(ke,{className:"h-7 w-20"})]},t))})}function Xze(){return u.jsxs("div",{className:"space-y-6",children:[u.jsxs("div",{className:"flex justify-between",children:[u.jsx(ke,{className:"h-8 w-48"}),u.jsx(ke,{className:"h-10 w-24"})]}),u.jsx("div",{className:"border rounded-xl overflow-hidden bg-white",children:u.jsxs(Ei,{children:[u.jsx(Gi,{children:u.jsxs(tn,{children:[u.jsx(tt,{children:"Date"}),u.jsx(tt,{children:"Flock"}),u.jsx(tt,{children:"Feed"}),u.jsx(tt,{children:"Actions"})]})}),u.jsx(Ai,{children:Array.from({length:5}).map((e,t)=>u.jsxs(tn,{children:[u.jsx(Qe,{children:u.jsx(ke,{className:"h-5 w-24"})}),u.jsx(Qe,{children:u.jsx(ke,{className:"h-5 w-20"})}),u.jsx(Qe,{children:u.jsx(ke,{className:"h-5 w-12"})}),u.jsx(Qe,{className:"text-right",children:u.jsx(ke,{className:"h-8 w-8 rounded-full ml-auto"})})]},t))})]})})]})}const Zze=(e,t,r)=>{const n=new Yt({orientation:"landscape"});n.setFontSize(18),n.text("Flock Consumption Report",148,15,{align:"center"}),n.setFontSize(12),n.setTextColor(100),n.text(r,148,25,{align:"center"}),n.setLineWidth(.5),n.line(10,30,287,30);let a=40;t&&(n.setFontSize(14),n.setTextColor(0),n.text("Consumption Overview",15,a),a+=8,Ba(n,{startY:a,head:[["Resource Type","Total Quantity"]],body:[["Feed (Consumption page only)",`${t.totalFeed?.toLocaleString()||0}`],["Total Medicine Consumed",`${t.totalMedicine?.toLocaleString()||0}`],["Total Vaccine Consumed",`${t.totalVaccine?.toLocaleString()||0}`]],theme:"grid",headStyles:{fillColor:[59,130,246]},styles:{fontSize:10,cellPadding:3},columnStyles:{0:{cellWidth:80}}}),a=n.lastAutoTable.finalY+15),n.setFontSize(14),n.setTextColor(0),n.text("Daily Consumption Logs",15,a),a+=8;const i=e.map(s=>[s.id,s.date?Kt(new Date(s.date),"dd MMM yyyy"):"-",s.flock?.flockName||"-",s.feeds?.head||"-",s.feeds?.quantity||0,s.medicines?.head||"-",s.medicines?.quantity||0,s.vaccines?.head||"-",s.vaccines?.quantity||0,s.notes||"-"]);Ba(n,{startY:a,head:[["Tracking ID","Date","Flock Name","Feed Type","Feed Quantity","Medicine Type","Medicine Quantity","Vaccine Type","Vaccine Quantity","Notes"]],body:i,theme:"striped",headStyles:{fillColor:[31,41,55]},styles:{fontSize:8,cellPadding:3},columnStyles:{0:{cellWidth:22},1:{cellWidth:26},2:{cellWidth:26},3:{cellWidth:26},4:{cellWidth:22},5:{cellWidth:28},6:{cellWidth:26},7:{cellWidth:26},8:{cellWidth:26},9:{cellWidth:30}},didDrawPage:()=>{n.setFontSize(9),n.setTextColor(150);const s=n.internal.getNumberOfPages(),o=n.internal.getCurrentPageInfo().pageNumber;n.text(`Generated on ${Kt(new Date,"dd MMM yyyy HH:mm")} | Page ${o} of ${s}`,148,205,{align:"center"})}}),n.save(`Consumption_Report_${Kt(new Date,"yyyy-MM-dd")}.pdf`)},Jze=()=>{const{setStocks:e}=Dr(),[t,r]=S.useState(!0),[n,a]=S.useState(!1),[i,s]=S.useState([]),o=S.useRef(1),[c,f]=S.useState(!1),[d,m]=S.useState(""),[v,g]=S.useState(null),[b,y]=S.useState(!0),[w,N]=S.useState(""),[j,C]=S.useState(""),O=S.useRef(!0),D=S.useRef(0);S.useEffect(()=>{o.current=1,O.current=!0,s([]),L(),R(d??void 0,w,j)},[d,w,j]);const L=async()=>{try{if(!O.current)return;r(!0);let W="";w?.trim()&&(W+=`&startDate=${encodeURIComponent(w.trim())}`),j?.trim()&&(W+=`&endDate=${encodeURIComponent(j.trim())}`),d&&(W+=`&flockId=${d}`);const me=await pB(o.current,10,W.length>0?W:void 0);me.message.toLowerCase()==="success"&&me.data&&(O.current=o.current<me.data.pagination.pages&&me.data.pagination.pages>0,D.current=me.data.pagination.pages,s(Y=>[...Y,...me.data.items]))}catch(W){pt.error(er(W))}finally{r(!1)}},R=async(W,me,Y)=>{try{y(!0);let k="?";me&&(k+=`startDate=${me}&`),Y&&(k+=`endDate=${Y}&`),W&&(k+=`flockId=${W}&`),(k.endsWith("&")||k.endsWith("?"))&&(k=k.slice(0,-1));const I=await Hze(k.length>0?k:void 0);I.message.toLowerCase()==="success"&&g(I.data)}catch(k){console.error("Summary Fetch Error:",k)}finally{y(!1)}},U=async()=>{try{const W=await tS();W.data&&e(W.data)}catch(W){console.error("Failed to sync inventory:",W)}},B=async W=>{try{r(!0);const me=await zze(W);me.message.toLowerCase()==="success"&&(pt.success("Consumption recorded"),s(Y=>[me.data,...Y]),R(d??void 0,w,j),U(),a(!1))}catch(me){pt.error(er(me))}finally{r(!1)}},X=async(W,me)=>{try{f(!0);const Y=await Uze(W,me);Y.message.toLowerCase()==="success"&&(pt.success("Record updated"),s(k=>k.map(I=>I.id===W?Y.data:I)),R(d??void 0,w,j),U())}catch(Y){pt.error(er(Y))}finally{f(!1)}},F=async()=>{try{let W="";return w?.trim()&&(W+=`&startDate=${encodeURIComponent(w.trim())}`),j?.trim()&&(W+=`&endDate=${encodeURIComponent(j.trim())}`),d&&(W+=`&flockId=${encodeURIComponent(d)}`),W.endsWith("&")&&(W=W.slice(0,-1)),(await pB(void 0,void 0,W)).data.items}catch(W){return pt.error(er(W)),[]}},z=async W=>{try{(await $ze(W)).message.toLowerCase()==="success"&&(pt.success("Record deleted"),s(Y=>Y.filter(k=>k.id!==W)),R(d??void 0,w,j),U())}catch(me){pt.error(er(me))}},J=S.useCallback(()=>a(W=>!W),[]),ne=S.useCallback(W=>N(W),[]),ge=S.useCallback(W=>C(W),[]),te=S.useCallback(W=>{m(W==="all"?null:W)},[]),Z=S.useCallback(()=>{o.current<D.current&&(o.current+=1,L())},[D.current,d,w,j]),K=S.useCallback(()=>{o.current>1&&(O.current=!0,o.current-=1,L())},[D.current,d,w,j]);return u.jsx(Vze,{selectedFlockId:d??"",showForm:n,records:i,isLoading:t,isUpdating:c,summary:v,startDate:w,endDate:j,isLoadingSummary:b,pageNumber:o.current,totalPages:D.current,onSelectFlockId:te,onSelectStartDate:ne,onSelectEndDate:ge,onCreate:B,onDelete:z,onEdit:X,toggleForm:J,onNextClick:Z,onPrevClick:K,getAllRecordsWithoutPagination:F})},gB=async(e,t,r)=>{let n=e&&t?`page=${e}&limit=${t}`:"";const a=`${rr.birdHealth}${n.length||r?.length?"?":""}${n}${r||""}`,{data:i}=await dr(a,nr.Get);return i},Qze=async e=>{const{data:t}=await dr(rr.birdHealth,nr.Post,e);return t},eUe=async(e,t)=>{const r=`${rr.birdHealth}/${e}`,{data:n}=await dr(r,nr.Put,t);return n},tUe=async e=>{const t=`${rr.birdHealth}/${e}`,{data:r}=await dr(t,nr.Delete);return r},rUe=async e=>{const t=`${rr.birdHealthSummary}${e||""}`,{data:r}=await dr(t,nr.Get);return r},nUe=async e=>{const t=`${rr.flock}?farmId=${e}&limit=100&page=1`,{data:r}=await dr(t,nr.Get);return r},aUe=()=>u.jsxs("div",{className:"space-y-6",children:[u.jsxs("div",{className:"flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4",children:[u.jsx(ke,{className:"h-8 w-52"}),u.jsx(ke,{className:"h-9 w-44"})]}),u.jsx("div",{className:"border rounded-xl overflow-hidden shadow-sm",children:u.jsxs(Ei,{children:[u.jsx(Gi,{children:u.jsxs(tn,{className:"bg-muted/50",children:[u.jsx(tt,{children:"Date"}),u.jsx(tt,{children:"Flock"}),u.jsx(tt,{children:"Mortality"}),u.jsx(tt,{children:"Cull"}),u.jsx(tt,{children:"Feed"}),u.jsx(tt,{children:"Water (L)"}),u.jsx(tt,{children:"Light Hrs"}),u.jsx(tt,{className:"text-right",children:"Actions"})]})}),u.jsx(Ai,{children:[...Array(6)].map((e,t)=>u.jsxs(tn,{children:[[24,28,16,16,28,16,16].map((r,n)=>u.jsx(Qe,{children:u.jsx(ke,{className:`h-5 w-${r}`})},n)),u.jsx(Qe,{className:"text-right",children:u.jsx("div",{className:"flex justify-end gap-2",children:u.jsx(ke,{className:"h-8 w-8"})})})]},t))})]})})]});function iUe({totalMortality:e,highestMortality:t}){return u.jsxs("div",{className:"grid gap-4 md:grid-cols-2",children:[u.jsxs(jr,{className:"border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm rounded-xl overflow-hidden",children:[u.jsx("div",{className:"h-1 w-full bg-gradient-to-r from-red-500 to-rose-400"}),u.jsxs(Cr,{className:"p-5 space-y-3",children:[u.jsxs("div",{className:"flex items-center justify-between",children:[u.jsx("span",{className:"text-xs font-semibold uppercase tracking-widest text-zinc-400",children:"Total Mortality"}),u.jsx("div",{className:"h-7 w-7 rounded-full bg-red-50 dark:bg-red-950 flex items-center justify-center",children:u.jsx(f5,{className:"h-4 w-4 text-red-500"})})]}),u.jsxs("div",{children:[u.jsx("p",{className:"text-3xl font-bold tabular-nums text-red-600 dark:text-red-400 break-words overflow-hidden",children:e.toLocaleString()}),u.jsx("p",{className:"text-xs text-zinc-400 mt-1 font-medium",children:"Total birds lost across all flocks"})]}),u.jsx(_i,{variant:"secondary",className:"text-[11px] border bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800",children:"Selected period"})]})]}),u.jsxs(jr,{className:"border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm rounded-xl overflow-hidden",children:[u.jsx("div",{className:"h-1 w-full bg-gradient-to-r from-amber-400 to-orange-400"}),u.jsxs(Cr,{className:"p-5 space-y-3",children:[u.jsxs("div",{className:"flex items-center justify-between",children:[u.jsx("span",{className:"text-xs font-semibold uppercase tracking-widest text-zinc-400",children:"Highest Mortality"}),u.jsx("div",{className:"h-7 w-7 rounded-full bg-amber-50 dark:bg-amber-950 flex items-center justify-center",children:u.jsx(_b,{className:"h-4 w-4 text-amber-500"})})]}),t?u.jsxs("div",{children:[u.jsx("p",{className:"text-lg font-bold text-zinc-900 dark:text-zinc-50",children:t.flockName}),u.jsxs("p",{className:"text-2xl font-bold tabular-nums text-amber-600 dark:text-amber-400 mt-0.5 break-words overflow-hidden",children:[t.mortality.toLocaleString()," birds"]}),u.jsx("p",{className:"text-xs text-zinc-400 mt-1 font-medium",children:"Flock with most mortality"})]}):u.jsx("p",{className:"text-sm text-zinc-400 py-2",children:"No data available"}),u.jsx(_i,{variant:"secondary",className:"text-[11px] border bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",children:"Worst flock"})]})]})]})}function sUe(){return u.jsx("div",{className:"grid gap-4 md:grid-cols-2",children:["from-red-50/50 to-red-100/30 border-red-200/50","from-amber-50/50 to-amber-100/30 border-amber-200/50"].map((e,t)=>u.jsxs(jr,{className:`bg-gradient-to-br ${e}`,children:[u.jsxs(hn,{className:"flex flex-row items-center justify-between space-y-0 pb-2",children:[u.jsx(ke,{className:"h-4 w-28 rounded"}),u.jsx(ke,{className:"h-5 w-5 rounded-full"})]}),u.jsxs(Cr,{className:"space-y-2",children:[u.jsx(ke,{className:"h-10 w-40 rounded"}),u.jsx(ke,{className:"h-3 w-48 rounded"})]})]},t))})}const Nu=({icon:e,label:t,value:r})=>u.jsxs("div",{className:"flex items-start gap-3",children:[u.jsx(e,{className:"h-4 w-4 text-muted-foreground mt-0.5 shrink-0"}),u.jsxs("div",{children:[u.jsx("p",{className:"text-xs text-muted-foreground",children:t}),u.jsx("p",{className:"font-medium text-sm",children:r??"—"})]})]}),oUe=({open:e,onOpenChange:t,record:r})=>u.jsx(Dh,{open:e,onOpenChange:t,children:u.jsxs(id,{className:"max-w-lg",children:[u.jsxs(sd,{children:[u.jsx(od,{children:"Bird Health Record"}),u.jsxs(ld,{children:[r.flock?.flockName," ·"," ",Kt(new Date(r.date),"dd MMMM yyyy")]})]}),u.jsxs("div",{className:"space-y-5 py-2",children:[u.jsxs("div",{className:"grid grid-cols-2 gap-4 text-sm",children:[u.jsx(Nu,{icon:Tz,label:"Date",value:Kt(new Date(r.date),"dd MMM yyyy")}),u.jsx(Nu,{icon:R0,label:"Flock",value:r.flock?.flockName}),u.jsx(Nu,{icon:f5,label:"Mortality",value:r.mortality}),u.jsx(Nu,{icon:vle,label:"Cull",value:r.cull}),u.jsx(Nu,{icon:R0,label:"Opening Birds",value:r.openingBirds?.toLocaleString()})]}),u.jsx(Do,{}),u.jsxs("div",{className:"grid grid-cols-2 gap-4 text-sm",children:[u.jsx(Nu,{icon:aD,label:"Feed Type",value:r.feedId}),u.jsx(Nu,{icon:aD,label:"Feed Consumed (bags)",value:r.feedConsumed}),u.jsx(Nu,{icon:Oj,label:"Water Consumed (L)",value:r.waterConsumption})]}),u.jsx(Do,{}),u.jsxs("div",{className:"grid grid-cols-2 gap-4 text-sm",children:[u.jsx(Nu,{icon:nD,label:"Light Hours",value:r.lightHours!=null?`${r.lightHours} hrs`:null}),u.jsx(Nu,{icon:nD,label:"Light Intensity (lux)",value:r.lightIntensity})]}),r.notes&&u.jsxs(u.Fragment,{children:[u.jsx(Do,{}),u.jsxs("div",{className:"space-y-2",children:[u.jsxs("div",{className:"flex items-center gap-2 text-sm text-muted-foreground",children:[u.jsx(Oz,{className:"h-4 w-4"}),u.jsx("span",{children:"Notes"})]}),u.jsxs("div",{className:"bg-muted/50 p-3 rounded-md text-sm whitespace-pre-wrap border italic",children:['"',r.notes,'"']})]})]})]}),u.jsx("div",{className:"flex justify-end pt-2 border-t gap-3",children:u.jsx(xt,{variant:"outline",onClick:()=>t(!1),children:"Close"})})]})}),lUe=(e,t)=>Aa({date:sr().required("date is required").matches(/^\d{4}-\d{2}-\d{2}$/,"Invalid date format (YYYY-MM-DD)").test("no-future-date","Date cannot be in the future",r=>{if(!r)return!1;const[n,a,i]=r.split("-").map(Number),s=new Date(n,a-1,i),o=new Date;return o.setHours(0,0,0,0),s<=o}),farmId:sr().required("Farm is required"),flockName:sr().required("Flock Name is required"),mortality:Hr().min(0,"Must be ≥ 0").required("Mortality is required"),cull:Hr().min(0,"Must be ≥ 0").required("Cull is required"),feedId:sr().nullable().optional(),feedConsumed:Hr().min(0).nullable().optional().test("stock-limit","Exceeds available feed stock",function(r){if(!r)return!0;const n=this.parent.feedId;if(!n)return!0;let a=e?.feeds?.find(i=>i.Type===n)?.quantity??0;return t?.feedId===n&&(a+=Number(t?.feedConsumed)||0),r<=a}),waterConsumption:Hr().min(0).nullable().optional(),lightHours:Hr().min(0).max(24).nullable().optional(),lightIntensity:Hr().min(0).nullable().optional(),notes:sr().optional()});function sJ({initialValues:e={},onSubmit:t,isLoading:r,className:n}){const{farms:a,stocks:i}=Dr(),[s,o]=S.useState([]),[c,f]=S.useState(!1),d=Ls({initialValues:{date:e.date?new Date(e.date).toISOString().split("T")[0]:new Date().toISOString().split("T")[0],farmId:e.farmId||"",flockName:e.flockName||"",mortality:e.mortality??0,cull:e.cull??0,feedId:e.feedId||"",feedConsumed:e.feedConsumed??"",waterConsumption:e.waterConsumption??"",lightHours:e.lightHours??"",lightIntensity:e.lightIntensity??"",notes:e.notes||""},validationSchema:lUe(i,e),enableReinitialize:!0,onSubmit:async w=>{const N={flockName:w.flockName,date:new Date(w.date).toISOString(),mortality:Number(w.mortality),cull:Number(w.cull),feedId:w.feedId||null,feedConsumed:w.feedConsumed!==""?Number(w.feedConsumed):null,waterConsumption:w.waterConsumption!==""?Number(w.waterConsumption):null,lightHours:w.lightHours!==""?Number(w.lightHours):null,lightIntensity:w.lightIntensity!==""?Number(w.lightIntensity):null,notes:w.notes||void 0};await t(N),d.resetForm()}});S.useEffect(()=>{if(!d.values.farmId){o([]),d.setFieldValue("flockName","");return}(async()=>{f(!0);try{const N=await nUe(d.values.farmId);N.data?.items&&o(N.data.items)}catch{o([])}finally{f(!1)}})()},[d.values.farmId]);const m="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-400",v=d.errors,g=d.touched,b=(w,N,j="text",C)=>u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{className:"text-slate-600",children:N}),u.jsx(Ot,{type:j,name:w,value:d.values[w],onChange:d.handleChange,placeholder:C,className:et("focus:ring-slate-400",g[w]&&v[w]&&"border-red-500")}),g[w]&&v[w]&&u.jsx("p",{className:"text-[10px] text-red-500",children:v[w]})]}),y=s.find(w=>w.flockName===d.values.flockName);return u.jsxs("form",{onSubmit:d.handleSubmit,className:et("bg-white p-6 rounded-2xl shadow-sm border space-y-8",n),children:[u.jsxs("div",{className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:[b("date","Date","date"),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{className:"text-slate-600",children:"Farm"}),u.jsxs("select",{name:"farmId",value:d.values.farmId,onChange:d.handleChange,className:et(m,g.farmId&&v.farmId&&"border-red-500"),children:[u.jsx("option",{value:"",children:"Select Farm..."}),a.map(w=>u.jsx("option",{value:w.id.toString(),children:w.name},w.id))]}),g.farmId&&v.farmId&&u.jsx("p",{className:"text-[10px] text-red-500",children:v.farmId})]})]}),u.jsx("div",{className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{className:"text-slate-600",children:"Flock Name"}),u.jsxs("select",{name:"flockName",value:d.values.flockName,onChange:d.handleChange,disabled:!d.values.farmId||c,className:et(m,g.flockName&&v.flockName&&"border-red-500"),children:[u.jsx("option",{value:"",children:c?"Loading flocks...":"Select Flock..."}),s.map(w=>u.jsx("option",{value:w.flockName,children:w.flockName},w.id))]}),g.flockName&&v.flockName&&u.jsx("p",{className:"text-[10px] text-red-500",children:v.flockName}),y&&u.jsxs("p",{className:"text-[11px] text-muted-foreground",children:["Available Birds:"," ",u.jsx("span",{className:"font-semibold text-slate-800",children:y.totalBirds?.toLocaleString()??"N/A"})]})]})}),u.jsxs("div",{className:"space-y-3 p-4 border rounded-xl bg-red-50/30 border-red-100",children:[u.jsx("h3",{className:"text-xs font-bold uppercase tracking-widest text-red-400",children:"Bird Count"}),u.jsxs("div",{className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:[b("mortality","Mortality","number","e.g. 10"),b("cull","Cull","number","e.g. 5")]})]}),u.jsxs("div",{className:"space-y-3 p-4 border rounded-xl bg-green-50/30 border-green-100",children:[u.jsx("h3",{className:"text-xs font-bold uppercase tracking-widest text-green-500",children:"Feed & Water"}),u.jsxs("div",{className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:[u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{className:"text-slate-600",children:"Feed"}),u.jsxs("select",{name:"feedId",value:d.values.feedId,onChange:d.handleChange,className:m,children:[u.jsx("option",{value:"",children:"Select Feed..."}),i?.feeds?.map(w=>u.jsxs("option",{value:w.Type,children:[w.Type," (Avail: ",w.quantity,")"]},w.Type))]})]}),b("feedConsumed","Feed Consumed (bags)","number","e.g. 20"),b("waterConsumption","Water Consumed (liters)","number","e.g. 150")]})]}),u.jsxs("div",{className:"space-y-3 p-4 border rounded-xl bg-blue-50/30 border-blue-100",children:[u.jsx("h3",{className:"text-xs font-bold uppercase tracking-widest text-blue-400",children:"Environment"}),u.jsxs("div",{className:"grid grid-cols-1 md:grid-cols-2 gap-6",children:[b("lightHours","Light Hours","number","e.g. 14"),b("lightIntensity","Light Intensity (lux)","number","e.g. 40")]})]}),u.jsxs("div",{className:"space-y-2",children:[u.jsx(bt,{className:"text-slate-600",children:"Notes / Observations"}),u.jsx(dd,{name:"notes",placeholder:"E.g. Routine daily checkup...",value:d.values.notes,onChange:d.handleChange,className:"min-h-[90px] focus:ring-slate-400"})]}),u.jsxs("div",{className:"flex items-center justify-end gap-3 pt-4 border-t",children:[u.jsx(xt,{type:"button",variant:"outline",onClick:()=>d.resetForm(),disabled:r,children:"Reset"}),u.jsx(xt,{type:"submit",disabled:r||!d.isValid,children:r?"Saving...":"Save Record"})]})]})}function cUe(e){const{flocks:t}=Dr(),r=async()=>{const a=e.startDate&&e.endDate?`From ${Kt(new Date(e.startDate),"dd MMM yyyy")} To ${Kt(new Date(e.endDate),"dd MMM yyyy")}`:"All Time Records";let i=await e.getAllRecordsWithoutPagination();if(i.length===0){pt.error("No records available to export");return}dUe(i,e.summary,a)},n=async()=>{let a=await e.getAllRecordsWithoutPagination();if(a.length===0){pt.error("No records available to export");return}const i=Y_e(a),s=`Birdhealth_${Kt(new Date,"yyyy-MM-dd")}`;_m(i,s,"BirdHealth")};return u.jsxs("div",{className:"bg-background",children:[u.jsx("section",{className:"p-6 border-b",children:u.jsxs("div",{className:"max-w-7xl mx-auto space-y-6",children:[u.jsxs("div",{className:"flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6",children:[u.jsx("h2",{className:"text-2xl font-bold tracking-tight",children:"Bird Health Summary"}),u.jsxs("div",{className:"flex flex-wrap items-center gap-4",children:[u.jsxs("div",{className:"flex items-center gap-2",children:[u.jsx(bt,{htmlFor:"bhStartDate",className:"text-sm font-medium text-muted-foreground whitespace-nowrap",children:"Start"}),u.jsx(Ot,{id:"bhStartDate",type:"date",value:e.startDate||"",disabled:e.isLoadingSummary,onChange:a=>e.onSelectStartDate(a.target.value),className:"h-9 w-40"})]}),u.jsxs("div",{className:"flex items-center gap-2",children:[u.jsx(bt,{htmlFor:"bhEndDate",className:"text-sm font-medium text-muted-foreground whitespace-nowrap",children:"End"}),u.jsx(Ot,{id:"bhEndDate",type:"date",value:e.endDate||"",disabled:e.isLoadingSummary,onChange:a=>e.onSelectEndDate(a.target.value),className:"h-9 w-40"})]}),u.jsxs("div",{className:"flex items-center gap-2",children:[u.jsx(bt,{htmlFor:"bhFlockFilter",className:"text-sm font-medium text-muted-foreground whitespace-nowrap",children:"Flock"}),u.jsxs("select",{id:"bhFlockFilter",value:e.selectedFlockId,disabled:e.isLoadingSummary,onChange:a=>e.onSelectFlockId(a.target.value),className:et("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm","focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2","w-44"),children:[u.jsx("option",{value:"all",children:"All Flocks"}),t.map(a=>u.jsx("option",{value:a.id.toString(),children:a.flockName},a.id))]})]})]})]}),e.summary?u.jsx(iUe,{...e.summary}):e.isLoadingSummary?u.jsx(sUe,{}):u.jsx("div",{className:"text-center py-12 text-muted-foreground",children:"No bird health summary available yet"})]})}),e.showForm?u.jsx("section",{className:"max-w-3xl mx-auto p-6",children:u.jsxs(hd,{Header:{title:"Add Bird Health Record",desc:"Record daily bird conditions including mortality, culling, feed consumption, and environment."},Body:{title:"Health Details",desc:"Fill in the form below to log today's bird health metrics"},Footer:{title:"All records are tracked securely and used for health trend reports"},children:[u.jsx(sJ,{onSubmit:e.onCreate,isLoading:e.isLoading}),u.jsx(xt,{className:"mt-6 w-full",onClick:e.toggleForm,children:"View All Records"})]})}):u.jsx("section",{className:"max-w-7xl mx-auto p-6",children:u.jsx(uUe,{records:e.records,onDelete:e.onDelete,isLoading:e.isLoading,isUpdating:e.isUpdating,toggleForm:e.toggleForm,pageNumber:e.pageNumber,totalPages:e.totalPages,onNextClick:e.onNextClick,onPrevClick:e.onPrevClick,onEdit:e.onEdit})}),u.jsxs("div",{className:"flex justify-end gap-2",children:[u.jsxs(xt,{variant:"outline",size:"sm",onClick:n,disabled:e.records.length===0,className:"flex items-center gap-2",children:[u.jsx(dm,{className:"h-4 w-4"}),"Export Excel"]}),u.jsxs(xt,{variant:"outline",size:"sm",onClick:r,disabled:e.records.length===0,className:"flex items-center gap-2",children:[u.jsx(Ph,{className:"h-4 w-4"}),"Export PDF"]})]})]})}function uUe({records:e,isLoading:t,isUpdating:r,onDelete:n,toggleForm:a,pageNumber:i,totalPages:s,onNextClick:o,onPrevClick:c,onEdit:f}){return t?u.jsx(aUe,{}):u.jsxs("div",{className:"space-y-6",children:[u.jsxs("div",{className:"flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4",children:[u.jsx("h2",{className:"text-2xl font-bold tracking-tight",children:"Bird Health"}),u.jsx(xt,{variant:"outline",size:"sm",onClick:a,children:"+ Add New Record"})]}),u.jsx("div",{className:"border rounded-xl overflow-hidden shadow-sm",children:e.length>0?u.jsxs(Ei,{children:[u.jsx(Gi,{children:u.jsxs(tn,{className:"bg-muted/50",children:[u.jsx(tt,{children:"Date"}),u.jsx(tt,{children:"Flock"}),u.jsx(tt,{children:"Opening Birds"}),u.jsx(tt,{children:"Mortality"}),u.jsx(tt,{children:"Cull"}),u.jsx(tt,{children:"Feed"}),u.jsx(tt,{children:"Feed (bags)"}),u.jsx(tt,{children:"Water (L)"}),u.jsx(tt,{children:"Light Hrs"}),u.jsx(tt,{children:"Light (lux)"}),u.jsx(tt,{className:"text-right",children:"Actions"})]})}),u.jsx(Ai,{children:e.map(d=>u.jsx(fUe,{record:d,isUpdating:r,onDelete:n,onEdit:m=>f(d.id,m)},d.id))})]}):u.jsxs("div",{className:"text-center py-16 space-y-6",children:[u.jsx("h2",{className:"text-2xl font-bold text-muted-foreground",children:"No bird health records yet"}),u.jsx("p",{className:"text-muted-foreground",children:"Add your first daily record"}),u.jsx(xt,{size:"lg",onClick:a,children:"+ Add Record"})]})}),u.jsxs("div",{className:"flex justify-between items-center pt-4",children:[u.jsx(xt,{size:"lg",disabled:t||r||i<=1,onClick:c,children:"Prev Page"}),u.jsxs("span",{className:"text-sm text-muted-foreground",children:["Page ",i," ",`of ${s}`]}),u.jsx(xt,{size:"lg",disabled:t||r||i>=s,onClick:o,children:"Next Page"})]})]})}function fUe({record:e,isUpdating:t,onDelete:r,onEdit:n}){const{user:a}=Dr(),[i,s]=S.useState(!1),[o,c]=S.useState(!1),[f,d]=S.useState(!1);return u.jsxs(u.Fragment,{children:[u.jsxs(tn,{className:"hover:bg-muted/30",children:[u.jsx(Qe,{className:"font-medium",children:Kt(new Date(e.date),"dd MMM yyyy")}),u.jsx(Qe,{children:u.jsx(_i,{variant:"outline",children:e.flock?.flockName??"—"})}),u.jsx(Qe,{children:e.openingBirds?.toLocaleString()??"—"}),u.jsx(Qe,{children:u.jsx("span",{className:"font-semibold text-red-600",children:e.mortality})}),u.jsx(Qe,{children:e.cull}),u.jsx(Qe,{className:"max-w-[120px] truncate",children:e.feedId??"—"}),u.jsx(Qe,{children:e.feedConsumed??"—"}),u.jsx(Qe,{children:e.waterConsumption??"—"}),u.jsx(Qe,{children:e.lightHours!=null?`${e.lightHours} hrs`:"—"}),u.jsx(Qe,{children:e.lightIntensity!=null?`${e.lightIntensity} lux`:"—"}),u.jsx(Qe,{className:"text-right",children:u.jsxs($g,{children:[u.jsx(Hg,{asChild:!0,children:u.jsx(xt,{variant:"ghost",size:"icon",disabled:t,children:u.jsx(dx,{className:"h-4 w-4"})})}),u.jsxs(Em,{align:"end",children:[a?.role==="super_admin"&&u.jsxs(u.Fragment,{children:[u.jsxs(ii,{onClick:()=>d(!0),children:[u.jsx(ad,{className:"mr-2 h-4 w-4"}),"Edit"]}),u.jsxs(ii,{onClick:()=>c(!0),children:[u.jsx(Xc,{className:"mr-2 h-4 w-4"}),"Delete"]})]}),u.jsxs(ii,{onClick:()=>s(!0),children:[u.jsx(hx,{className:"mr-2 h-4 w-4"}),"View Details"]})]})]})})]}),a?.role==="super_admin"&&u.jsxs(u.Fragment,{children:[u.jsx(cd,{open:o,title:"Delete bird health Record",desc:"Are you sure you want to delete this bird health entry? This action cannot be undone.",onClick:async m=>{m&&r(e.id),c(!1)}}),u.jsx(ud,{title:"Edit bird health Record",desc:"Update the bird health details below",open:f,onOpenChange:()=>d(!1),children:u.jsx(sJ,{initialValues:{...e,date:e.date.toString(),notes:e.notes??void 0},onSubmit:n,isLoading:t})})]}),u.jsx(oUe,{open:i,record:e,onOpenChange:()=>s(m=>!m)})]})}const dUe=(e,t,r)=>{const n=new Yt("l","mm","a4");n.setFontSize(20),n.text("Flock Daily Bird Health & Environment Report",148,15,{align:"center"}),n.setFontSize(10),n.setTextColor(100),n.text(`Report Period: ${r}`,148,22,{align:"center"}),n.setLineWidth(.5),n.line(10,28,287,28);let a=38;if(t){n.setFontSize(14),n.setTextColor(0),n.text("Aggregated Health Summary",15,a),a+=6;const s=Object.entries(t).filter(([o])=>o!=="id"&&o!=="flockId").map(([o,c])=>[o.replace(/([A-Z])/g," $1").replace(/^./,f=>f.toUpperCase()),typeof c=="number"?c.toLocaleString():String(c||"-")]);Ba(n,{startY:a,head:[["Metric Attribute","Value"]],body:[["Total Data Points Generated",e.length.toString()],...s],theme:"grid",headStyles:{fillColor:[59,130,246]},styles:{fontSize:9},margin:{left:15}}),a=n.lastAutoTable.finalY+12}n.setFontSize(14),n.setTextColor(0),n.text("Daily Operational Logs",15,a),a+=6;const i=e.map(s=>[Kt(new Date(s.date),"yyyy-MM-dd"),s.flock?.flockName||"-",s.openingBirds?.toLocaleString()||"0",s.mortality.toString(),s.cull.toString(),s.feedId||"-",s.feedConsumed!=null?`${s.feedConsumed}`:"-",s.waterConsumption!=null?`${s.waterConsumption}`:"-",s.lightHours!=null?`${s.lightHours}`:"-",s.lightIntensity!=null?`${s.lightIntensity}`:"-",s.notes||"-"]);Ba(n,{startY:a,head:[["Date","Flock Name","Opening Birds","Mortality Losses","Culling Count","Feed Tracking ID","Feed Volume (Bags)","Water Intake (Liters)","Photoperiod (Hours)","Light Intensity (Lux)","Operational Notes"]],body:i,theme:"striped",headStyles:{fillColor:[31,41,55]},styles:{fontSize:8},columnStyles:{0:{cellWidth:24},1:{cellWidth:26},2:{cellWidth:24},3:{cellWidth:26},4:{cellWidth:24},5:{cellWidth:28},6:{cellWidth:26},7:{cellWidth:28},8:{cellWidth:26},9:{cellWidth:26},10:{cellWidth:39}},margin:{left:10,right:10},didDrawPage:()=>{n.setFontSize(8),n.setTextColor(150);const s=n.internal.getNumberOfPages(),o=n.internal.getCurrentPageInfo().pageNumber;n.text(`Generated on: ${Kt(new Date,"dd MMM yyyy HH:mm")} | Page ${o} of ${s}`,148,200,{align:"center"})}}),n.save(`BirdHealth_Report_${Kt(new Date,"yyyy-MM-dd")}.pdf`)},hUe=()=>{const{setStocks:e}=Dr(),[t,r]=S.useState(!0),[n,a]=S.useState(!1),[i,s]=S.useState([]),o=S.useRef(1),[c,f]=S.useState(!1),[d,m]=S.useState(null),[v,g]=S.useState(null),[b,y]=S.useState(!0),[w,N]=S.useState(""),[j,C]=S.useState(""),O=S.useRef(!0),D=S.useRef(0);S.useEffect(()=>{o.current=1,O.current=!0,R()},[d,w,j]),S.useEffect(()=>{z(d,w,j)},[d,w,j]);const L=S.useCallback(async()=>{try{const W=await tS();W.data&&e(W.data)}catch(W){console.error("Failed to sync inventory:",W)}},[e]),R=async()=>{try{if(!O.current)return;r(!0),console.log("filters::",{selectedFlockId:d,startDate:w,endDate:j});let W="";w?.trim()&&(W+=`&startDate=${encodeURIComponent(w.trim())}`),j?.trim()&&(W+=`&endDate=${encodeURIComponent(j.trim())}`),d&&(W+=`&flockId=${encodeURIComponent(d)}`),W.endsWith("&")&&(W=W.slice(0,-1));const me=await gB(o.current,10,W.length>0?W:void 0);me.message.toLowerCase()==="success"&&me.data&&(O.current=o.current<me.data.pagination.pages&&me.data.pagination.pages>0,D.current=me.data.pagination.pages,s(me.data.items))}catch(W){pt.error(er(W))}finally{r(!1)}},U=async W=>{try{r(!0);const me=await Qze(W);me.message.toLowerCase()==="success"&&(s(Y=>[me.data,...Y]),z(),L(),a(!1))}catch(me){pt.error(er(me))}finally{r(!1)}},B=async()=>{try{let W="";return w?.trim()&&(W+=`&startDate=${encodeURIComponent(w.trim())}`),j?.trim()&&(W+=`&endDate=${encodeURIComponent(j.trim())}`),d&&(W+=`&flockId=${encodeURIComponent(d)}`),W.endsWith("&")&&(W=W.slice(0,-1)),(await gB(void 0,void 0,W)).data.items}catch(W){return pt.error(er(W)),[]}},X=async W=>{try{(await tUe(W)).message.toLowerCase()==="success"&&(s(Y=>Y.filter(k=>k.id!==W)),z(),L())}catch(me){pt.error(er(me))}},F=async(W,me)=>{try{f(!0);const Y=await eUe(W,me);Y.message.toLowerCase()==="success"&&(pt.success("Record updated"),s(k=>k.map(I=>I.id===W?Y.data:I)),z(d,w,j))}catch(Y){pt.error(er(Y))}finally{f(!1)}},z=async(W,me,Y)=>{try{y(!0);let k="?";me?.trim()&&(k+=`startDate=${encodeURIComponent(me.trim())}&`),Y?.trim()&&(k+=`endDate=${encodeURIComponent(Y.trim())}&`),W&&(k+=`flockId=${encodeURIComponent(W)}&`),k.endsWith("&")&&(k=k.slice(0,-1));const I=await rUe(k.length>1?k:void 0);I.message.toLowerCase()==="success"&&g(I.data)}catch(k){pt.error(er(k))}finally{y(!1)}},J=S.useCallback(()=>{a(W=>(W||L(),!W))},[L]),ne=S.useCallback(W=>N(W),[]),ge=S.useCallback(W=>C(W),[]),te=S.useCallback(W=>m(W==="all"?null:Number(W)),[]),Z=S.useCallback(()=>{o.current+=1,O.current=o.current<=D.current,R()},[d,w,j,D.current]),K=S.useCallback(()=>{o.current-=1,O.current=o.current>0,R()},[d,w,j,D.current]);return u.jsx(cUe,{showForm:n,records:i,isLoading:t,isUpdating:c,summary:v,isLoadingSummary:b,selectedFlockId:d?.toString()||"all",startDate:w,endDate:j,pageNumber:o.current,totalPages:D.current,onSelectStartDate:ne,onSelectEndDate:ge,onSelectFlockId:te,onEdit:F,onCreate:U,onDelete:X,toggleForm:J,onNextClick:Z,onPrevClick:K,getAllRecordsWithoutPagination:B})},mUe=[{path:gr.login,element:e4e,isPublic:!0},{path:gr.signup,element:n4e,isPublic:!0},{path:gr.forgotPassword,element:sze,isPublic:!0},{path:gr.changePassword,element:uze,isPublic:!1},{path:gr.expenses,element:$Ee,isPublic:!1},{path:gr.stocks,element:w4e,isPublic:!1},{path:gr.eggProduction,element:R4e,isPublic:!1},{path:gr.sales,element:Y4e,isPublic:!1},{path:gr.salaries,element:sAe,isPublic:!1},{path:gr.report,element:cAe,isPublic:!1},{path:gr.dashboard,element:eze,isPublic:!1},{path:gr.verifyEmail,element:mze,isPublic:!1},{path:gr.changeEmail,element:vze,isPublic:!1},{path:gr.farms,element:Aze,isPublic:!1},{path:gr.flocks,element:Bze,isPublic:!1},{path:gr.dailyConsumption,element:Jze,isPublic:!1},{path:gr.birdHealth,element:hUe,isPublic:!1}],pUe="/assets/Banner-img-BTP08R2t.jpeg",oJ="/assets/greenova-logo-CHK5q5vz.png",vB=({children:e})=>u.jsxs("div",{className:"grid min-h-svh lg:grid-cols-2",children:[u.jsxs("div",{className:"flex flex-col gap-4 p-6 md:p-10",children:[u.jsx("div",{className:"flex justify-center gap-2 md:justify-start",children:u.jsxs("div",{className:"flex items-center gap-3 md:justify-start",children:[u.jsx("div",{className:"relative flex aspect-square size-10 items-center justify-center rounded-xl overflow-hidden shadow-md shrink-0 border border-white/20",children:u.jsx("div",{className:"flex aspect-square size-10 items-center justify-center rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 overflow-hidden shrink-0",children:u.jsx("img",{src:oJ,alt:"GreenOva",className:"size-7 object-contain"})})}),u.jsxs("span",{className:"text-2xl font-bold tracking-tight text-slate-900 dark:text-white",children:["Green",u.jsx("span",{className:"text-green-600",children:"Ova"})]})]})}),u.jsx("div",{className:"flex flex-1 items-center justify-center",children:u.jsx("div",{className:"w-full max-w-xs",children:e})})]}),u.jsx("div",{className:"bg-muted relative hidden lg:block m-4 rounded-2xl overflow-hidden",children:u.jsx("img",{src:pUe,alt:"Image",className:"absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"})})]});function xB({...e}){return u.jsx(Afe,{"data-slot":"collapsible",...e})}function gUe({...e}){return u.jsx(SU,{"data-slot":"collapsible-trigger",...e})}function vUe({...e}){return u.jsx(NU,{"data-slot":"collapsible-content",...e})}const xUe=mU,yUe=pU,lJ=S.forwardRef(({className:e,...t},r)=>u.jsx(x5,{className:et("fixed inset-0 z-50 bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",e),...t,ref:r}));lJ.displayName=x5.displayName;const cJ=S.forwardRef(({side:e="right",className:t,children:r,...n},a)=>u.jsxs(yUe,{children:[u.jsx(lJ,{}),u.jsxs(y5,{ref:a,className:et("fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",e==="right"&&"inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",e==="left"&&"inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",e==="top"&&"inset-x-0 top-0 h-auto border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",e==="bottom"&&"inset-x-0 bottom-0 h-auto border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",t),...n,children:[r,u.jsxs(gU,{className:"absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary",children:[u.jsx(Mz,{className:"h-4 w-4"}),u.jsx("span",{className:"sr-only",children:"Close"})]})]})]}));cJ.displayName=y5.displayName;const uJ=({className:e,...t})=>u.jsx("div",{className:et("flex flex-col space-y-2 text-center sm:text-left",e),...t});uJ.displayName="SheetHeader";const fJ=S.forwardRef(({className:e,...t},r)=>u.jsx(b5,{ref:r,className:et("text-lg font-semibold text-foreground",e),...t}));fJ.displayName=b5.displayName;const dJ=S.forwardRef(({className:e,...t},r)=>u.jsx(w5,{ref:r,className:et("text-sm text-muted-foreground",e),...t}));dJ.displayName=w5.displayName;function bUe({delayDuration:e=0,...t}){return u.jsx(Bme,{"data-slot":"tooltip-provider",delayDuration:e,...t})}function wUe({...e}){return u.jsx(zme,{"data-slot":"tooltip",...e})}function SUe({...e}){return u.jsx(Ume,{"data-slot":"tooltip-trigger",...e})}function NUe({className:e,sideOffset:t=0,children:r,...n}){return u.jsx($me,{children:u.jsxs(Hme,{"data-slot":"tooltip-content",sideOffset:t,className:et("z-50 w-fit origin-(--radix-tooltip-content-transform-origin) animate-in rounded-md bg-foreground px-3 py-1.5 text-xs text-balance text-background fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",e),...n,children:[r,u.jsx(qme,{className:"z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground"})]})})}const lA=768;function _Ue(){const[e,t]=S.useState(void 0);return S.useEffect(()=>{const r=window.matchMedia(`(max-width: ${lA-1}px)`),n=()=>{t(window.innerWidth<lA)};return r.addEventListener("change",n),t(window.innerWidth<lA),()=>r.removeEventListener("change",n)},[]),!!e}const EUe="sidebar_state",AUe=3600*24*7,jUe="16rem",CUe="18rem",TUe="3rem",OUe="b",hJ=S.createContext(null);function YS(){const e=S.useContext(hJ);if(!e)throw new Error("useSidebar must be used within a SidebarProvider.");return e}function kUe({defaultOpen:e=!0,open:t,onOpenChange:r,className:n,style:a,children:i,...s}){const o=_Ue(),[c,f]=S.useState(!1),[d,m]=S.useState(e),v=t??d,g=S.useCallback(N=>{const j=typeof N=="function"?N(v):N;r?r(j):m(j),document.cookie=`${EUe}=${j}; path=/; max-age=${AUe}`},[r,v]),b=S.useCallback(()=>o?f(N=>!N):g(N=>!N),[o,g,f]);S.useEffect(()=>{const N=j=>{j.key===OUe&&(j.metaKey||j.ctrlKey)&&(j.preventDefault(),b())};return window.addEventListener("keydown",N),()=>window.removeEventListener("keydown",N)},[b]);const y=v?"expanded":"collapsed",w=S.useMemo(()=>({state:y,open:v,setOpen:g,isMobile:o,openMobile:c,setOpenMobile:f,toggleSidebar:b}),[y,v,g,o,c,f,b]);return u.jsx(hJ.Provider,{value:w,children:u.jsx(bUe,{delayDuration:0,children:u.jsx("div",{"data-slot":"sidebar-wrapper",style:{"--sidebar-width":jUe,"--sidebar-width-icon":TUe,...a},className:et("group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",n),...s,children:i})})})}function PUe({side:e="left",variant:t="sidebar",collapsible:r="offcanvas",className:n,children:a,...i}){const{isMobile:s,state:o,openMobile:c,setOpenMobile:f}=YS();return r==="none"?u.jsx("div",{"data-slot":"sidebar",className:et("flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",n),...i,children:a}):s?u.jsx(xUe,{open:c,onOpenChange:f,...i,children:u.jsxs(cJ,{"data-sidebar":"sidebar","data-slot":"sidebar","data-mobile":"true",className:"w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden",style:{"--sidebar-width":CUe},side:e,children:[u.jsxs(uJ,{className:"sr-only",children:[u.jsx(fJ,{children:"Sidebar"}),u.jsx(dJ,{children:"Displays the mobile sidebar."})]}),u.jsx("div",{className:"flex h-full w-full flex-col",children:a})]})}):u.jsxs("div",{className:"group peer hidden text-sidebar-foreground md:block","data-state":o,"data-collapsible":o==="collapsed"?r:"","data-variant":t,"data-side":e,"data-slot":"sidebar",children:[u.jsx("div",{"data-slot":"sidebar-gap",className:et("relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear","group-data-[collapsible=offcanvas]:w-0","group-data-[side=right]:rotate-180",t==="floating"||t==="inset"?"group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]":"group-data-[collapsible=icon]:w-(--sidebar-width-icon)")}),u.jsx("div",{"data-slot":"sidebar-container",className:et("fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",e==="left"?"left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]":"right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",t==="floating"||t==="inset"?"p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]":"group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",n),...i,children:u.jsx("div",{"data-sidebar":"sidebar","data-slot":"sidebar-inner",className:"flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm",children:a})})]})}function DUe({className:e,onClick:t,...r}){const{toggleSidebar:n}=YS();return u.jsxs(xt,{"data-sidebar":"trigger","data-slot":"sidebar-trigger",variant:"ghost",size:"icon",className:et("size-7",e),onClick:a=>{t?.(a),n()},...r,children:[u.jsx(ole,{}),u.jsx("span",{className:"sr-only",children:"Toggle Sidebar"})]})}function RUe({className:e,...t}){return u.jsx("main",{"data-slot":"sidebar-inset",className:et("relative flex w-full flex-1 flex-col bg-background","md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",e),...t})}function MUe({className:e,...t}){return u.jsx("div",{"data-slot":"sidebar-header","data-sidebar":"header",className:et("flex flex-col gap-2 p-2",e),...t})}function LUe({className:e,...t}){return u.jsx("div",{"data-slot":"sidebar-footer","data-sidebar":"footer",className:et("flex flex-col gap-2 p-2",e),...t})}function FUe({className:e,...t}){return u.jsx("div",{"data-slot":"sidebar-content","data-sidebar":"content",className:et("flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",e),...t})}function IUe({className:e,...t}){return u.jsx("div",{"data-slot":"sidebar-group","data-sidebar":"group",className:et("relative flex w-full min-w-0 flex-col p-2",e),...t})}function BUe({className:e,asChild:t=!1,...r}){const n=t?mx:"div";return u.jsx(n,{"data-slot":"sidebar-group-label","data-sidebar":"group-label",className:et("flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0","group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",e),...r})}function TO({className:e,...t}){return u.jsx("ul",{"data-slot":"sidebar-menu","data-sidebar":"menu",className:et("flex w-full min-w-0 flex-col gap-1",e),...t})}function Jw({className:e,...t}){return u.jsx("li",{"data-slot":"sidebar-menu-item","data-sidebar":"menu-item",className:et("group/menu-item relative",e),...t})}const zUe=u5("peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",{variants:{variant:{default:"hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",outline:"bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]"},size:{default:"h-8 text-sm",sm:"h-7 text-xs",lg:"h-12 text-sm group-data-[collapsible=icon]:p-0!"}},defaultVariants:{variant:"default",size:"default"}});function Qw({asChild:e=!1,isActive:t=!1,variant:r="default",size:n="default",tooltip:a,className:i,...s}){const o=e?mx:"button",{isMobile:c,state:f}=YS(),d=u.jsx(o,{"data-slot":"sidebar-menu-button","data-sidebar":"menu-button","data-size":n,"data-active":t,className:et(zUe({variant:r,size:n}),i),...s});return a?(typeof a=="string"&&(a={children:a}),u.jsxs(wUe,{children:[u.jsx(SUe,{asChild:!0,children:d}),u.jsx(NUe,{side:"right",align:"center",hidden:f!=="collapsed"||c,...a})]})):d}function UUe({className:e,asChild:t=!1,showOnHover:r=!1,...n}){const a=t?mx:"button";return u.jsx(a,{"data-slot":"sidebar-menu-action","data-sidebar":"menu-action",className:et("absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform peer-hover/menu-button:text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0","after:absolute after:-inset-2 md:after:hidden","peer-data-[size=sm]/menu-button:top-1","peer-data-[size=default]/menu-button:top-1.5","peer-data-[size=lg]/menu-button:top-2.5","group-data-[collapsible=icon]:hidden",r&&"group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground data-[state=open]:opacity-100 md:opacity-0",e),...n})}function $Ue({className:e,...t}){return u.jsx("ul",{"data-slot":"sidebar-menu-sub","data-sidebar":"menu-sub",className:et("mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5","group-data-[collapsible=icon]:hidden",e),...t})}function HUe({className:e,...t}){return u.jsx("li",{"data-slot":"sidebar-menu-sub-item","data-sidebar":"menu-sub-item",className:et("group/menu-sub-item relative",e),...t})}function qUe({asChild:e=!1,size:t="md",isActive:r=!1,className:n,...a}){const i=e?mx:"a";return u.jsx(i,{"data-slot":"sidebar-menu-sub-button","data-sidebar":"menu-sub-button","data-size":t,"data-active":r,className:et("flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground","data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",t==="sm"&&"text-xs",t==="md"&&"text-sm","group-data-[collapsible=icon]:hidden",n),...a})}let z2={title:"User Management",url:gr.userManagement,icon:Ple};function WUe({items:e}){const{user:t}=Dr();return u.jsxs(IUe,{children:[u.jsx(BUe,{children:"Platform"}),u.jsxs(TO,{children:[e.map(r=>u.jsx(xB,{asChild:!0,defaultOpen:r.isActive,children:u.jsxs(Jw,{children:[u.jsx(Qw,{asChild:!0,tooltip:r.title,children:u.jsxs(Mu,{to:r.url,children:[u.jsx(r.icon,{}),u.jsx("span",{children:r.title})]})}),r.items?.length?u.jsxs(u.Fragment,{children:[u.jsx(gUe,{asChild:!0,children:u.jsxs(UUe,{className:"data-[state=open]:rotate-90",children:[u.jsx(Coe,{}),u.jsx("span",{className:"sr-only",children:"Toggle"})]})}),u.jsx(vUe,{children:u.jsx($Ue,{children:r.items?.map(n=>u.jsx(HUe,{children:u.jsx(qUe,{asChild:!0,children:u.jsx(Mu,{to:n.url,children:u.jsx("span",{children:n.title})})})},n.title))})})]}):null]})},r.title)),t?.role==="super_admin"&&u.jsx(xB,{asChild:!0,defaultOpen:!1,children:u.jsx(Jw,{children:u.jsx(Qw,{asChild:!0,tooltip:z2.title,children:u.jsxs(Mu,{to:z2.url,children:[u.jsx(z2.icon,{}),u.jsx("span",{children:z2.title})]})})})})]})]})}const sj=S.forwardRef(({className:e,...t},r)=>u.jsx(kU,{ref:r,className:et("relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full",e),...t}));sj.displayName=kU.displayName;const oj=S.forwardRef(({className:e,...t},r)=>u.jsx(PU,{ref:r,className:et("aspect-square h-full w-full object-cover",e),...t}));oj.displayName=PU.displayName;const lj=S.forwardRef(({className:e,...t},r)=>u.jsx(DU,{ref:r,className:et("flex h-full w-full items-center justify-center rounded-full bg-muted text-muted-foreground",e),...t}));lj.displayName=DU.displayName;function VUe(){const{isMobile:e}=YS(),{logout:t,user:r}=Dr(),{navigateTo:n}=Am(),a=()=>{t(),n("/login")};return u.jsx(TO,{children:u.jsx(Jw,{children:u.jsxs($g,{children:[u.jsx(Hg,{asChild:!0,children:u.jsxs(Qw,{size:"lg",className:"data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground",children:[u.jsxs(sj,{className:"h-8 w-8 rounded-lg",children:[u.jsx(oj,{src:"/avatars/malik.jpg",alt:r?.name}),u.jsx(lj,{className:"rounded-lg",children:"CN"})]}),u.jsxs("div",{className:"grid flex-1 text-left text-sm leading-tight",children:[u.jsx("span",{className:"truncate font-medium",children:r?.name}),u.jsx("span",{className:"truncate text-xs",children:r?.email})]}),u.jsx(Ooe,{className:"ml-auto size-4"})]})}),u.jsxs(Em,{className:"w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg",side:e?"bottom":"right",align:"end",sideOffset:4,children:[u.jsx(PV,{className:"p-0 font-normal",children:u.jsxs("div",{className:"flex items-center gap-2 px-1 py-1.5 text-left text-sm",children:[u.jsxs(sj,{className:"h-8 w-8 rounded-lg",children:[u.jsx(oj,{src:"/avatars/malik.jpg",alt:r?.name}),u.jsx(lj,{className:"rounded-lg",children:"CN"})]}),u.jsxs("div",{className:"grid flex-1 text-left text-sm leading-tight",children:[u.jsx("span",{className:"truncate font-medium",children:r?.name}),u.jsx("span",{className:"truncate text-xs",children:r?.email})]})]})}),u.jsx(ab,{}),u.jsx(hM,{}),u.jsx(ab,{}),u.jsxs(hM,{children:[u.jsxs(ii,{onClick:()=>n(gr.changePassword),children:[u.jsx(Koe,{className:"mr-2 h-4 w-4"}),"Change Password"]}),u.jsxs(ii,{onClick:()=>n(gr.verifyEmail),children:[u.jsx(rle,{className:"mr-2 h-4 w-4"}),"Verify Email"]}),u.jsxs(ii,{onClick:()=>n(gr.changeEmail),children:[u.jsx(Rle,{className:"mr-2 h-4 w-4"}),"Update Profile"]})]}),u.jsx(ab,{}),u.jsxs(ii,{onClick:a,children:[u.jsx(ele,{}),"Log out"]})]})]})})})}const GUe={navMain:[{title:"Dashboard",url:gr.dashboard,icon:kz,isActive:!0},{title:"Flocks",url:gr.flocks,icon:R0},{title:"Consumptions",url:gr.dailyConsumption,icon:Sb},{title:"Bird Health",url:gr.birdHealth,icon:Woe},{title:"Expenses",url:gr.expenses,icon:mh},{title:"Stocks",url:gr.stocks,icon:qp},{title:"Egg Production",url:gr.eggProduction,icon:Nb},{title:"Sales",url:gr.sales,icon:yle},{title:"Salaries",url:gr.salaries,icon:Fle},{title:"Reports",url:gr.report,icon:Sb},{title:"Farms",url:gr.farms,icon:Sle}]};function YUe({...e}){return u.jsxs(PUe,{variant:"inset",...e,children:[u.jsx(MUe,{className:"border-b border-zinc-200 dark:border-zinc-800 pb-3",children:u.jsx(TO,{children:u.jsx(Jw,{children:u.jsx(Qw,{size:"lg",asChild:!0,children:u.jsxs(Mu,{to:"",className:"flex items-center gap-3 px-1",children:[u.jsx("div",{className:"relative flex aspect-square size-9 items-center justify-center rounded-xl overflow-hidden shadow-sm shrink-0",children:u.jsx("div",{className:"flex aspect-square size-10 items-center justify-center rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 overflow-hidden shrink-0",children:u.jsx("img",{src:oJ,alt:"GreenOva",className:"size-7 object-contain"})})}),u.jsxs("div",{className:"grid flex-1 text-left leading-tight",children:[u.jsx("span",{className:"truncate text-sm font-bold text-zinc-900 dark:text-zinc-50 tracking-tight",children:"GreenOva"}),u.jsx("span",{className:"truncate text-[11px] font-medium text-zinc-400 uppercase tracking-widest",children:"Farm Management"})]})]})})})})}),u.jsxs(FUe,{className:"py-4",children:[u.jsx("p",{className:"px-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500",children:"Main Menu"}),u.jsx(WUe,{items:GUe.navMain})]}),u.jsx(LUe,{className:"border-t border-zinc-200 dark:border-zinc-800 pt-3",children:u.jsx(VUe,{})})]})}function KUe({...e}){return u.jsx("nav",{"aria-label":"breadcrumb","data-slot":"breadcrumb",...e})}function XUe(e){return u.jsx(Dh,{open:e.open,onOpenChange:e.onClick,children:u.jsxs(id,{className:"sm:max-w-md",children:[u.jsxs(sd,{children:[u.jsx(od,{className:"text-destructive",children:e.title}),u.jsxs(ld,{children:[e.desc,u.jsx("br",{})]})]}),u.jsxs(Fj,{className:"gap-3 mt-6",children:[u.jsx(xt,{variant:"outline",onClick:()=>e.onClick(!1),children:"Cancel"}),u.jsx(xt,{variant:"destructive",onClick:()=>e.onClick(!0),children:"Confirm"})]})]})})}const ZUe=({rows:e=5})=>u.jsx(Ei,{children:u.jsx(Ai,{children:Array.from({length:e}).map((t,r)=>u.jsxs(tn,{children:[u.jsx(Qe,{children:u.jsx(ke,{className:"h-4 w-[120px]"})}),u.jsx(Qe,{children:u.jsx(ke,{className:"h-4 w-[200px]"})}),u.jsx(Qe,{children:u.jsx(ke,{className:"h-4 w-[80px]"})}),u.jsx(Qe,{children:u.jsx(ke,{className:"h-4 w-[100px]"})}),u.jsx(Qe,{children:u.jsx(ke,{className:"h-4 w-[120px]"})}),u.jsx(Qe,{children:u.jsx(ke,{className:"h-4 w-[100px]"})}),u.jsx(Qe,{className:"text-right",children:u.jsx(ke,{className:"h-8 w-[110px] ml-auto"})})]},r))})}),JUe=e=>u.jsx("div",{children:u.jsx(QUe,{users:e.users,onChangeStatus:e.onChangeStatus,isLoading:e.isLoading})}),QUe=e=>u.jsx("div",{className:"max-w-7xl mx-auto p-6",children:u.jsx("div",{className:"border rounded-xl overflow-hidden shadow-sm",children:e.users.length>0||e.isLoading?u.jsxs(Ei,{children:[u.jsx(Gi,{children:u.jsxs(tn,{children:[u.jsx(tt,{children:"Name"}),u.jsx(tt,{children:"Email"}),u.jsx(tt,{children:"Status"}),u.jsx(tt,{children:"Role"}),u.jsx(tt,{children:"Email Verified"}),u.jsx(tt,{children:"Created At"}),u.jsx(tt,{className:"text-right",children:"Actions"})]})}),e.isLoading?u.jsx(ZUe,{rows:6}):u.jsx(Ai,{children:e.users.map(t=>u.jsx(e$e,{user:t,onChangeStatus:e.onChangeStatus},t.id))})]}):u.jsx("div",{className:"text-center py-16 space-y-6",children:u.jsx("h2",{className:"text-2xl font-bold text-muted-foreground",children:"No users found"})})})}),e$e=e=>{const[t,r]=S.useState(!1);return u.jsxs(u.Fragment,{children:[u.jsxs(tn,{children:[u.jsx(Qe,{className:"font-medium",children:e.user.name}),u.jsx(Qe,{children:e.user.email}),u.jsx(Qe,{children:e.user.status}),u.jsx(Qe,{children:e.user.role}),u.jsx(Qe,{children:e.user.isEmailVerified?"Verified":"Not Verified"}),u.jsx(Qe,{children:new Date(e.user.createdAt).toLocaleDateString()}),u.jsx(Qe,{className:"text-right",children:u.jsx(xt,{variant:e.user.status==="allowed"?"destructive":"default",onClick:()=>r(!0),children:e.user.status==="allowed"?"Block User":"Allow User"})})]}),u.jsx(XUe,{open:t,title:"Status shift",desc:`Are you sure you want to ${e.user.status==="allowed"?"block":"allow"} this user?`,onClick:async n=>{n&&await e.onChangeStatus(e.user.id),r(!1)}})]})},t$e=async()=>{let e=rr.getAllUsers,{data:t}=await dr(e,nr.Get);return t},r$e=async(e,t)=>{let r=rr.shiftUsersStatus,{data:n}=await dr(r,nr.Post,{id:e,status:t});return n},n$e=()=>{const[e,t]=S.useState([]),[r,n]=S.useState(!0),{navigateTo:a}=Am();S.useEffect(()=>{i()},[]);const i=async()=>{try{let o=await t$e();o.message.toLowerCase()==="success"&&t(o.data)}catch(o){pt.error(er(o)),a(gr.dashboard)}finally{n(!1)}},s=async o=>{try{let c=e.findIndex(m=>m.id===o),f=e[c].status==="allowed"?"rejected":"allowed";(await r$e(o,f)).message.toLowerCase()==="success"&&t(m=>(m[c].status=f,m))}catch(c){pt.error(er(c))}};return u.jsx(JUe,{users:e,isLoading:r,onChangeStatus:s})},yB=({children:e})=>{const{getCurrentRoute:t}=Am(),{isAuthenticated:r}=Dr();return!r&&t()!==gr.changePassword&&t()!==gr.login?u.jsx(hb,{to:gr.login,replace:!0}):u.jsxs(kUe,{children:[u.jsx(YUe,{variant:"inset"}),u.jsx(RUe,{className:"bg-background",children:u.jsxs("main",{className:"flex flex-col min-h-screen bg-stone-50 dark:bg-zinc-950",children:[u.jsx("div",{className:"h-0.5 w-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 shrink-0"}),u.jsxs("header",{className:"flex h-14 shrink-0 items-center gap-3 px-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12",children:[u.jsx(DUe,{className:"-ml-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"}),u.jsx("div",{className:"w-px h-4 bg-zinc-200 dark:bg-zinc-700"}),u.jsx(KUe,{})]}),u.jsx("div",{className:"flex-1 p-6",children:e})]})})]})},a$e=({children:e})=>{const{isAuthenticated:t,user:r}=Dr(),n=localStorage.getItem("authToken"),a=localStorage.getItem("userProfile");return!n||!a?u.jsx(vB,{children:e}):t?r?.isEmailVerified?u.jsx(hb,{to:gr.dashboard,replace:!0}):u.jsx(hb,{to:gr.verifyEmail,replace:!0}):u.jsx(vB,{children:e})},i$e=()=>{const{user:e}=Dr();return u.jsx(u.Fragment,{children:u.jsxs(Cee,{children:[mUe.map((t,r)=>t.isPublic?u.jsx(e1,{path:t.path,element:u.jsx(a$e,{children:u.jsx(t.element,{})})},`route-${r}`):u.jsx(e1,{path:t.path,element:u.jsx(yB,{children:u.jsx(t.element,{})})},`route-${r}`)),e?.role==="super_admin"&&u.jsx(e1,{path:gr.userManagement,element:u.jsx(yB,{children:u.jsx(n$e,{})})}),u.jsx(e1,{path:"*",element:u.jsx(hb,{to:gr.dashboard,replace:!0})})]})})};function s$e(){const[e,t]=S.useState(!1),{setFarms:r,setStocks:n,setFlocks:a,isAuthenticated:i}=Dr();S.useEffect(()=>{s()},[]);const s=async()=>{await o(),await c();const d=window.location.pathname===gr.changePassword;i&&!d&&await f(),t(!0)},o=async()=>{try{let d=await Sze();d.message.toLowerCase()==="success"&&r(d.data)}catch(d){pt.error(er(d))}},c=async()=>{try{let d=await tS();d.message.toLowerCase()==="success"&&n(d.data)}catch(d){pt.error(er(d))}},f=async()=>{try{let d=await XC();d.message.toLowerCase()==="success"&&a(d.data.items)}catch(d){pt.error(er(d))}};return e?u.jsx(i$e,{}):u.jsxs("div",{className:"fixed inset-0 bg-background flex flex-col items-center justify-center z-50",children:[u.jsxs("div",{className:"relative",children:[u.jsx(Joe,{className:"h-20 w-20 animate-[spin_1s_linear_infinite] text-primary"}),u.jsx("div",{className:"absolute inset-0 rounded-full bg-primary/10 animate-ping"})]}),u.jsx("p",{className:"mt-6 text-lg font-medium text-muted-foreground",children:"Initializing Farm Dashboard..."})]})}OQ.createRoot(document.getElementById("root")).render(u.jsxs(u.Fragment,{children:[u.jsx(FEe,{position:"top-center"}),u.jsx(Jee,{children:u.jsx(s$e,{})})]}));export{Ln as _,o$e as c,Kl as g};
