@@ -42,6 +42,32 @@ function isDateInRange(itemDateStr?: string, startDate?: string, endDate?: strin
   return true;
 }
 
+// Reusable pagination helper adhering to live greenovapk.com specification (limit=10 default)
+function paginateItems(items: any[], req: Request, defaultLimit = 10) {
+  const pageParam = req.query.page !== undefined ? parseInt(req.query.page as string, 10) : undefined;
+  const limitParam = req.query.limit !== undefined ? parseInt(req.query.limit as string, 10) : undefined;
+  const limit = limitParam && !isNaN(limitParam) && limitParam > 0 ? limitParam : defaultLimit;
+  const total = items.length;
+  const pages = Math.max(1, Math.ceil(total / limit));
+  const page = pageParam && !isNaN(pageParam) && pageParam > 0 ? pageParam : 1;
+
+  // If page parameter is explicitly provided, slice for that page.
+  // If page parameter is omitted (e.g. export all records), return all items.
+  const paginatedItems = pageParam !== undefined
+    ? items.slice((page - 1) * limit, page * limit)
+    : items;
+
+  return {
+    items: paginatedItems,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages,
+    },
+  };
+}
+
 // In-Memory Data Stores for Full Interactive CRUD
 let flockItems: any[] = [
   {
@@ -932,9 +958,10 @@ apiRouter.get('/user/profile', (_req: Request, res: Response) => {
 apiRouter.get(['/daily-consumption', '/daily-consumptions'], (req: Request, res: Response) => {
   const flockId = getFlockId(req);
   const items = flockId ? allConsumptions.filter(c => c.flockId === flockId) : allConsumptions;
+  const result = paginateItems(items, req, 10);
   res.json({
     message: 'success',
-    data: { items, pagination: { page: 1, limit: 10, total: items.length, pages: 1 } },
+    data: result,
   });
 });
 
@@ -1012,9 +1039,10 @@ apiRouter.get(['/daily-consumption/summary', '/daily-consumptions/summary'], (re
 apiRouter.get('/bird-health', (req: Request, res: Response) => {
   const flockId = getFlockId(req);
   const items = flockId ? birdHealthItems.filter(b => b.flockId === flockId) : birdHealthItems;
+  const result = paginateItems(items, req, 10);
   res.json({
     message: 'success',
-    data: { items, pagination: { page: 1, limit: 10, total: items.length, pages: 1 } },
+    data: result,
   });
 });
 
@@ -1100,18 +1128,21 @@ apiRouter.get('/bird-health/summary', (req: Request, res: Response) => {
 // 9. Egg Productions CRUD
 apiRouter.get(['/egg-production', '/egg-productions'], (req: Request, res: Response) => {
   const flockId = getFlockId(req);
-  const items = flockId ? rawEggProductions.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId) : rawEggProductions;
+  const startDate = req.query.startDate as string | undefined;
+  const endDate = req.query.endDate as string | undefined;
+
+  let items = rawEggProductions;
+  if (flockId) {
+    items = items.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId);
+  }
+  if (startDate || endDate) {
+    items = items.filter((it: any) => isDateInRange(it.date || it.productionDate || it.createdAt, startDate, endDate));
+  }
+
+  const result = paginateItems(items, req, 10);
   res.json({
     message: 'success',
-    data: {
-      items,
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: items.length,
-        pages: Math.max(1, Math.ceil(items.length / 20)),
-      },
-    },
+    data: result,
   });
 });
 
@@ -1188,18 +1219,34 @@ apiRouter.get(['/egg-production/summary', '/egg-productions/summary'], (req: Req
 // 10. Expenses CRUD
 apiRouter.get('/expenses', (req: Request, res: Response) => {
   const flockId = getFlockId(req);
-  const items = flockId ? rawExpenses.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId) : rawExpenses;
+  const headFilter = req.query.head as string | undefined;
+  const startDate = req.query.startDate as string | undefined;
+  const endDate = req.query.endDate as string | undefined;
+  const sortBy = req.query.sortBy as string | undefined;
+  const sortOrder = req.query.sortOrder as string | undefined;
+
+  let items = rawExpenses;
+  if (flockId) {
+    items = items.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId);
+  }
+  if (headFilter && headFilter !== 'all') {
+    items = items.filter((it: any) => it.head === headFilter || it.expenseHead === headFilter);
+  }
+  if (startDate || endDate) {
+    items = items.filter((it: any) => isDateInRange(it.expenseDate || it.date || it.createdAt, startDate, endDate));
+  }
+  if (sortBy === 'cost' && sortOrder) {
+    items = [...items].sort((a: any, b: any) => {
+      const aCost = Number(a.expenseCost || a.amount || a.cost || 0);
+      const bCost = Number(b.expenseCost || b.amount || b.cost || 0);
+      return sortOrder.toLowerCase() === 'asc' ? aCost - bCost : bCost - aCost;
+    });
+  }
+
+  const result = paginateItems(items, req, 10);
   res.json({
     message: 'success',
-    data: {
-      items,
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: items.length,
-        pages: Math.max(1, Math.ceil(items.length / 20)),
-      },
-    },
+    data: result,
   });
 });
 
@@ -1293,18 +1340,21 @@ apiRouter.get('/expenses/summary', (req: Request, res: Response) => {
 // 11. Stocks CRUD
 apiRouter.get('/stocks', (req: Request, res: Response) => {
   const flockId = getFlockId(req);
-  const items = flockId ? rawStocks.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId) : rawStocks;
+  const startDate = req.query.startDate as string | undefined;
+  const endDate = req.query.endDate as string | undefined;
+
+  let items = rawStocks;
+  if (flockId) {
+    items = items.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId);
+  }
+  if (startDate || endDate) {
+    items = items.filter((it: any) => isDateInRange(it.date || it.createdAt, startDate, endDate));
+  }
+
+  const result = paginateItems(items, req, 10);
   res.json({
     message: 'success',
-    data: {
-      items,
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: items.length,
-        pages: Math.max(1, Math.ceil(items.length / 20)),
-      },
-    },
+    data: result,
   });
 });
 
@@ -1398,18 +1448,21 @@ apiRouter.get('/stocks/summary', (req: Request, res: Response) => {
 // 12. Sales CRUD
 apiRouter.get('/sales', (req: Request, res: Response) => {
   const flockId = getFlockId(req);
-  const items = flockId ? rawSales.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId) : rawSales;
+  const startDate = req.query.startDate as string | undefined;
+  const endDate = req.query.endDate as string | undefined;
+
+  let items = rawSales;
+  if (flockId) {
+    items = items.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId);
+  }
+  if (startDate || endDate) {
+    items = items.filter((it: any) => isDateInRange(it.saleDate || it.date || it.createdAt, startDate, endDate));
+  }
+
+  const result = paginateItems(items, req, 10);
   res.json({
     message: 'success',
-    data: {
-      items,
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: items.length,
-        pages: Math.max(1, Math.ceil(items.length / 20)),
-      },
-    },
+    data: result,
   });
 });
 
@@ -1492,18 +1545,25 @@ apiRouter.get('/sales/summary', (req: Request, res: Response) => {
 // 13. Salaries CRUD
 apiRouter.get('/salaries', (req: Request, res: Response) => {
   const flockId = getFlockId(req);
-  const items = flockId ? rawSalaries.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId) : rawSalaries;
+  const search = req.query.search as string | undefined;
+
+  let items = rawSalaries;
+  if (flockId) {
+    items = items.filter((it: any) => it.flockId === flockId || it.flock?.id === flockId);
+  }
+  if (search && search.trim()) {
+    const sTerm = search.trim().toLowerCase();
+    items = items.filter((it: any) =>
+      (it.employeeName && it.employeeName.toLowerCase().includes(sTerm)) ||
+      (it.designation && it.designation.toLowerCase().includes(sTerm)) ||
+      (it.remarks && it.remarks.toLowerCase().includes(sTerm))
+    );
+  }
+
+  const result = paginateItems(items, req, 10);
   res.json({
     message: 'success',
-    data: {
-      items,
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: items.length,
-        pages: Math.max(1, Math.ceil(items.length / 20)),
-      },
-    },
+    data: result,
   });
 });
 
