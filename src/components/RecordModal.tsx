@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Egg, Wheat, HeartPulse, X, Calendar, Layers, ChevronDown } from 'lucide-react';
+import { Egg, Wheat, HeartPulse, X } from 'lucide-react';
 import { Flock, EggProduction, FeedConsumption, MortalityLog } from '../types/farm';
 
 interface RecordModalProps {
@@ -25,7 +25,6 @@ export const RecordModal: React.FC<RecordModalProps> = ({
 
   const defaultFlock = flocks[0]?.id || '';
   const [flockId, setFlockId] = useState(defaultFlock);
-  const [recordDate, setRecordDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   // Egg fields
   const [morning, setMorning] = useState(7500);
@@ -45,11 +44,11 @@ export const RecordModal: React.FC<RecordModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const selectedFlock = flocks.find((f) => f.id === flockId) || flocks[0];
-    const logDate = recordDate || new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
 
     if (type === 'egg') {
       const total = morning + evening;
-      const clean = Math.max(0, total - damaged);
+      const clean = total - damaged;
       const trays = Math.floor(clean / 30);
       const layingRate = ((total / (selectedFlock.currentCount || 1)) * 100).toFixed(1);
 
@@ -57,7 +56,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
         id: `egg-${Date.now()}`,
         flockId: selectedFlock.id,
         flockName: selectedFlock.name,
-        date: logDate,
+        date: today,
         morningEggs: morning,
         eveningEggs: evening,
         totalEggs: total,
@@ -71,7 +70,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
         id: `feed-${Date.now()}`,
         flockId: selectedFlock.id,
         flockName: selectedFlock.name,
-        date: logDate,
+        date: today,
         feedType,
         feedQuantityKg: feedQuantity,
         gramsPerBird: Number(gramsPerBird),
@@ -83,7 +82,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
         id: `mort-${Date.now()}`,
         flockId: selectedFlock.id,
         flockName: selectedFlock.name,
-        date: logDate,
+        date: today,
         count: deaths,
         cause,
         symptoms,
@@ -95,7 +94,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center space-x-2">
@@ -110,42 +109,19 @@ export const RecordModal: React.FC<RecordModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
-          {/* Flock & Date Row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-700 font-semibold mb-1 flex items-center space-x-1">
-                <Layers className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Select Flock</span>
-              </label>
-              <div className="relative">
-                <select
-                  value={flockId}
-                  onChange={(e) => setFlockId(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 pr-8 font-medium bg-white focus:ring-2 focus:ring-emerald-500 appearance-none cursor-pointer"
-                >
-                  {flocks.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name} ({f.shedNumber})
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-slate-700 font-semibold mb-1 flex items-center space-x-1">
-                <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Record Date</span>
-              </label>
-              <input
-                type="date"
-                required
-                value={recordDate}
-                onChange={(e) => setRecordDate(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2.5 font-medium bg-white focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-              />
-            </div>
+          <div>
+            <label className="block text-slate-700 font-semibold mb-1">Select Flock</label>
+            <select
+              value={flockId}
+              onChange={(e) => setFlockId(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg p-2.5 font-medium"
+            >
+              {flocks.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name} ({f.currentCount.toLocaleString()} birds)
+                </option>
+              ))}
+            </select>
           </div>
 
           {type === 'egg' && (
@@ -158,7 +134,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                     min="0"
                     value={morning}
                     onChange={(e) => setMorning(Number(e.target.value))}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 font-bold"
+                    className="w-full border border-slate-300 rounded-lg p-2.5"
                   />
                 </div>
                 <div>
@@ -168,7 +144,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                     min="0"
                     value={evening}
                     onChange={(e) => setEvening(Number(e.target.value))}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 font-bold"
+                    className="w-full border border-slate-300 rounded-lg p-2.5"
                   />
                 </div>
               </div>
@@ -179,7 +155,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                   min="0"
                   value={damaged}
                   onChange={(e) => setDamaged(Number(e.target.value))}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 text-rose-600 font-bold"
+                  className="w-full border border-slate-300 rounded-lg p-2.5"
                 />
               </div>
             </>
@@ -193,7 +169,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                   type="text"
                   value={feedType}
                   onChange={(e) => setFeedType(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 font-medium"
+                  className="w-full border border-slate-300 rounded-lg p-2.5"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -204,7 +180,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                     min="0"
                     value={feedQuantity}
                     onChange={(e) => setFeedQuantity(Number(e.target.value))}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 font-bold"
+                    className="w-full border border-slate-300 rounded-lg p-2.5"
                   />
                 </div>
                 <div>
@@ -214,7 +190,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                     min="0"
                     value={waterLiters}
                     onChange={(e) => setWaterLiters(Number(e.target.value))}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 font-bold text-sky-700"
+                    className="w-full border border-slate-300 rounded-lg p-2.5"
                   />
                 </div>
               </div>
@@ -230,7 +206,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                   min="1"
                   value={deaths}
                   onChange={(e) => setDeaths(Number(e.target.value))}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 font-black text-rose-600"
+                  className="w-full border border-slate-300 rounded-lg p-2.5"
                 />
               </div>
               <div>
@@ -259,13 +235,13 @@ export const RecordModal: React.FC<RecordModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 font-semibold cursor-pointer hover:bg-slate-50 transition-colors"
+              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 font-semibold cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg cursor-pointer transition-colors shadow-sm"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg cursor-pointer"
             >
               Save Record
             </button>
