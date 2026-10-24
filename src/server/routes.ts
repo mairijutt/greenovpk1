@@ -1,19 +1,6 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
-import {
-  syncFromSupabase,
-  persistExpenseToSupabase,
-  deleteExpenseFromSupabase,
-  persistEggProductionToSupabase,
-  deleteEggProductionFromSupabase,
-  persistFlockToSupabase,
-  deleteFlockFromSupabase,
-  persistSaleToSupabase,
-  deleteSaleFromSupabase,
-  persistStockToSupabase,
-  deleteStockFromSupabase,
-} from './supabaseSync.ts';
 
 export const apiRouter = Router();
 
@@ -357,15 +344,6 @@ function loadStore() {
 
 // Initial load
 loadStore();
-
-// Live sync from Supabase PostgreSQL database
-syncFromSupabase({
-  setExpenses: (items) => { rawExpenses = items; },
-  setFlocks: (items) => { flockItems = items; },
-  setEggs: (items) => { rawEggProductions = items; },
-  setSales: (items) => { rawSales = items; },
-  setStocks: (items) => { rawStocks = items; },
-});
 
 // Challan Upload Handlers
 const dummyChallan = (_req: Request, res: Response) => {
@@ -831,7 +809,6 @@ apiRouter.post(['/flock', '/flocks'], (req: Request, res: Response) => {
 
   flockItems.unshift(newFlock);
   saveStore();
-  persistFlockToSupabase(newFlock);
   return res.json({ message: 'success', data: newFlock });
 });
 
@@ -847,7 +824,6 @@ apiRouter.put(['/flock/:id', '/flocks/:id'], (req: Request, res: Response) => {
       updatedAt: new Date().toISOString(),
     };
     saveStore();
-    persistFlockToSupabase(flockItems[idx]);
     return res.json({ message: 'success', data: flockItems[idx] });
   }
   return res.json({ message: 'success', data: { id, ...body } });
@@ -857,7 +833,6 @@ apiRouter.delete(['/flock/:id', '/flocks/:id'], (req: Request, res: Response) =>
   const id = Number(req.params.id);
   flockItems = flockItems.filter(f => f.id !== id);
   saveStore();
-  deleteFlockFromSupabase(id);
   return res.json({ message: 'success', data: { id } });
 });
 
@@ -1197,7 +1172,6 @@ apiRouter.post(['/egg-production', '/egg-productions'], (req: Request, res: Resp
   };
   rawEggProductions.unshift(newProd);
   saveStore();
-  persistEggProductionToSupabase(newProd);
   res.json({ message: 'success', data: newProd });
 });
 
@@ -1208,7 +1182,6 @@ apiRouter.put(['/egg-production/:id', '/egg-productions/:id'], (req: Request, re
   if (idx >= 0) {
     rawEggProductions[idx] = { ...rawEggProductions[idx], ...body, id, updatedAt: new Date().toISOString() };
     saveStore();
-    persistEggProductionToSupabase(rawEggProductions[idx]);
     return res.json({ message: 'success', data: rawEggProductions[idx] });
   }
   res.json({ message: 'success', data: { id, ...body } });
@@ -1218,7 +1191,6 @@ apiRouter.delete(['/egg-production/:id', '/egg-productions/:id'], (req: Request,
   const id = Number(req.params.id);
   rawEggProductions = rawEggProductions.filter((e: any) => e.id !== id);
   saveStore();
-  deleteEggProductionFromSupabase(id);
   res.json({ message: 'success', data: { id } });
 });
 
@@ -1304,7 +1276,6 @@ apiRouter.post(['/expense', '/expenses'], (req: Request, res: Response) => {
   };
   rawExpenses.unshift(newExp);
   saveStore();
-  persistExpenseToSupabase(newExp);
   res.json({ message: 'success', data: newExp });
 });
 
@@ -1316,7 +1287,6 @@ apiRouter.put(['/expense/:id', '/expenses/:id'], (req: Request, res: Response) =
     const cost = body.expenseCost !== undefined ? Number(body.expenseCost) : (body.amount !== undefined ? Number(body.amount) : rawExpenses[idx].expenseCost);
     rawExpenses[idx] = { ...rawExpenses[idx], ...body, expenseCost: cost, amount: cost, id, updatedAt: new Date().toISOString() };
     saveStore();
-    persistExpenseToSupabase(rawExpenses[idx]);
     return res.json({ message: 'success', data: rawExpenses[idx] });
   }
   res.json({ message: 'success', data: { id, ...body } });
@@ -1326,7 +1296,6 @@ apiRouter.delete(['/expense/:id', '/expenses/:id'], (req: Request, res: Response
   const id = Number(req.params.id);
   rawExpenses = rawExpenses.filter((e: any) => e.id !== id);
   saveStore();
-  deleteExpenseFromSupabase(id);
   res.json({ message: 'success', data: { id } });
 });
 
@@ -1413,7 +1382,6 @@ apiRouter.post('/stocks', (req: Request, res: Response) => {
   };
   rawStocks.unshift(newStock);
   saveStore();
-  persistStockToSupabase(newStock);
   res.json({ message: 'success', data: newStock });
 });
 
@@ -1424,7 +1392,6 @@ apiRouter.put('/stocks/:id', (req: Request, res: Response) => {
   if (idx >= 0) {
     rawStocks[idx] = { ...rawStocks[idx], ...body, id, updatedAt: new Date().toISOString() };
     saveStore();
-    persistStockToSupabase(rawStocks[idx]);
     return res.json({ message: 'success', data: rawStocks[idx] });
   }
   res.json({ message: 'success', data: { id, ...body } });
@@ -1434,7 +1401,6 @@ apiRouter.delete('/stocks/:id', (req: Request, res: Response) => {
   const id = Number(req.params.id);
   rawStocks = rawStocks.filter((s: any) => s.id !== id);
   saveStore();
-  deleteStockFromSupabase(id);
   res.json({ message: 'success', data: { id } });
 });
 
@@ -1532,7 +1498,6 @@ apiRouter.post(['/sale', '/sales'], (req: Request, res: Response) => {
   };
   rawSales.unshift(newSale);
   saveStore();
-  persistSaleToSupabase(newSale);
   res.json({ message: 'success', data: newSale });
 });
 
@@ -1544,7 +1509,6 @@ apiRouter.put(['/sale/:id', '/sales/:id'], (req: Request, res: Response) => {
     const totAmount = body.totalAmount !== undefined ? Number(body.totalAmount) : (body.amount !== undefined ? Number(body.amount) : rawSales[idx].totalAmount);
     rawSales[idx] = { ...rawSales[idx], ...body, totalAmount: totAmount, amount: totAmount, id, updatedAt: new Date().toISOString() };
     saveStore();
-    persistSaleToSupabase(rawSales[idx]);
     return res.json({ message: 'success', data: rawSales[idx] });
   }
   res.json({ message: 'success', data: { id, ...body } });
@@ -1554,7 +1518,6 @@ apiRouter.delete(['/sale/:id', '/sales/:id'], (req: Request, res: Response) => {
   const id = Number(req.params.id);
   rawSales = rawSales.filter((s: any) => s.id !== id);
   saveStore();
-  deleteSaleFromSupabase(id);
   res.json({ message: 'success', data: { id } });
 });
 

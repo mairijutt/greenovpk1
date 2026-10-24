@@ -23,7 +23,6 @@ export interface Flock {
   startDate: string;
   status: 'Active' | 'Culled' | 'Completed';
   targetFCR?: number;
-  cost?: number;
 }
 
 export interface EggProduction {

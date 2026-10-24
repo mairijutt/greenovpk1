@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { Layers, Plus, Calendar, Activity, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Layers, Plus, Calendar, Activity, CheckCircle, AlertCircle } from 'lucide-react';
 import { Flock, Farm } from '../types/farm';
-import { FilterBar } from './FilterBar';
 
 interface FlocksViewProps {
   flocks: Flock[];
@@ -11,11 +10,6 @@ interface FlocksViewProps {
 
 export const FlocksView: React.FC<FlocksViewProps> = ({ flocks, farms, onAddFlock }) => {
   const [showAddModal, setShowAddModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPurpose, setSelectedPurpose] = useState('all');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-
   const [newFlock, setNewFlock] = useState({
     name: '',
     farmId: 'farm-1',
@@ -26,37 +20,6 @@ export const FlocksView: React.FC<FlocksViewProps> = ({ flocks, farms, onAddFloc
     ageWeeks: 1,
     targetFCR: 2.1,
   });
-
-  const purposeCategories = [
-    { label: 'All Flock Types', value: 'all' },
-    { label: 'Commercial Layers', value: 'Layers' },
-    { label: 'Meat Broilers', value: 'Broilers' },
-  ];
-
-  const filteredFlocks = useMemo(() => {
-    return flocks.filter((f) => {
-      const matchPurpose = selectedPurpose === 'all' || f.purpose === selectedPurpose;
-      let matchDate = true;
-      if (startDate && f.startDate < startDate) matchDate = false;
-      if (endDate && f.startDate > endDate) matchDate = false;
-
-      const q = searchTerm.toLowerCase().trim();
-      const matchSearch =
-        q === '' ||
-        f.name.toLowerCase().includes(q) ||
-        f.shedNumber.toLowerCase().includes(q) ||
-        f.breed.toLowerCase().includes(q);
-
-      return matchPurpose && matchDate && matchSearch;
-    });
-  }, [flocks, selectedPurpose, startDate, endDate, searchTerm]);
-
-  const handleResetFilters = () => {
-    setSearchTerm('');
-    setSelectedPurpose('all');
-    setStartDate('');
-    setEndDate('');
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,155 +63,102 @@ export const FlocksView: React.FC<FlocksViewProps> = ({ flocks, farms, onAddFloc
         </button>
       </div>
 
-      {/* Flock Filter Bar */}
-      <FilterBar
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder="Search flock name, shed number, breed..."
-        categories={purposeCategories}
-        selectedCategory={selectedPurpose}
-        onSelectCategory={setSelectedPurpose}
-        categoryLabel="Flock Type"
-        startDate={startDate}
-        onSelectStartDate={setStartDate}
-        endDate={endDate}
-        onSelectEndDate={setEndDate}
-        totalCount={flocks.length}
-        filteredCount={filteredFlocks.length}
-        itemTypeLabel="flock batches"
-        onResetFilters={handleResetFilters}
-      />
-
       {/* Flocks Grid */}
-      {filteredFlocks.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredFlocks.map((flock) => {
-            const retentionRate = ((flock.currentCount / flock.initialCount) * 100).toFixed(1);
-            const farm = farms.find((f) => f.id === flock.farmId);
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {flocks.map((flock) => {
+          const retentionRate = ((flock.currentCount / flock.initialCount) * 100).toFixed(1);
+          const farm = farms.find((f) => f.id === flock.farmId);
 
-            return (
-              <div
-                key={flock.id}
-                className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 hover:border-emerald-300 transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      {flock.purpose}
-                    </span>
-                    <span className="flex items-center text-xs font-semibold text-emerald-600">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
-                      {flock.status}
-                    </span>
+          return (
+            <div key={flock.id} className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 hover:border-emerald-300 transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    {flock.purpose}
+                  </span>
+                  <span className="flex items-center text-xs font-semibold text-emerald-600">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
+                    {flock.status}
+                  </span>
+                </div>
+
+                <h3 className="text-base font-bold text-slate-900 mt-1">{flock.name}</h3>
+                <p className="text-xs text-slate-500">
+                  {flock.shedNumber} • {farm?.name || 'Main Unit'}
+                </p>
+
+                <div className="mt-4 pt-4 border-t border-slate-100 space-y-2.5 text-xs">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Breed:</span>
+                    <span className="font-semibold text-slate-900">{flock.breed}</span>
                   </div>
-
-                  <h3 className="text-base font-bold text-slate-900 mt-1">{flock.name}</h3>
-                  <p className="text-xs text-slate-500">
-                    {flock.shedNumber} • {farm?.name || 'Main Unit'}
-                  </p>
-
-                  <div className="mt-4 pt-4 border-t border-slate-100 space-y-2.5 text-xs">
-                    <div className="flex justify-between text-slate-600">
-                      <span>Breed:</span>
-                      <span className="font-semibold text-slate-900">{flock.breed}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-600">
-                      <span>Age:</span>
-                      <span className="font-semibold text-slate-900">{flock.ageWeeks} Weeks</span>
-                    </div>
-                    <div className="flex justify-between text-slate-600">
-                      <span>Placement Date:</span>
-                      <span className="font-mono text-slate-700">{flock.startDate}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-600">
-                      <span>Target FCR:</span>
-                      <span className="font-semibold text-emerald-700">{flock.targetFCR || 2.1}</span>
-                    </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Age:</span>
+                    <span className="font-semibold text-slate-900">{flock.ageWeeks} Weeks</span>
                   </div>
-
-                  {/* Progress Bar */}
-                  <div className="mt-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <div className="flex justify-between text-[11px] font-semibold text-slate-700 mb-1">
-                      <span>Bird Count: {flock.currentCount.toLocaleString()}</span>
-                      <span>{retentionRate}% alive</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-emerald-600 h-2 rounded-full"
-                        style={{ width: `${retentionRate}%` }}
-                      ></div>
-                    </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Placement Date:</span>
+                    <span className="font-mono text-slate-700">{flock.startDate}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Target FCR:</span>
+                    <span className="font-semibold text-emerald-700">{flock.targetFCR || 2.1}</span>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Placed: {flock.initialCount.toLocaleString()}</span>
-                  <span className="font-bold text-slate-700">{flock.shedNumber}</span>
+                {/* Progress Bar */}
+                <div className="mt-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <div className="flex justify-between text-[11px] font-semibold text-slate-700 mb-1">
+                    <span>Bird Count: {flock.currentCount.toLocaleString()}</span>
+                    <span>{retentionRate}% alive</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-emerald-600 h-2 rounded-full"
+                      style={{ width: `${retentionRate}%` }}
+                    ></div>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1 text-right">
+                    Started with {flock.initialCount.toLocaleString()} chicks
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-          <AlertCircle className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-slate-800">No flocks match your filter</h3>
-          <p className="text-xs text-slate-500 mt-1">Try clearing search terms or selecting all flock types.</p>
-          <button
-            onClick={handleResetFilters}
-            className="mt-3 inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Filters</span>
-          </button>
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
 
       {/* Add Flock Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100">
-            <h2 className="text-base font-bold text-slate-900 mb-4">Add New Flock Batch</h2>
+            <h2 className="text-base font-bold text-slate-900 mb-4">Register New Flock Batch</h2>
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block text-slate-700 font-semibold mb-1">Flock Name</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Flock L-25C"
+                  placeholder="e.g. Flock L-25C (Spring Layers)"
                   value={newFlock.name}
                   onChange={(e) => setNewFlock({ ...newFlock, name: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg p-2.5 font-medium"
+                  className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Assigned Farm</label>
+                  <label className="block text-slate-700 font-semibold mb-1">Purpose</label>
                   <select
-                    value={newFlock.farmId}
-                    onChange={(e) => setNewFlock({ ...newFlock, farmId: e.target.value })}
+                    value={newFlock.purpose}
+                    onChange={(e) => setNewFlock({ ...newFlock, purpose: e.target.value as any })}
                     className="w-full border border-slate-300 rounded-lg p-2.5"
                   >
-                    {farms.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
+                    <option value="Layers">Layers (Eggs)</option>
+                    <option value="Broilers">Broilers (Meat)</option>
+                    <option value="Breeders">Breeders</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Shed Number</label>
-                  <input
-                    type="text"
-                    value={newFlock.shedNumber}
-                    onChange={(e) => setNewFlock({ ...newFlock, shedNumber: e.target.value })}
-                    className="w-full border border-slate-300 rounded-lg p-2.5"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 font-semibold mb-1">Breed</label>
                   <input
@@ -258,22 +168,11 @@ export const FlocksView: React.FC<FlocksViewProps> = ({ flocks, farms, onAddFloc
                     className="w-full border border-slate-300 rounded-lg p-2.5"
                   />
                 </div>
-                <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Purpose</label>
-                  <select
-                    value={newFlock.purpose}
-                    onChange={(e) => setNewFlock({ ...newFlock, purpose: e.target.value as any })}
-                    className="w-full border border-slate-300 rounded-lg p-2.5"
-                  >
-                    <option value="Layers">Layers (Commercial Egg)</option>
-                    <option value="Broilers">Broilers (Meat)</option>
-                  </select>
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-semibold mb-1">Chicks Placed</label>
+                  <label className="block text-slate-700 font-semibold mb-1">Initial Chicks Count</label>
                   <input
                     type="number"
                     min="1"
@@ -298,15 +197,15 @@ export const FlocksView: React.FC<FlocksViewProps> = ({ flocks, farms, onAddFloc
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 font-semibold cursor-pointer hover:bg-slate-50 transition-colors"
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold cursor-pointer hover:bg-emerald-500 transition-colors shadow-sm"
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold cursor-pointer hover:bg-emerald-500"
                 >
-                  Save Flock Batch
+                  Save Flock
                 </button>
               </div>
             </form>
