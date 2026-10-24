@@ -123,18 +123,70 @@ export default function App() {
     localStorage.setItem('greenova_financials', JSON.stringify(financials));
   }, [financials]);
 
-  // Handler functions
+  // Initial live sync from API & Supabase
+  useEffect(() => {
+    fetch('/api/flocks')
+      .then((res) => res.json())
+      .then((res) => {
+        if (res?.data?.items && Array.isArray(res.data.items) && res.data.items.length > 0) {
+          const apiFlocks: Flock[] = res.data.items.map((item: any) => ({
+            id: String(item.id),
+            farmId: String(item.farmId || 9),
+            name: item.flockName || `Unit ${item.id}`,
+            shedNumber: `Shed ${item.id}`,
+            breed: item.breed || 'LSL',
+            purpose: 'Layers',
+            initialCount: Number(item.originalTotalBirds || item.totalBirds || 25000),
+            currentCount: Number(item.totalBirds || 25000),
+            startDate: item.acquiredDate ? item.acquiredDate.split('T')[0] : '2026-02-25',
+            ageWeeks: Number(item.ageWeeks || item.ageInWeeks || 38),
+            status: item.isActive !== false ? 'Active' : 'Culled',
+            cost: Number(item.cost || 7500000),
+            notes: item.notes || '',
+          }));
+          setFlocks(apiFlocks);
+        }
+      })
+      .catch((e) => console.warn('Could not fetch live flocks from API:', e));
+  }, []);
+
+  // Handler functions with real-time Supabase persistence
   const handleAddEgg = (newEgg: EggProduction) => {
     setEggProductions([newEgg, ...eggProductions]);
+    const numFid = newEgg.flockId === '8' ? 8 : (newEgg.flockId === '9' ? 9 : (newEgg.flockId === '10' ? 10 : 8));
+    fetch('/api/egg-production', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: newEgg.date,
+        flockId: numFid,
+        totalEggs: newEgg.totalEggs,
+        brokenEggs: newEgg.damagedEggs,
+        averageWeight: 60,
+        grade: 'standard',
+        notes: `Morning: ${newEgg.morningEggs}, Evening: ${newEgg.eveningEggs}`
+      })
+    }).catch(e => console.warn('Egg persistence error:', e));
   };
 
   const handleAddFeed = (newFeed: FeedConsumption) => {
     setConsumptionLogs([newFeed, ...consumptionLogs]);
+    const numFid = newFeed.flockId === '8' ? 8 : (newFeed.flockId === '9' ? 9 : (newFeed.flockId === '10' ? 10 : 8));
+    fetch('/api/daily-consumption', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: newFeed.date,
+        flockId: numFid,
+        feedConsumed: newFeed.feedQuantityKg,
+        waterConsumption: newFeed.waterIntakeLiters,
+        feedType: newFeed.feedType
+      })
+    }).catch(e => console.warn('Feed persistence error:', e));
   };
 
   const handleAddMortality = (newMort: MortalityLog) => {
     setMortalityLogs([newMort, ...mortalityLogs]);
-    // Also deduct from flock
     setFlocks(
       flocks.map((f) =>
         f.id === newMort.flockId
@@ -142,10 +194,33 @@ export default function App() {
           : f
       )
     );
+    const numFid = newMort.flockId === '8' ? 8 : (newMort.flockId === '9' ? 9 : (newMort.flockId === '10' ? 10 : 8));
+    fetch('/api/bird-health', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: newMort.date,
+        flockId: numFid,
+        mortality: newMort.count,
+        notes: newMort.cause
+      })
+    }).catch(e => console.warn('Mortality persistence error:', e));
   };
 
   const handleAddFlock = (flock: Flock) => {
     setFlocks([...flocks, flock]);
+    fetch('/api/flock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        flockName: flock.name,
+        breed: flock.breed,
+        totalBirds: flock.initialCount,
+        cost: flock.cost || 7500000,
+        acquiredDate: flock.startDate,
+        farmId: Number(flock.farmId) || 9
+      })
+    }).catch(e => console.warn('Flock persistence error:', e));
   };
 
   const handleToggleVaccine = (id: string) => {
@@ -173,6 +248,20 @@ export default function App() {
 
   const handleAddTransaction = (record: FinancialRecord) => {
     setFinancials([record, ...financials]);
+    const isExp = record.type === 'Expense';
+    fetch(isExp ? '/api/expense' : '/api/sale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: record.amount,
+        expenseCost: record.amount,
+        totalAmount: record.amount,
+        head: record.category.toUpperCase().replace(/\s+/g, '_'),
+        notes: record.description,
+        flockId: 8,
+        date: record.date
+      })
+    }).catch(e => console.warn('Transaction persistence error:', e));
   };
 
   return (
