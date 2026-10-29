@@ -570,20 +570,23 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans antialiased">
-      {/* Top Header */}
+      {/* Top Header with Mobile Hamburger Menu */}
       <Header
         currentUser={currentUser}
         onSignOut={handleSignOut}
         onOpenLogin={() => setShowLoginModal(true)}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
       />
 
       {/* Main Body */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* Navigation Sidebar matching live menu */}
         <Sidebar
           currentTab={currentTab}
           onSelectTab={(tab) => setCurrentTab(tab)}
           isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
           currentUser={currentUser}
           onSignOut={handleSignOut}
           onUpdateUser={handleUpdateUser}

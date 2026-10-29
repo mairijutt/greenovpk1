@@ -55,6 +55,7 @@ interface SidebarProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   isOpen: boolean;
+  onClose?: () => void;
   currentUser?: UserProfileData | null;
   onSignOut?: () => void;
   onUpdateUser?: (updated: UserProfileData) => void;
@@ -74,6 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
   isOpen,
+  onClose,
   currentUser,
   onSignOut,
   onUpdateUser,
@@ -268,11 +270,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
+      {/* Mobile Backdrop Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
       <aside
-        className={`bg-white border-r border-slate-200 w-64 flex-shrink-0 flex flex-col justify-between transition-all duration-200 shadow-sm ${
-          isOpen ? 'block' : 'hidden md:flex'
+        className={`bg-white border-r border-slate-200 w-72 md:w-64 flex-shrink-0 flex flex-col justify-between transition-transform duration-300 ease-in-out shadow-2xl md:shadow-sm fixed md:static inset-y-0 left-0 z-50 md:z-auto ${
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
+        {/* Mobile Drawer Header with Close Button */}
+        <div className="flex items-center justify-between p-3.5 border-b border-emerald-900 md:hidden bg-emerald-950 text-white flex-shrink-0">
+          <div className="flex items-center space-x-2.5">
+            <div className="h-8 w-8 rounded-lg bg-emerald-600/30 border border-emerald-500/40 p-1 flex items-center justify-center">
+              <img
+                src="/assets/greenova-logo-CHK5q5vz.png"
+                alt="Logo"
+                className="h-full w-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            </div>
+            <div>
+              <div className="text-xs font-bold leading-tight">Intelligence Poultry</div>
+              <div className="text-[10px] text-emerald-300">Navigation Menu</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-emerald-200 hover:text-white hover:bg-emerald-900 transition-colors cursor-pointer"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
         {/* Scrollable Navigation Menu */}
         <div className="p-3.5 space-y-4 overflow-y-auto flex-1">
           {sections.map((section, idx) => (
@@ -287,7 +326,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   return (
                     <button
                       key={item.id}
-                      onClick={() => onSelectTab(item.id)}
+                      onClick={() => {
+                        onSelectTab(item.id);
+                        onClose?.();
+                      }}
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs transition-colors cursor-pointer ${
                         isActive
                           ? 'bg-emerald-600 text-white font-bold shadow-xs'

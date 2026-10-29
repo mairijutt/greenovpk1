@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut, Menu, X } from 'lucide-react';
 
 interface HeaderProps {
   currentUser: {
@@ -12,20 +12,35 @@ interface HeaderProps {
   } | null;
   onSignOut: () => void;
   onOpenLogin: () => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentUser,
   onSignOut,
   onOpenLogin,
+  isSidebarOpen = false,
+  onToggleSidebar,
 }) => {
   return (
     <header className="bg-emerald-950 text-white border-b border-emerald-800/60 sticky top-0 z-30 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo & Platform Title */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-600/30 border border-emerald-500/40 p-1">
+          {/* Logo & Platform Title & Mobile Menu Button */}
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            {onToggleSidebar && (
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                aria-label={isSidebarOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
+                className="md:hidden p-2 rounded-lg bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 hover:text-white border border-emerald-700/60 transition-colors cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              >
+                {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+            )}
+
+            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-600/30 border border-emerald-500/40 p-1 flex-shrink-0">
               <img
                 src="/assets/greenova-logo-CHK5q5vz.png"
                 alt="GreenOva Logo"
@@ -36,13 +51,13 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-lg tracking-tight text-white">Intelligence Poultry</span>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                <span className="font-bold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">Intelligence Poultry</span>
+                <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   Smart OS
                 </span>
               </div>
-              <p className="text-xs text-emerald-300/80 hidden sm:block">
+              <p className="text-[11px] sm:text-xs text-emerald-300/80 hidden sm:block">
                 Smarter Poultry. Stronger Profits.
               </p>
             </div>

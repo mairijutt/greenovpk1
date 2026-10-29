@@ -56,8 +56,34 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
+    <div className="relative min-h-screen w-full flex flex-col justify-center items-center p-4 sm:p-6 overflow-hidden bg-slate-950">
+      {/* Background Graphic & Atmosphere */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <img
+          src="/src/assets/images/poultry_login_bg_1793271065125.jpg"
+          alt="Intelligence Poultry Facility"
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover scale-105 filter brightness-80 contrast-105"
+        />
+        {/* Subtle dark gradient overlay to ensure perfect card contrast and readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-slate-950/50 backdrop-blur-[1px]" />
+
+        {/* Ambient high-tech glowing accents */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-500/15 rounded-full blur-3xl" />
+      </div>
+
+      {/* Top Brand Pill */}
+      <div className="relative z-10 mb-4 sm:mb-6 flex items-center justify-center">
+        <div className="flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/30 backdrop-blur-md shadow-lg text-xs font-semibold">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="text-white">Intelligence Poultry OS</span>
+          <span className="text-emerald-400">•</span>
+          <span className="text-emerald-300">Enterprise Cloud</span>
+        </div>
+      </div>
+
+      <div className="relative z-10 max-w-md w-full bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-white/40 ring-1 ring-black/10 animate-in fade-in zoom-in-95 duration-200">
         {/* Header with Logo */}
         <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-950 p-7 text-center text-white relative">
           {onCancel && (
@@ -183,8 +209,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
         </div>
 
         {/* Footer info */}
-        <div className="bg-slate-50 p-3 text-center border-t border-slate-100 text-[11px] text-slate-400">
-          Intelligence Poultry Management System • Smarter Poultry. Stronger Profits.
+        <div className="bg-slate-50/90 backdrop-blur-xs p-3.5 text-center border-t border-slate-100 flex flex-col items-center gap-1 text-[11px] text-slate-500">
+          <div className="font-semibold text-slate-700">
+            Intelligence Poultry Management System
+          </div>
+          <div className="text-[10px] text-slate-400 flex items-center justify-center space-x-1.5">
+            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+            <span>256-bit Encrypted Session • Production Cloud</span>
+          </div>
         </div>
       </div>
     </div>
