@@ -62,7 +62,7 @@ export default function App() {
   const [activeFarm, setActiveFarm] = useState<string>('all');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Authenticated user state
+  // Authenticated user state - initialized to null so every page refresh requires login credentials
   const [currentUser, setCurrentUser] = useState<{
     name: string;
     email: string;
@@ -71,30 +71,14 @@ export default function App() {
     role?: string;
     emailVerified?: boolean;
     initials?: string;
-  } | null>(() => {
-    const saved = localStorage.getItem('greenova_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.email === 'aaglobal500@gmail.com') {
-          parsed.emailVerified = true;
-          localStorage.setItem('greenova_user', JSON.stringify(parsed));
-        }
-        return parsed;
-      } catch (e) {}
-    }
-    const defaultUser = {
-      name: 'Ahsan Nawaz',
-      email: 'aaglobal500@gmail.com',
-      token: 'auth-super-admin-2026',
-      phone: '+92 300 8645210',
-      role: 'Managing Director & Farm Admin',
-      initials: 'CN',
-      emailVerified: true,
-    };
-    localStorage.setItem('greenova_user', JSON.stringify(defaultUser));
-    return defaultUser;
-  });
+  } | null>(null);
+
+  useEffect(() => {
+    // Remove persistent user credentials from localStorage so login is required on each refresh
+    try {
+      localStorage.removeItem('greenova_user');
+    } catch (e) {}
+  }, []);
 
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [recordModalType, setRecordModalType] = useState<'egg' | 'mortality' | 'feed' | null>(null);
@@ -561,8 +545,16 @@ export default function App() {
     return (
       <LoginView
         onLoginSuccess={(user) => {
-          localStorage.setItem('greenova_user', JSON.stringify(user));
-          setCurrentUser(user);
+          const profile = {
+            name: user.name || (user.email.includes('aaglobal') ? 'Ahsan Nawaz' : 'Farm Supervisor'),
+            email: user.email,
+            token: user.token || 'auth-prod-' + Date.now(),
+            phone: user.email.includes('aaglobal') ? '+92 300 8645210' : '+92 301 7654321',
+            role: user.email.includes('aaglobal') ? 'Managing Director & Farm Admin' : 'Shed Supervisor',
+            initials: user.email.includes('aaglobal') ? 'CN' : 'FS',
+            emailVerified: true,
+          };
+          setCurrentUser(profile);
         }}
       />
     );
@@ -701,8 +693,16 @@ export default function App() {
           <div className="relative max-w-md w-full">
             <LoginView
               onLoginSuccess={(user) => {
-                localStorage.setItem('greenova_user', JSON.stringify(user));
-                setCurrentUser(user);
+                const profile = {
+                  name: user.name || (user.email.includes('aaglobal') ? 'Ahsan Nawaz' : 'Farm Supervisor'),
+                  email: user.email,
+                  token: user.token || 'auth-prod-' + Date.now(),
+                  phone: user.email.includes('aaglobal') ? '+92 300 8645210' : '+92 301 7654321',
+                  role: user.email.includes('aaglobal') ? 'Managing Director & Farm Admin' : 'Shed Supervisor',
+                  initials: user.email.includes('aaglobal') ? 'CN' : 'FS',
+                  emailVerified: true,
+                };
+                setCurrentUser(profile);
                 setShowLoginModal(false);
               }}
               onCancel={() => setShowLoginModal(false)}
