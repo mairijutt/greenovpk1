@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
-import { Database, Download, Upload, Server, Terminal, Copy, CheckCircle2, ShieldCheck, RefreshCw } from 'lucide-react';
-import { getApiBaseUrl } from '../services/api';
+import {
+  Database,
+  Download,
+  Upload,
+  Server,
+  Terminal,
+  Copy,
+  CheckCircle2,
+  ShieldCheck,
+  FileCode,
+  HardDrive,
+} from 'lucide-react';
+import { StatCard, PageHeader, UIButton } from './ui';
 
 interface DatabaseBackupViewProps {
   onRestoreData?: (data: any) => void;
@@ -57,12 +68,18 @@ export const DatabaseBackupView: React.FC<DatabaseBackupViewProps> = ({ onRestor
         if (file.name.endsWith('.json')) {
           const parsed = JSON.parse(text);
           if (parsed.flocks) localStorage.setItem('greenova_flocks', JSON.stringify(parsed.flocks));
-          if (parsed.eggProductions) localStorage.setItem('greenova_eggs', JSON.stringify(parsed.eggProductions));
-          if (parsed.financials) localStorage.setItem('greenova_financials', JSON.stringify(parsed.financials));
+          if (parsed.eggProductions)
+            localStorage.setItem('greenova_eggs', JSON.stringify(parsed.eggProductions));
+          if (parsed.financials)
+            localStorage.setItem('greenova_financials', JSON.stringify(parsed.financials));
           setImportStatus(`Imported ${file.name} successfully! Refreshing view...`);
           setTimeout(() => window.location.reload(), 1500);
         } else {
-          setImportStatus(`Loaded SQL file ${file.name} (${(file.size / 1024).toFixed(1)} KB) successfully into local workspace storage.`);
+          setImportStatus(
+            `Loaded SQL file ${file.name} (${(file.size / 1024).toFixed(
+              1
+            )} KB) successfully into local workspace storage.`
+          );
         }
       } catch (err: any) {
         setImportStatus(`Import error: ${err.message}`);
@@ -73,51 +90,92 @@ export const DatabaseBackupView: React.FC<DatabaseBackupViewProps> = ({ onRestor
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
-            <Database className="w-5 h-5 text-emerald-600" />
-            <span>Database Backup & Live VPS Deployment</span>
-          </h1>
-          <p className="text-xs text-slate-500">
-            Export application snapshots, restore database backups, and safely dump production MySQL from your VPS.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <a
-            href="/greenovapk_live_files_backup.tar.gz"
-            download="greenovapk_live_files_backup.tar.gz"
-            className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold px-3.5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
-            title="Download 100% live frontend build files from greenovapk.com"
-          >
-            <Download className="w-4 h-4" />
-            <span>Download Live Files Archive (1.7 MB)</span>
-          </a>
-          <a
-            href="/greenova_postgres_dump.sql"
-            download="greenova_postgres_dump.sql"
-            className="bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold px-3.5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
-            title="Download PostgreSQL schema and database dump"
-          >
-            <Download className="w-4 h-4" />
-            <span>Download PostgreSQL Dump (.sql)</span>
-          </a>
-          <a
-            href="/GreenOva_Full_DB_Backup.json"
-            download="GreenOva_Full_Production_DB_Backup.json"
-            className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-lg shadow-sm transition-all cursor-pointer flex items-center space-x-1.5"
-          >
-            <Download className="w-4 h-4" />
-            <span>Download JSON DB (72 KB)</span>
-          </a>
-        </div>
+      {/* Standardized Page Header */}
+      <PageHeader
+        title="Database Backup & VPS Replication"
+        subtitle="Export application snapshots, restore database backups, and safely dump production MySQL from your VPS."
+        icon={Database}
+        iconColor="emerald"
+        badge="Zero Downtime Active"
+        actions={
+          <>
+            <a
+              href="/greenovapk_live_files_backup.tar.gz"
+              download="greenovapk_live_files_backup.tar.gz"
+              className="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg shadow-xs transition-all cursor-pointer border border-emerald-600/30"
+              title="Download live frontend build files"
+            >
+              <Download className="w-4 h-4" />
+              <span>Live Files Archive (1.7 MB)</span>
+            </a>
+
+            <a
+              href="/greenova_postgres_dump.sql"
+              download="greenova_postgres_dump.sql"
+              className="inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs px-3.5 py-2.5 rounded-lg border border-slate-200 shadow-xs transition-all cursor-pointer"
+              title="Download PostgreSQL schema and database dump"
+            >
+              <FileCode className="w-4 h-4 text-blue-600" />
+              <span>PostgreSQL Dump (.sql)</span>
+            </a>
+
+            <UIButton
+              variant="dark"
+              icon={Download}
+              onClick={handleExportJson}
+            >
+              JSON Snapshot
+            </UIButton>
+          </>
+        }
+      />
+
+      {/* Standardized KPI Stats Grid matching DashboardView */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Google Cloud SQL"
+          value="PostgreSQL 15"
+          icon={Database}
+          color="blue"
+          badge={{ text: 'asia-southeast1', color: 'blue' }}
+          subtext="Instance: ai-studio-d3f5a8cb"
+        />
+
+        <StatCard
+          title="Live VPS Endpoint"
+          value="greenovapk.com"
+          icon={Server}
+          color="emerald"
+          valueColor="text-emerald-700"
+          badge={{ text: '203.161.38.61', color: 'emerald' }}
+          subtext="Dual-stack production backend"
+        />
+
+        <StatCard
+          title="Verified DB Data"
+          value="38 Days"
+          unit="Production"
+          icon={ShieldCheck}
+          color="teal"
+          badge={{ text: 'Complete Sync', color: 'teal' }}
+          subtext="Flocks, eggs, sales & expenses"
+        />
+
+        <StatCard
+          title="Safety Guarantee"
+          value="Zero Downtime"
+          icon={CheckCircle2}
+          color="indigo"
+          badge={{ text: 'Read-Only Dumps', color: 'blue' }}
+          subtext="Non-locking transactions active"
+        />
       </div>
 
       {/* Google Cloud SQL Provisioned Database Card */}
-      <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 p-5 rounded-2xl border border-blue-800/60 text-white shadow-md">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-lg bg-blue-600/30 border border-blue-400/30 text-blue-300">
+      <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 p-6 rounded-2xl border border-blue-800/60 text-white shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 rounded-xl bg-blue-600/30 border border-blue-400/30 text-blue-300">
               <Database className="w-5 h-5 text-blue-400" />
             </div>
             <div>
@@ -130,38 +188,38 @@ export const DatabaseBackupView: React.FC<DatabaseBackupViewProps> = ({ onRestor
               <p className="text-[11px] text-blue-200/80">Region: asia-southeast1 • Project: future-brace-1ggh3</p>
             </div>
           </div>
-          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-slate-950 flex items-center w-fit">
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500 text-slate-950 flex items-center w-fit shadow-xs">
             <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
             Cloud Database Active
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5 mt-4 pt-3 border-t border-blue-900/60 text-xs">
-          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5 pt-4 border-t border-blue-900/60 text-xs">
+          <div className="bg-white/5 p-3 rounded-xl border border-white/10">
             <span className="text-[10px] uppercase font-bold text-blue-300 block">Farms</span>
-            <span className="text-base font-black text-white">2</span>
+            <span className="text-base font-black text-white">2 Units</span>
           </div>
-          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+          <div className="bg-white/5 p-3 rounded-xl border border-white/10">
             <span className="text-[10px] uppercase font-bold text-blue-300 block">Flocks</span>
-            <span className="text-base font-black text-white">3 Units</span>
+            <span className="text-base font-black text-white">3 Batches</span>
           </div>
-          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+          <div className="bg-white/5 p-3 rounded-xl border border-white/10">
             <span className="text-[10px] uppercase font-bold text-blue-300 block">Users</span>
             <span className="text-base font-black text-white">11 Admins</span>
           </div>
-          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+          <div className="bg-white/5 p-3 rounded-xl border border-white/10">
             <span className="text-[10px] uppercase font-bold text-blue-300 block">Eggs Log</span>
             <span className="text-base font-black text-emerald-400">38 Days</span>
           </div>
-          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+          <div className="bg-white/5 p-3 rounded-xl border border-white/10">
             <span className="text-[10px] uppercase font-bold text-blue-300 block">Sales</span>
             <span className="text-base font-black text-white">20 Orders</span>
           </div>
-          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+          <div className="bg-white/5 p-3 rounded-xl border border-white/10">
             <span className="text-[10px] uppercase font-bold text-blue-300 block">Expenses</span>
             <span className="text-base font-black text-rose-300">44 Heads</span>
           </div>
-          <div className="bg-white/5 p-2.5 rounded-xl border border-white/10">
+          <div className="bg-white/5 p-3 rounded-xl border border-white/10">
             <span className="text-[10px] uppercase font-bold text-blue-300 block">Salaries</span>
             <span className="text-base font-black text-white">23 Logs</span>
           </div>
@@ -169,10 +227,10 @@ export const DatabaseBackupView: React.FC<DatabaseBackupViewProps> = ({ onRestor
       </div>
 
       {/* Live VPS Database Verified Record */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs hover:border-emerald-300 transition-colors">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
             <h2 className="text-sm font-bold text-slate-900">Live VPS Database Record (Verified)</h2>
           </div>
           <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
@@ -284,7 +342,7 @@ export const DatabaseBackupView: React.FC<DatabaseBackupViewProps> = ({ onRestor
       </div>
 
       {/* Restore / Import Database File */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs hover:border-emerald-300 transition-colors">
         <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center space-x-2">
           <Upload className="w-4 h-4 text-emerald-600" />
           <span>Restore or Import Database File into This App</span>

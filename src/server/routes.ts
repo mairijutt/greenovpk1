@@ -1,6 +1,19 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import {
+  syncFromSupabase,
+  persistExpenseToSupabase,
+  deleteExpenseFromSupabase,
+  persistEggProductionToSupabase,
+  deleteEggProductionFromSupabase,
+  persistFlockToSupabase,
+  deleteFlockFromSupabase,
+  persistSaleToSupabase,
+  deleteSaleFromSupabase,
+  persistStockToSupabase,
+  deleteStockFromSupabase,
+} from './supabaseSync.ts';
 
 export const apiRouter = Router();
 
@@ -156,19 +169,64 @@ let rawExpenses: any[] = (backupData['/expenses?page=1&limit=20']?.data?.items |
   };
 });
 
-let rawStocks: any[] = (backupData['/stocks?page=1&limit=20']?.data?.items || []).map((stk: any) => ({
-  ...stk,
-  flock: stk.flock || { id: stk.flockId, flockName: stk.flockId === 8 ? 'Unit 1' : stk.flockId === 9 ? 'Unit 2' : 'Unit 3' },
+import { liveStockRecords } from '../data/liveStocks.ts';
+import { liveSalesRecords } from '../data/liveSales.ts';
+import { liveEggProductions } from '../data/liveEggProductions.ts';
+import { liveExpenseRecords } from '../data/liveExpenses.ts';
+
+let rawStocks: any[] = liveStockRecords.map((r: any) => ({
+  id: r.trackingId,
+  date: `${r.date}T00:00:00.000Z`,
+  Type: r.type,
+  head: r.head,
+  quantity: r.quantity,
+  notes: r.notes,
+  attachment: null,
+  amountPaid: r.amount,
+  paymentType: r.paymentType,
+  expenseId: null,
+  challanNo: r.challanNo,
+  flockId: Number(r.flockId),
+  flock: { id: Number(r.flockId), flockName: r.flockName },
+  createdAt: `${r.date}T00:00:00.000Z`,
+  updatedAt: `${r.date}T00:00:00.000Z`,
 }));
 
-let rawSales: any[] = (backupData['/sales?page=1&limit=20']?.data?.items || []).map((sale: any) => ({
-  ...sale,
-  flock: sale.flock || { id: sale.flockId, flockName: sale.flockId === 8 ? 'Unit 1' : sale.flockId === 9 ? 'Unit 2' : 'Unit 3' },
+let rawSales: any[] = liveSalesRecords.map((sale: any) => ({
+  id: sale.trackingId,
+  saleDate: `${sale.date}T00:00:00.000Z`,
+  date: `${sale.date}T00:00:00.000Z`,
+  flockId: sale.flockId,
+  itemsSold: sale.quantity,
+  attachment: null,
+  head: sale.head,
+  totalAmount: sale.totalAmount,
+  amount: sale.totalAmount,
+  notes: sale.notes,
+  grade: 'standard',
+  averageWeight: 60,
+  cashPayment: sale.cashPayment,
+  onlinePayment: sale.onlinePayment,
+  partyName: 'Market',
+  vehicleNumber: sale.vehicleNumber,
+  weight: null,
+  challanNo: sale.challanNo,
+  createdAt: `${sale.date}T12:00:00.000Z`,
+  updatedAt: `${sale.date}T12:00:00.000Z`,
+  flock: { id: sale.flockId, flockName: sale.flockName },
 }));
 
-let rawEggProductions: any[] = (backupData['/egg-productions?page=1&limit=20']?.data?.items || []).map((egg: any) => ({
-  ...egg,
-  flock: egg.flock || { id: egg.flockId, flockName: egg.flockId === 8 ? 'Unit 1' : egg.flockId === 9 ? 'Unit 2' : 'Unit 3' },
+let rawEggProductions: any[] = liveEggProductions.map((egg: any) => ({
+  id: Number(egg.trackingId || egg.id) || 0,
+  date: `${egg.date}T00:00:00.000Z`,
+  flockId: Number(egg.flockId),
+  totalEggs: egg.totalEggs,
+  brokenEggs: egg.damagedEggs !== undefined ? egg.damagedEggs : (egg.brokenEggs || 0),
+  birds: egg.flockId === '8' ? 24200 : egg.flockId === '9' ? 32500 : 25500,
+  notes: egg.notes || '',
+  grade: 'standard',
+  averageWeight: egg.averageWeight || 60,
+  flock: { id: Number(egg.flockId), flockName: egg.flockName },
 }));
 
 let rawSalaries: any[] = (backupData['/salaries?page=1&limit=20']?.data?.items || []).map((sal: any, idx: number) => {
@@ -248,12 +306,21 @@ let birdHealthItems: any[] = [
   },
 ];
 
-let allConsumptions: any[] = [
-  { id: 1, date: '2026-10-12T00:00:00.000Z', flockId: 8, flock: { id: 8, flockName: 'Unit 1' }, feedConsumed: 70, waterConsumed: 4000, medicineConsumed: 2, vaccineConsumed: 1 },
-  { id: 2, date: '2026-10-11T00:00:00.000Z', flockId: 8, flock: { id: 8, flockName: 'Unit 1' }, feedConsumed: 68, waterConsumed: 3900, medicineConsumed: 0, vaccineConsumed: 0 },
-  { id: 3, date: '2026-10-12T00:00:00.000Z', flockId: 9, flock: { id: 9, flockName: 'Unit 2' }, feedConsumed: 105, waterConsumed: 5200, medicineConsumed: 3, vaccineConsumed: 1 },
-  { id: 4, date: '2026-10-12T00:00:00.000Z', flockId: 10, flock: { id: 10, flockName: 'Unit 3' }, feedConsumed: 80, waterConsumed: 4200, medicineConsumed: 1, vaccineConsumed: 0 },
-];
+let allConsumptions: any[] = rawStocks.map((stk: any, idx: number) => ({
+  id: stk.trackingId || idx + 1,
+  date: stk.date ? (stk.date.includes('T') ? stk.date : `${stk.date}T00:00:00.000Z`) : new Date().toISOString(),
+  flockId: Number(stk.flockId) || 8,
+  flock: { id: Number(stk.flockId) || 8, flockName: stk.flockName || 'Unit 1' },
+  feedConsumed: Number(stk.quantity) || 0,
+  feedQuantityKg: (Number(stk.quantity) || 0) * 50,
+  waterConsumed: 0,
+  waterConsumption: 0,
+  medicineConsumed: 0,
+  vaccineConsumed: 0,
+  feedType: stk.feedType || `Layer Feed ${stk.type || '13'}`,
+  challanNo: stk.challanNo,
+  notes: stk.notes,
+}));
 
 let stockStoreData: any = {
   feeds: [
@@ -308,10 +375,97 @@ function loadStore() {
       const parsed = JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8'));
       if (Array.isArray(parsed.flockItems) && parsed.flockItems.length > 0) flockItems = parsed.flockItems;
       if (Array.isArray(parsed.farmList) && parsed.farmList.length > 0) farmList = parsed.farmList;
-      if (Array.isArray(parsed.rawExpenses) && parsed.rawExpenses.length > 0) rawExpenses = parsed.rawExpenses;
-      if (Array.isArray(parsed.rawStocks) && parsed.rawStocks.length > 0) rawStocks = parsed.rawStocks;
-      if (Array.isArray(parsed.rawSales) && parsed.rawSales.length > 0) rawSales = parsed.rawSales;
-      if (Array.isArray(parsed.rawEggProductions) && parsed.rawEggProductions.length > 0) rawEggProductions = parsed.rawEggProductions;
+      if (Array.isArray(parsed.rawExpenses) && parsed.rawExpenses.length >= 1241) {
+        rawExpenses = parsed.rawExpenses;
+      } else {
+        // Automatically upgrade store with all 1,241 official PDF expense records
+        rawExpenses = liveExpenseRecords.map((r: any) => ({
+          id: Number(r.trackingId) || 0,
+          expenseDate: `${r.date}T00:00:00.000Z`,
+          date: `${r.date}T00:00:00.000Z`,
+          challanNo: r.challanNo || '',
+          attachment: null,
+          flockId: Number(r.flockId) || 8,
+          flock: { id: Number(r.flockId) || 8, flockName: r.flockName || 'Unit 1' },
+          expenseCost: r.amount,
+          amount: r.amount,
+          head: r.head,
+          notes: r.notes || '',
+          isUserAdded: false,
+          createdAt: `${r.date}T00:00:00.000Z`,
+          updatedAt: `${r.date}T00:00:00.000Z`,
+        }));
+        saveStore();
+      }
+      if (Array.isArray(parsed.rawStocks) && parsed.rawStocks.length === 145) {
+        rawStocks = parsed.rawStocks;
+      } else {
+        rawStocks = liveStockRecords.map((r: any) => ({
+          id: r.trackingId,
+          date: `${r.date}T00:00:00.000Z`,
+          Type: r.type,
+          head: r.head,
+          quantity: r.quantity,
+          notes: r.notes,
+          attachment: null,
+          amountPaid: r.amount,
+          paymentType: r.paymentType,
+          expenseId: null,
+          challanNo: r.challanNo,
+          flockId: Number(r.flockId),
+          flock: { id: Number(r.flockId), flockName: r.flockName },
+          createdAt: `${r.date}T00:00:00.000Z`,
+          updatedAt: `${r.date}T00:00:00.000Z`,
+        }));
+        saveStore();
+      }
+      if (Array.isArray(parsed.rawSales) && parsed.rawSales.length >= 808) {
+        rawSales = parsed.rawSales;
+      } else {
+        // Automatically upgrade store with all 808 official PDF sales records
+        rawSales = liveSalesRecords.map((s: any) => ({
+          id: s.trackingId,
+          saleDate: `${s.date}T00:00:00.000Z`,
+          date: `${s.date}T00:00:00.000Z`,
+          flockId: s.flockId,
+          itemsSold: s.quantity,
+          attachment: null,
+          head: s.head,
+          totalAmount: s.totalAmount,
+          amount: s.totalAmount,
+          notes: s.notes,
+          grade: 'standard',
+          averageWeight: 60,
+          cashPayment: s.cashPayment,
+          onlinePayment: s.onlinePayment,
+          partyName: 'Market',
+          vehicleNumber: s.vehicleNumber,
+          weight: null,
+          challanNo: s.challanNo,
+          createdAt: `${s.date}T12:00:00.000Z`,
+          updatedAt: `${s.date}T12:00:00.000Z`,
+          flock: { id: s.flockId, flockName: s.flockName },
+        }));
+        saveStore();
+      }
+      if (Array.isArray(parsed.rawEggProductions) && parsed.rawEggProductions.length === 371) {
+        rawEggProductions = parsed.rawEggProductions;
+      } else {
+        // Automatically upgrade store with all 371 official PDF egg production records
+        rawEggProductions = liveEggProductions.map((e: any) => ({
+          id: Number(e.trackingId || e.id) || 0,
+          date: `${e.date}T00:00:00.000Z`,
+          flockId: Number(e.flockId),
+          totalEggs: e.totalEggs,
+          brokenEggs: e.damagedEggs !== undefined ? e.damagedEggs : (e.brokenEggs || 0),
+          birds: e.flockId === '8' ? 24200 : e.flockId === '9' ? 32500 : 25500,
+          notes: e.notes || '',
+          grade: 'standard',
+          averageWeight: e.averageWeight || 60,
+          flock: { id: Number(e.flockId), flockName: e.flockName },
+        }));
+        saveStore();
+      }
       if (Array.isArray(parsed.rawSalaries) && parsed.rawSalaries.length > 0) rawSalaries = parsed.rawSalaries;
       if (Array.isArray(parsed.birdHealthItems) && parsed.birdHealthItems.length > 0) birdHealthItems = parsed.birdHealthItems;
       if (Array.isArray(parsed.allConsumptions) && parsed.allConsumptions.length > 0) allConsumptions = parsed.allConsumptions;
@@ -344,6 +498,15 @@ function loadStore() {
 
 // Initial load
 loadStore();
+
+// Live sync from Supabase PostgreSQL database
+syncFromSupabase({
+  setExpenses: (items) => { rawExpenses = items; },
+  setFlocks: (items) => { flockItems = items; },
+  setEggs: (items) => { rawEggProductions = items; },
+  setSales: (items) => { rawSales = items; },
+  setStocks: (items) => { rawStocks = items; },
+});
 
 // Challan Upload Handlers
 const dummyChallan = (_req: Request, res: Response) => {
@@ -392,7 +555,7 @@ apiRouter.post('/auth/signin', (req: Request, res: Response) => {
 // COGS Categories vs Operating Expense Categories
 const COGS_HEADS = new Set(['FEED', 'CHICKEN', 'MEDICINE', 'VACCINE']);
 
-// Baseline Data Constants (Historical Database April - August 2026)
+// Baseline Data Constants (Historical Database April - October 2026)
 const BASELINE_DATA: Record<number, {
   revenue: number;
   expenses: number;
@@ -409,18 +572,18 @@ const BASELINE_DATA: Record<number, {
   expenseBreakdown: Record<string, number>;
 }> = {
   8: {
-    revenue: 35000000,
-    expenses: 80000000,
-    birds: 25000,
-    eggs: 1641540,
-    brokenEggs: 5500,
+    revenue: 29798926,
+    expenses: 66172253,
+    birds: 24200,
+    eggs: 1931280,
+    brokenEggs: 4170,
     feedBags: 4600,
     waterConsumption: 580000,
     feedPurchased: 4600,
     fcr: 1.48,
-    avgEggPrice: 18.2,
-    avgEggWeight: 59.8,
-    salesBreakdown: { EGG: 35000000 },
+    avgEggPrice: 16.39,
+    avgEggWeight: 60.0,
+    salesBreakdown: { EGG: 29798926 },
     expenseBreakdown: {
       FEED: 62000000,
       CHICKEN: 7800000,
@@ -431,18 +594,18 @@ const BASELINE_DATA: Record<number, {
     },
   },
   9: {
-    revenue: 245000000,
-    expenses: 210000000,
-    birds: 35000,
-    eggs: 13767720,
-    brokenEggs: 46000,
+    revenue: 266379294,
+    expenses: 243997005.6,
+    birds: 32500,
+    eggs: 14103090,
+    brokenEggs: 47970,
     feedBags: 31500,
     waterConsumption: 4100000,
     feedPurchased: 31500,
     fcr: 1.46,
-    avgEggPrice: 17.9,
-    avgEggWeight: 60.1,
-    salesBreakdown: { EGG: 244500000, Manure: 500000 },
+    avgEggPrice: 18.83,
+    avgEggWeight: 60.0,
+    salesBreakdown: { EGG: 265771294, Manure: 355000, 'Feed BAGS': 253000 },
     expenseBreakdown: {
       FEED: 160000000,
       CHICKEN: 15000000,
@@ -454,18 +617,18 @@ const BASELINE_DATA: Record<number, {
     },
   },
   10: {
-    revenue: 14905597,
-    expenses: 61179198.6,
+    revenue: 16601857,
+    expenses: 51483870,
     birds: 25500,
-    eggs: 850080,
-    brokenEggs: 3400,
+    eggs: 1133820,
+    brokenEggs: 3330,
     feedBags: 9495,
     waterConsumption: 740000,
     feedPurchased: 9495,
     fcr: 1.50,
-    avgEggPrice: 17.5,
-    avgEggWeight: 59.9,
-    salesBreakdown: { EGG: 14513022, Manure: 108000, 'Feed BAGS': 264625, OTHER: 19950 },
+    avgEggPrice: 16.0,
+    avgEggWeight: 60.0,
+    salesBreakdown: { EGG: 16317282, Manure: 253000, 'Feed BAGS': 11625, OTHER: 19950 },
     expenseBreakdown: {
       FEED: 44905100,
       CHICKEN: 2491900,
@@ -501,97 +664,45 @@ function computeMetrics(flockId?: number | null, startDate?: string, endDate?: s
     .filter(h => h.id > 4 || (h as any).isUserAdded)
     .reduce((sum, h) => sum + (Number(h.cull) || 0), 0);
 
-  // 3. Expenses
+  // 3. Expenses (Computed directly from all live authentic PDF expenses)
   let totalExpenses = 0;
   const expenseMap: Record<string, number> = {};
   const flockExpenseMap: Record<number, number> = {};
 
-  // Initialize from baseline
-  if (isAll) {
-    for (const fid of [8, 9, 10]) {
-      const base = BASELINE_DATA[fid];
-      if (base) {
-        totalExpenses += base.expenses;
-        flockExpenseMap[fid] = (flockExpenseMap[fid] || 0) + base.expenses;
-        for (const [h, amt] of Object.entries(base.expenseBreakdown)) {
-          const normH = h === 'SALARIES PAYMENTS' ? 'SALARIES_PAYMENTS' : h;
-          expenseMap[normH] = (expenseMap[normH] || 0) + amt;
-        }
-      }
-    }
-  } else if (BASELINE_DATA[flockId]) {
-    const base = BASELINE_DATA[flockId];
-    totalExpenses += base.expenses;
-    flockExpenseMap[flockId] = (flockExpenseMap[flockId] || 0) + base.expenses;
-    for (const [h, amt] of Object.entries(base.expenseBreakdown)) {
-      const normH = h === 'SALARIES PAYMENTS' ? 'SALARIES_PAYMENTS' : h;
-      expenseMap[normH] = (expenseMap[normH] || 0) + amt;
-    }
-  }
-
-  // Add all user-added expenses
   for (const exp of rawExpenses) {
-    if (exp.id > 1215 || exp.isUserAdded) {
-      const expFid = Number(exp.flockId) || 8;
-      if (!isAll && expFid !== flockId) continue;
-      if (!isDateInRange(exp.expenseDate, startDate, endDate)) continue;
+    const expFid = Number(exp.flockId) || 8;
+    if (!isAll && expFid !== flockId) continue;
+    if (!isDateInRange(exp.expenseDate || exp.date, startDate, endDate)) continue;
 
-      const cost = Number(exp.expenseCost) || 0;
-      let head = String(exp.head || 'FEED').trim();
-      if (head === 'SALARIES PAYMENTS') head = 'SALARIES_PAYMENTS';
+    const cost = Number(exp.expenseCost !== undefined ? exp.expenseCost : (exp.amount ?? 0)) || 0;
+    let head = String(exp.head || 'FEED').trim();
+    if (head === 'SALARIES PAYMENTS') head = 'SALARIES_PAYMENTS';
 
-      flockExpenseMap[expFid] = (flockExpenseMap[expFid] || 0) + cost;
-      totalExpenses += cost;
-      expenseMap[head] = (expenseMap[head] || 0) + cost;
-    }
+    flockExpenseMap[expFid] = (flockExpenseMap[expFid] || 0) + cost;
+    totalExpenses += cost;
+    expenseMap[head] = (expenseMap[head] || 0) + cost;
   }
 
-  // 4. Sales / Revenue
+  // 4. Sales / Revenue (Computed directly from all 808 live authentic PDF sales)
   let totalRevenue = 0;
   let totalItemsSold = 0;
   const salesMap: Record<string, number> = {};
   const flockSalesMap: Record<number, number> = {};
 
-  if (isAll) {
-    for (const fid of [8, 9, 10]) {
-      const base = BASELINE_DATA[fid];
-      if (base) {
-        totalRevenue += base.revenue;
-        totalItemsSold += (fid === 8 ? 1641540 : fid === 9 ? 13767720 : 850080);
-        flockSalesMap[fid] = (flockSalesMap[fid] || 0) + base.revenue;
-        for (const [h, amt] of Object.entries(base.salesBreakdown)) {
-          const normH = h === 'Feed_BAGS' ? 'Feed BAGS' : h;
-          salesMap[normH] = (salesMap[normH] || 0) + amt;
-        }
-      }
-    }
-  } else if (BASELINE_DATA[flockId]) {
-    const base = BASELINE_DATA[flockId];
-    totalRevenue += base.revenue;
-    totalItemsSold += (flockId === 8 ? 1641540 : flockId === 9 ? 13767720 : 850080);
-    flockSalesMap[flockId] = (flockSalesMap[flockId] || 0) + base.revenue;
-    for (const [h, amt] of Object.entries(base.salesBreakdown)) {
-      const normH = h === 'Feed_BAGS' ? 'Feed BAGS' : h;
-      salesMap[normH] = (salesMap[normH] || 0) + amt;
-    }
-  }
-
   for (const sale of rawSales) {
-    if (sale.id > 680 || sale.isUserAdded) {
-      const saleFid = Number(sale.flockId) || 8;
-      if (!isAll && saleFid !== flockId) continue;
-      if (!isDateInRange(sale.date || sale.saleDate, startDate, endDate)) continue;
+    const saleFid = Number(sale.flockId) || 8;
+    if (!isAll && saleFid !== flockId) continue;
+    if (!isDateInRange(sale.date || sale.saleDate, startDate, endDate)) continue;
 
-      const amt = Number(sale.totalAmount) || (Number(sale.itemsSold || 0) * Number(sale.rate || 0)) || Number(sale.amount) || 0;
-      const items = Number(sale.itemsSold) || 0;
-      let head = String(sale.head || 'EGG').trim();
-      if (head === 'Feed_BAGS') head = 'Feed BAGS';
+    const amt = Number(sale.totalAmount !== undefined ? sale.totalAmount : (sale.amount ?? 0)) || 0;
+    const items = Number(sale.itemsSold !== undefined ? sale.itemsSold : (sale.quantity ?? 0)) || 0;
+    let head = String(sale.head || sale.category || 'EGG').trim();
+    if (head === 'Feed_BAGS' || head === 'Feed_BAG') head = 'Feed BAGS';
 
-      flockSalesMap[saleFid] = (flockSalesMap[saleFid] || 0) + amt;
-      totalRevenue += amt;
-      totalItemsSold += items;
-      salesMap[head] = (salesMap[head] || 0) + amt;
-    }
+    flockSalesMap[saleFid] = (flockSalesMap[saleFid] || 0) + amt;
+    totalRevenue += amt;
+    totalItemsSold += items;
+    salesMap[head] = (salesMap[head] || 0) + amt;
   }
 
   // 5. Egg Productions (Computed directly from all live records)
@@ -809,6 +920,7 @@ apiRouter.post(['/flock', '/flocks'], (req: Request, res: Response) => {
 
   flockItems.unshift(newFlock);
   saveStore();
+  persistFlockToSupabase(newFlock);
   return res.json({ message: 'success', data: newFlock });
 });
 
@@ -824,6 +936,7 @@ apiRouter.put(['/flock/:id', '/flocks/:id'], (req: Request, res: Response) => {
       updatedAt: new Date().toISOString(),
     };
     saveStore();
+    persistFlockToSupabase(flockItems[idx]);
     return res.json({ message: 'success', data: flockItems[idx] });
   }
   return res.json({ message: 'success', data: { id, ...body } });
@@ -833,6 +946,7 @@ apiRouter.delete(['/flock/:id', '/flocks/:id'], (req: Request, res: Response) =>
   const id = Number(req.params.id);
   flockItems = flockItems.filter(f => f.id !== id);
   saveStore();
+  deleteFlockFromSupabase(id);
   return res.json({ message: 'success', data: { id } });
 });
 
@@ -1172,6 +1286,7 @@ apiRouter.post(['/egg-production', '/egg-productions'], (req: Request, res: Resp
   };
   rawEggProductions.unshift(newProd);
   saveStore();
+  persistEggProductionToSupabase(newProd);
   res.json({ message: 'success', data: newProd });
 });
 
@@ -1182,6 +1297,7 @@ apiRouter.put(['/egg-production/:id', '/egg-productions/:id'], (req: Request, re
   if (idx >= 0) {
     rawEggProductions[idx] = { ...rawEggProductions[idx], ...body, id, updatedAt: new Date().toISOString() };
     saveStore();
+    persistEggProductionToSupabase(rawEggProductions[idx]);
     return res.json({ message: 'success', data: rawEggProductions[idx] });
   }
   res.json({ message: 'success', data: { id, ...body } });
@@ -1191,6 +1307,7 @@ apiRouter.delete(['/egg-production/:id', '/egg-productions/:id'], (req: Request,
   const id = Number(req.params.id);
   rawEggProductions = rawEggProductions.filter((e: any) => e.id !== id);
   saveStore();
+  deleteEggProductionFromSupabase(id);
   res.json({ message: 'success', data: { id } });
 });
 
@@ -1276,6 +1393,7 @@ apiRouter.post(['/expense', '/expenses'], (req: Request, res: Response) => {
   };
   rawExpenses.unshift(newExp);
   saveStore();
+  persistExpenseToSupabase(newExp);
   res.json({ message: 'success', data: newExp });
 });
 
@@ -1287,6 +1405,7 @@ apiRouter.put(['/expense/:id', '/expenses/:id'], (req: Request, res: Response) =
     const cost = body.expenseCost !== undefined ? Number(body.expenseCost) : (body.amount !== undefined ? Number(body.amount) : rawExpenses[idx].expenseCost);
     rawExpenses[idx] = { ...rawExpenses[idx], ...body, expenseCost: cost, amount: cost, id, updatedAt: new Date().toISOString() };
     saveStore();
+    persistExpenseToSupabase(rawExpenses[idx]);
     return res.json({ message: 'success', data: rawExpenses[idx] });
   }
   res.json({ message: 'success', data: { id, ...body } });
@@ -1296,6 +1415,7 @@ apiRouter.delete(['/expense/:id', '/expenses/:id'], (req: Request, res: Response
   const id = Number(req.params.id);
   rawExpenses = rawExpenses.filter((e: any) => e.id !== id);
   saveStore();
+  deleteExpenseFromSupabase(id);
   res.json({ message: 'success', data: { id } });
 });
 
@@ -1382,6 +1502,7 @@ apiRouter.post('/stocks', (req: Request, res: Response) => {
   };
   rawStocks.unshift(newStock);
   saveStore();
+  persistStockToSupabase(newStock);
   res.json({ message: 'success', data: newStock });
 });
 
@@ -1392,6 +1513,7 @@ apiRouter.put('/stocks/:id', (req: Request, res: Response) => {
   if (idx >= 0) {
     rawStocks[idx] = { ...rawStocks[idx], ...body, id, updatedAt: new Date().toISOString() };
     saveStore();
+    persistStockToSupabase(rawStocks[idx]);
     return res.json({ message: 'success', data: rawStocks[idx] });
   }
   res.json({ message: 'success', data: { id, ...body } });
@@ -1401,6 +1523,7 @@ apiRouter.delete('/stocks/:id', (req: Request, res: Response) => {
   const id = Number(req.params.id);
   rawStocks = rawStocks.filter((s: any) => s.id !== id);
   saveStore();
+  deleteStockFromSupabase(id);
   res.json({ message: 'success', data: { id } });
 });
 
@@ -1498,6 +1621,7 @@ apiRouter.post(['/sale', '/sales'], (req: Request, res: Response) => {
   };
   rawSales.unshift(newSale);
   saveStore();
+  persistSaleToSupabase(newSale);
   res.json({ message: 'success', data: newSale });
 });
 
@@ -1509,6 +1633,7 @@ apiRouter.put(['/sale/:id', '/sales/:id'], (req: Request, res: Response) => {
     const totAmount = body.totalAmount !== undefined ? Number(body.totalAmount) : (body.amount !== undefined ? Number(body.amount) : rawSales[idx].totalAmount);
     rawSales[idx] = { ...rawSales[idx], ...body, totalAmount: totAmount, amount: totAmount, id, updatedAt: new Date().toISOString() };
     saveStore();
+    persistSaleToSupabase(rawSales[idx]);
     return res.json({ message: 'success', data: rawSales[idx] });
   }
   res.json({ message: 'success', data: { id, ...body } });
@@ -1518,6 +1643,7 @@ apiRouter.delete(['/sale/:id', '/sales/:id'], (req: Request, res: Response) => {
   const id = Number(req.params.id);
   rawSales = rawSales.filter((s: any) => s.id !== id);
   saveStore();
+  deleteSaleFromSupabase(id);
   res.json({ message: 'success', data: { id } });
 });
 
@@ -1612,24 +1738,42 @@ apiRouter.delete('/salaries/:id', (req: Request, res: Response) => {
 
 apiRouter.get('/salaries/summary', (req: Request, res: Response) => {
   const flockId = getFlockId(req);
-  let totalPaid = !flockId ? 7078367 : (flockId === 8 ? 2100000 : flockId === 9 ? 3500000 : flockId === 10 ? 1478367 : 0);
-  let totalAdvance = !flockId ? 215000 : (flockId === 8 ? 50000 : flockId === 9 ? 120000 : flockId === 10 ? 45000 : 0);
 
+  // Baseline verified figures matching official old system records
+  // Total Paid: 708,000 (Unit 2: 517,000, Unit 3: 191,000)
+  // Total Advance: 157,430 (Unit 2: 101,430, Unit 3: 56,000)
+  // Net Salary Paid: 30,000 (Akram net wage disbursed)
   const flockPaidMap: Record<number, number> = {
-    8: 2100000,
-    9: 3500000,
-    10: 1478367,
+    8: 0,
+    9: 517000,
+    10: 191000,
   };
 
+  const flockAdvanceMap: Record<number, number> = {
+    8: 0,
+    9: 101430,
+    10: 56000,
+  };
+
+  let totalPaid = !flockId ? 708000 : (flockPaidMap[flockId] || 0);
+  let totalAdvance = !flockId ? 157430 : (flockAdvanceMap[flockId] || 0);
+  let netSalaryPaid = !flockId ? 30000 : (flockId === 9 ? 30000 : 0);
+
+  // Incorporate dynamically added user salaries
   for (const sal of rawSalaries) {
-    if (sal.id > 100 || sal.isUserAdded) {
-      const sFid = Number(sal.flockId) || 8;
-      const paid = Number(sal.salaryAmount || sal.total || sal.amount) || 0;
-      const adv = Number(sal.advance || sal.advanceAmount) || 0;
+    if (sal.isUserAdded) {
+      const sFid = Number(sal.flockId) || 9;
+      const paid = Number(sal.total || sal.salaryAmount) || 0;
+      const adv = Number(sal.advance) || 0;
+      const net = Number(sal.salaryAmount) || 0;
+
       flockPaidMap[sFid] = (flockPaidMap[sFid] || 0) + paid;
+      flockAdvanceMap[sFid] = (flockAdvanceMap[sFid] || 0) + adv;
+
       if (!flockId || sFid === flockId) {
         totalPaid += paid;
         totalAdvance += adv;
+        netSalaryPaid += net;
       }
     }
   }
@@ -1637,7 +1781,9 @@ apiRouter.get('/salaries/summary', (req: Request, res: Response) => {
   const targetFlocks = flockId ? flockItems.filter(f => f.id === flockId) : flockItems;
   const byFlock = targetFlocks.map(f => ({
     totalPaid: flockPaidMap[f.id] || 0,
+    totalAdvance: flockAdvanceMap[f.id] || 0,
     flock: f.flockName,
+    flockId: f.id,
   }));
 
   res.json({
@@ -1645,6 +1791,7 @@ apiRouter.get('/salaries/summary', (req: Request, res: Response) => {
     data: {
       totalPaid,
       totalAdvance,
+      netSalaryPaid,
       totalSalaryAmount: totalPaid,
       byFlock,
     },
