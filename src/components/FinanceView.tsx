@@ -17,6 +17,11 @@ import {
   Layers,
   Layers2,
   Filter,
+  Paperclip,
+  FileText,
+  UploadCloud,
+  Download,
+  Trash2,
 } from 'lucide-react';
 import { FinancialRecord } from '../types/farm.ts';
 import {
@@ -112,14 +117,39 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
   const [newRecord, setNewRecord] = useState({
     type: defaultType === 'Expense' ? ('Expense' as const) : ('Income' as const),
-    head: 'FEED',
+    head: defaultType === 'Income' ? 'EGG' : 'FEED',
     flockName: 'Unit 1',
     flockId: 8,
-    amount: 150000,
+    amount: defaultType === 'Income' ? 250000 : 150000,
     referenceNo: `INV-${Date.now().toString().slice(-4)}`,
     challanNo: `${Math.floor(100 + Math.random() * 900)}`,
     description: '',
   });
+
+  const [attachmentData, setAttachmentData] = useState<string | null>(null);
+  const [attachmentName, setAttachmentName] = useState<string>('');
+  const [previewRecord, setPreviewRecord] = useState<FinancialRecord | null>(null);
+
+  const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size exceeds 10MB limit.');
+        return;
+      }
+      setAttachmentName(file.name);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachmentData(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveAttachment = () => {
+    setAttachmentName('');
+    setAttachmentData(null);
+  };
 
   // Filtered dataset
   const filtered = useMemo(() => {
@@ -340,7 +370,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     const fid = newRecord.flockName === 'Unit 1' ? 8 : newRecord.flockName === 'Unit 2' ? 9 : 10;
     const trackingId = Date.now().toString().slice(-4);
     const record: FinancialRecord = {
-      id: `exp-${trackingId}`,
+      id: `${newRecord.type === 'Income' ? 'inc' : 'exp'}-${trackingId}`,
       trackingId: Number(trackingId),
       type: newRecord.type,
       category: newRecord.head,
@@ -354,9 +384,12 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       description: newRecord.description || `${newRecord.head}: Manual entry`,
       notes: newRecord.description,
       status: 'Paid',
+      attachment: attachmentData || null,
+      attachmentName: attachmentName || null,
     };
     onAddTransaction(record);
     setShowModal(false);
+    handleRemoveAttachment();
   };
 
   const getFlockBadgeClass = (flockName?: string, flockId?: string | number) => {
@@ -981,6 +1014,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-3 px-3 text-right">Cash Payment</th>
                   <th className="py-3 px-3 text-right">Total Amount</th>
                   <th className="py-3 px-3">Vehicle / Challan</th>
+                  <th className="py-3 px-3 text-center">Attachment</th>
                 </tr>
               ) : selectedType === 'Expense' ? (
                 <tr>
@@ -991,6 +1025,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-3 px-3">Challan No</th>
                   <th className="py-3 px-3">Description & Notes</th>
                   <th className="py-3 px-3 text-right">Amount (PKR)</th>
+                  <th className="py-3 px-3 text-center">Attachment</th>
                   <th className="py-3 px-3 text-center">Status</th>
                 </tr>
               ) : (
@@ -1003,6 +1038,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-3 px-3">Challan No</th>
                   <th className="py-3 px-3">Description & Notes</th>
                   <th className="py-3 px-3 text-right">Amount (PKR)</th>
+                  <th className="py-3 px-3 text-center">Attachment</th>
                   <th className="py-3 px-3 text-center">Status</th>
                 </tr>
               )}
@@ -1010,13 +1046,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <tbody className="divide-y divide-slate-100">
               {paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
                     No financial records match the selected unit, head, date range, and filters.
                   </td>
                 </tr>
               ) : (
                 paginatedRecords.map((fin) => {
-                  const trackingId = fin.trackingId || (fin.id ? fin.id.replace('exp-', '').replace('fin-', '').replace('sale-', '') : '—');
+                  const trackingId = fin.trackingId || (fin.id ? fin.id.replace('exp-', '').replace('fin-', '').replace('sale-', '').replace('inc-', '') : '—');
                   const unitName = fin.flockName || (fin.flockId === 8 || fin.flockId === '8' ? 'Unit 1' : fin.flockId === 9 || fin.flockId === '9' ? 'Unit 2' : fin.flockId === 10 || fin.flockId === '10' ? 'Unit 3' : '—');
                   const headName = fin.head || fin.category;
                   const s = fin as any;
@@ -1062,6 +1098,21 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                         </td>
                         <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">
                           {s.vehicleNumber || 'ABC'} {s.challanNo ? `(#${s.challanNo})` : ''}
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          {fin.attachment || fin.attachmentName ? (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewRecord(fin)}
+                              className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 cursor-pointer transition-colors shadow-xs"
+                              title={fin.attachmentName || 'View Attachment'}
+                            >
+                              <Paperclip className="w-3 h-3 mr-1" />
+                              Slip
+                            </button>
+                          ) : (
+                            <span className="text-slate-300 font-mono text-xs">—</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1113,6 +1164,21 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                         }`}
                       >
                         Rs. {fin.amount.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        {fin.attachment || fin.attachmentName ? (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewRecord(fin)}
+                            className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300/80 cursor-pointer transition-colors shadow-xs"
+                            title={fin.attachmentName || 'View Attachment'}
+                          >
+                            <Paperclip className="w-3 h-3 mr-1" />
+                            Slip
+                          </button>
+                        ) : (
+                          <span className="text-slate-300 font-mono text-xs">—</span>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span className="inline-flex items-center text-emerald-700 text-[11px] font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
@@ -1269,7 +1335,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <DollarSign className="w-4 h-4" />
                 </div>
                 <h2 className="text-base font-bold text-slate-900">
-                  Record Voucher / Expense (21 Heads)
+                  {newRecord.type === 'Income' ? 'Record Sales & Receipt' : 'Record Voucher / Expense (21 Heads)'}
                 </h2>
               </div>
               <button
@@ -1286,7 +1352,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 <UISelect
                   label="Transaction Type"
                   value={newRecord.type}
-                  onChange={(e) => setNewRecord({ ...newRecord, type: e.target.value as any })}
+                  onChange={(e) => {
+                    const nextType = e.target.value as 'Expense' | 'Income';
+                    setNewRecord({
+                      ...newRecord,
+                      type: nextType,
+                      head: nextType === 'Income' ? 'EGG' : 'FEED',
+                    });
+                  }}
                 >
                   <option value="Expense">Expense (Cost)</option>
                   <option value="Income">Income (Sales)</option>
@@ -1311,15 +1384,23 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <UISelect
-                  label="Expense Head (21 Heads)"
+                  label={newRecord.type === 'Income' ? 'Sales Category / Head' : 'Expense Head (21 Heads)'}
                   value={newRecord.head}
                   onChange={(e) => setNewRecord({ ...newRecord, head: e.target.value })}
                 >
-                  {EXPENSE_HEADS_21.map((h) => (
-                    <option key={h} value={h}>
-                      {h.replace('_', ' ')}
-                    </option>
-                  ))}
+                  {newRecord.type === 'Income' ? (
+                    ['EGG', 'Manure', 'Feed BAGS', 'Cull Birds', 'OTHER'].map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))
+                  ) : (
+                    EXPENSE_HEADS_21.map((h) => (
+                      <option key={h} value={h}>
+                        {h.replace('_', ' ')}
+                      </option>
+                    ))
+                  )}
                 </UISelect>
 
                 <UIInput
@@ -1348,24 +1429,173 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
               <UITextarea
                 label="Description & Notes"
-                placeholder="e.g. Cardboard 16 number 30 bundle, feed bags, etc."
+                placeholder="e.g. Cardboard 16 number 30 bundle, feed bags, egg sales etc."
                 value={newRecord.description}
                 onChange={(e) => setNewRecord({ ...newRecord, description: e.target.value })}
               />
+
+              {/* Attachment / Slip Upload Field */}
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Attach Voucher / Receipt / Slip (Image or PDF)
+                </label>
+                {attachmentName ? (
+                  <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <div className="flex items-center space-x-2 truncate">
+                      {attachmentData?.startsWith('data:image') ? (
+                        <img
+                          src={attachmentData}
+                          alt="Slip Preview"
+                          className="w-8 h-8 rounded object-cover border border-emerald-200"
+                        />
+                      ) : (
+                        <FileText className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+                      )}
+                      <div className="truncate">
+                        <p className="text-xs font-bold text-emerald-950 truncate">{attachmentName}</p>
+                        <p className="text-[10px] text-emerald-600 font-medium">Slip document attached</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveAttachment}
+                      className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      title="Remove attachment"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-slate-200 hover:border-emerald-400 rounded-xl cursor-pointer bg-slate-50/70 hover:bg-emerald-50/20 transition-all">
+                    <div className="flex items-center space-x-2 text-slate-600">
+                      <UploadCloud className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-semibold text-slate-700">
+                        Upload Challan / Invoice / Bank Slip
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 mt-0.5">
+                      JPG, PNG, WEBP or PDF file format
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      onChange={handleAttachmentChange}
+                    />
+                  </label>
+                )}
+              </div>
 
               <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">
                 <UIButton
                   type="button"
                   variant="secondary"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    handleRemoveAttachment();
+                  }}
                 >
                   Cancel
                 </UIButton>
                 <UIButton type="submit" variant="primary">
-                  Save Voucher
+                  {newRecord.type === 'Income' ? 'Save Sale Record' : 'Save Expense Voucher'}
                 </UIButton>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Attachment Document Preview Modal */}
+      {previewRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Document / Slip Attachment
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Voucher #{previewRecord.trackingId || previewRecord.id} • {previewRecord.type} • {previewRecord.head || previewRecord.category} • Rs. {previewRecord.amount.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewRecord(null)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto my-4 bg-slate-50 rounded-xl p-4 flex items-center justify-center border border-slate-200/80 min-h-[300px]">
+              {previewRecord.attachment?.startsWith('data:image') ? (
+                <img
+                  src={previewRecord.attachment}
+                  alt={previewRecord.attachmentName || 'Slip'}
+                  className="max-h-[58vh] max-w-full rounded-lg object-contain shadow-sm border border-slate-200"
+                />
+              ) : previewRecord.attachment?.startsWith('data:application/pdf') ? (
+                <iframe
+                  src={previewRecord.attachment}
+                  title={previewRecord.attachmentName || 'PDF Document'}
+                  className="w-full h-[480px] rounded-lg border border-slate-200"
+                />
+              ) : (
+                <div className="text-center p-8">
+                  <FileText className="w-16 h-16 text-emerald-600 mx-auto mb-3" />
+                  <p className="text-sm font-bold text-slate-800">
+                    {previewRecord.attachmentName || 'Attached Slip Document'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Challan #{previewRecord.challanNo || 'N/A'} • Reference: {previewRecord.referenceNo || 'N/A'}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {previewRecord.description || previewRecord.notes || 'No extra notes provided.'}
+                  </p>
+                  {previewRecord.attachment && (
+                    <a
+                      href={previewRecord.attachment}
+                      download={previewRecord.attachmentName || 'attachment'}
+                      className="mt-4 inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 mr-1.5" />
+                      Download Attachment File
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
+              <div className="text-slate-500 truncate max-w-xs">
+                File: <span className="font-semibold text-slate-800">{previewRecord.attachmentName || 'Slip Attached'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                {previewRecord.attachment && (
+                  <a
+                    href={previewRecord.attachment}
+                    download={previewRecord.attachmentName || 'voucher-slip'}
+                    className="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                    Download
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewRecord(null)}
+                  className="px-4 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

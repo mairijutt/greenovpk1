@@ -21,7 +21,7 @@ import {
   Banknote,
   Layers,
 } from 'lucide-react';
-import { InventoryItem } from '../types/farm.ts';
+import { InventoryItem, FinancialRecord } from '../types/farm.ts';
 import { StatCard, PageHeader, UIButton, TableCard } from './ui';
 import {
   STOCK_SUMMARY,
@@ -33,9 +33,10 @@ import {
 interface StocksViewProps {
   inventory: InventoryItem[];
   onRestock: (id: string, amount: number) => void;
+  onAddTransaction?: (record: FinancialRecord) => void;
 }
 
-export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock }) => {
+export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, onAddTransaction }) => {
   const [activeTab, setActiveTab] = useState<'shipments' | 'add-stock' | 'warehouse'>('shipments');
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
   const [selectedFeedType, setSelectedFeedType] = useState<string>('all');
@@ -68,6 +69,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock }) 
   const [formChallan, setFormChallan] = useState<string>('');
   const [formNotes, setFormNotes] = useState<string>('');
   const [attachmentName, setAttachmentName] = useState<string>('');
+  const [attachmentData, setAttachmentData] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const handleHeadChange = (newHead: string) => {
@@ -96,12 +98,18 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock }) 
     setFormChallan('');
     setFormNotes('');
     setAttachmentName('');
+    setAttachmentData(null);
   };
 
   const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setAttachmentName(file.name);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachmentData(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -165,12 +173,48 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock }) 
         amountPaid: amt,
         paymentType: formPaymentType.toUpperCase(),
         notes: formNotes,
-        attachment: attachmentName || null,
+        attachment: attachmentData || attachmentName || null,
       }),
     }).catch((e) => console.warn('Stock backend sync error:', e));
 
+    // Automatically create corresponding Farm Expense transaction so cost reflects dynamically everywhere
+    if (onAddTransaction) {
+      const expenseRecord: FinancialRecord = {
+        id: `exp-stk-${Date.now()}`,
+        trackingId: newRecord.trackingId,
+        type: 'Expense',
+        category: formHead === 'FEED' ? 'FEED' : formHead === 'MEDICINE' ? 'MEDICINE' : formHead === 'VACCINE' ? 'VACCINE' : formHead,
+        head: formHead === 'FEED' ? 'FEED' : formHead === 'MEDICINE' ? 'MEDICINE' : formHead === 'VACCINE' ? 'VACCINE' : formHead,
+        amount: amt,
+        date: formDate,
+        referenceNo: `STK-${newRecord.trackingId}`,
+        challanNo: formChallan.trim(),
+        flockId: Number(flockId),
+        flockName: formFlock,
+        description: `Stock Intake: ${qty} ${formHead === 'FEED' ? 'bags' : 'units'} of ${formStockType} (${formHead}) via ${formPaymentType}`,
+        notes: formNotes || `Stock record #${newRecord.trackingId} auto-synced to Farm Expenses ledger.`,
+        status: 'Paid',
+        attachment: attachmentData || null,
+        attachmentName: attachmentName || null,
+      };
+      onAddTransaction(expenseRecord);
+    }
+
+    // Auto-restock warehouse inventory item if applicable
+    if (onRestock && qty > 0) {
+      const match = inventory.find(
+        (item) =>
+          item.category.toLowerCase() === formHead.toLowerCase() ||
+          item.name.toLowerCase().includes(formStockType.toLowerCase()) ||
+          (formHead === 'FEED' && item.name.toLowerCase().includes('feed'))
+      );
+      if (match) {
+        onRestock(match.id, qty);
+      }
+    }
+
     // Show toast and reset form
-    setToastMessage(`Stock record #${newRecord.trackingId} saved successfully!`);
+    setToastMessage(`Stock record #${newRecord.trackingId} saved & automatically logged to Farm Expenses (Rs. ${amt.toLocaleString()})!`);
     setTimeout(() => setToastMessage(null), 4000);
     handleResetForm();
     setActiveTab('shipments');

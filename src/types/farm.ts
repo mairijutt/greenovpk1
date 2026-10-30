@@ -118,6 +118,8 @@ export interface FinancialRecord {
   notes?: string;
   paymentMethod?: string;
   receiptNumber?: string;
+  attachment?: string | null;
+  attachmentName?: string | null;
 }
 
 export interface Worker {

@@ -148,15 +148,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [selectedFlock, fromDate, toDate]);
 
   const activeSales = useMemo(() => {
-    return liveSalesRecords.filter((s) => {
+    // Incorporate any live sales plus newly added sales in financials
+    const userSales = financials
+      .filter((f) => f.type === 'Income')
+      .map((f) => ({
+        id: f.id,
+        trackingId: Number(f.trackingId) || 9999,
+        date: f.date,
+        flockId: Number(f.flockId) || 8,
+        flock: f.flockName || 'Unit 1',
+        amount: f.amount,
+        quantity: Math.round(f.amount / 17.5),
+        onlinePayment: f.paymentMethod === 'ONLINE' ? f.amount : 0,
+        cashPayment: f.paymentMethod !== 'ONLINE' ? f.amount : 0,
+      }));
+    const combined = [...userSales, ...liveSalesRecords];
+    return combined.filter((s) => {
       const matchFlock = isFlockMatch(s.flockId, s.flock);
       const matchDate = isDateMatch(s.date);
       return matchFlock && matchDate;
     });
-  }, [selectedFlock, fromDate, toDate]);
+  }, [selectedFlock, fromDate, toDate, financials]);
 
   const activeStocks = useMemo(() => {
-    return liveStockRecords.filter((s) => {
+    let savedStocks: any[] = [];
+    try {
+      const saved = localStorage.getItem('greenova_stocks_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) savedStocks = parsed;
+      }
+    } catch (e) {}
+    const stockList = savedStocks.length > 0 ? savedStocks : liveStockRecords;
+    return stockList.filter((s: any) => {
       const matchFlock = isFlockMatch(s.flockId, s.flockName);
       const matchDate = isDateMatch(s.date);
       return matchFlock && matchDate;
@@ -182,14 +206,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return { totalEggs, morningEggs, eveningEggs, brokenEggs, cleanTrays, avgLaying, count: activeEggLogs.length };
   }, [activeEggLogs]);
 
-  // 2. Financial Metrics
+  // 2. Financial Metrics - Dynamically sums all sales, stocks, and expenses
   const dynamicFinance = useMemo(() => {
     const revenue = activeSales.reduce((sum, s) => sum + (s.amount || 0), 0);
     const itemsSold = activeSales.reduce((sum, s) => sum + (s.quantity || 0), 0);
     const online = activeSales.reduce((sum, s) => sum + (s.onlinePayment || 0), 0);
     const cash = activeSales.reduce((sum, s) => sum + (s.cashPayment || 0), 0);
 
-    // Expense: if 'all', Rs. 361.65M; if 'today', stock delivery or estimated daily expense
+    // Sum stock procurement disbursements in the active period
+    const stockExpense = activeStocks.reduce((sum, s: any) => sum + (s.amount || 0), 0);
+
+    // Sum user-added non-stock vouchers in financials
+    const userExpenses = financials
+      .filter((f) => f.type === 'Expense' && !f.id?.startsWith('exp-stock-'))
+      .reduce((sum, f) => {
+        const matchFlock = isFlockMatch(f.flockId, f.flockName);
+        const matchDate = isDateMatch(f.date);
+        return matchFlock && matchDate ? sum + (f.amount || 0) : sum;
+      }, 0);
+
     let expenses = 0;
     if (preset === 'all') {
       if (selectedFlock === 'all') {
@@ -201,15 +236,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       } else {
         expenses = unitWiseExpenseSummary['Unit 3']?.amount || 51483870;
       }
+      // Add any newly added user stocks and expenses to all-time
+      expenses += stockExpense > 0 ? (stockExpense - 282566219 > 0 ? stockExpense - 282566219 : 0) : 0;
+      expenses += userExpenses;
     } else {
-      // For today/filtered range: sum stock amounts in period + operational running costs
-      const stockExpense = activeStocks.reduce((sum, s) => sum + (s.amount || 0), 0);
-      expenses = stockExpense > 0 ? stockExpense : activeEggLogs.length * 3500;
+      // For today/filtered range: sum stock amounts in period + operational running costs + user vouchers
+      const baseExpense = stockExpense > 0 ? stockExpense : activeEggLogs.length * 3500;
+      expenses = baseExpense + userExpenses;
     }
 
     const net = revenue - expenses;
     return { revenue, itemsSold, online, cash, expenses, net, salesCount: activeSales.length };
-  }, [activeSales, activeStocks, activeEggLogs, preset, selectedFlock]);
+  }, [activeSales, activeStocks, activeEggLogs, financials, preset, selectedFlock]);
 
   // 3. Consumption Metrics
   const dynamicConsumption = useMemo(() => {
@@ -525,121 +563,205 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
         </div>
 
-        {/* Financial KPI Cards - Dynamically reflects Today vs Period */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-emerald-400 transition-colors">
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider">
-                {preset === 'today' ? "Today's Sales Revenue" : 'Period Sales Revenue'}
-              </span>
-              <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
-                <DollarSign className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-xl font-black text-emerald-700 font-mono">
-              Rs. {Math.round(dynamicFinance.revenue).toLocaleString()}
-            </div>
-            <div className="mt-1 flex items-center text-xs text-slate-500">
-              <span className="font-semibold text-emerald-700 mr-1">
-                {dynamicFinance.salesCount} Sales
-              </span>
-              <span>• {dynamicFinance.itemsSold.toLocaleString()} Items Sold</span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-rose-400 transition-colors">
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider">
-                {preset === 'today' ? "Today's Disbursements" : 'Period Farm Expenses'}
-              </span>
-              <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
-                <CreditCard className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-xl font-black text-slate-900 font-mono">
-              Rs. {Math.round(dynamicFinance.expenses).toLocaleString()}
-            </div>
-            <div className="mt-1 flex items-center text-xs text-slate-500">
-              <span className="font-semibold text-rose-600 mr-1">
-                {preset === 'today' ? 'Feed Stock / Operational' : '1,241 Vouchers'}
-              </span>
-              <span>• {scopeLabel}</span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-amber-400 transition-colors">
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider">
-                {preset === 'today' ? "Today's Net Balance" : 'Net Operating Position'}
-              </span>
-              <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
-                <Activity className="w-4 h-4" />
-              </div>
-            </div>
-            <div
-              className={`text-xl font-black font-mono ${
-                dynamicFinance.net >= 0 ? 'text-emerald-700' : 'text-rose-600'
-              }`}
-            >
-              {dynamicFinance.net < 0 ? '-' : ''}Rs. {Math.abs(Math.round(dynamicFinance.net)).toLocaleString()}
-            </div>
-            <div className="mt-1 flex items-center text-xs text-slate-500">
-              <span>{dynamicFinance.net >= 0 ? 'Operational Surplus' : 'Gross Procurement Adjusted'}</span>
-            </div>
-          </div>
-
-          {/* Dedicated One Bird Expense & Revenue Details Card */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-teal-400 transition-colors">
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider">
-                {preset === 'today' ? "1 Bird Today Economics" : "1 Bird Economics"}
-              </span>
-              <div className="p-1.5 rounded-lg bg-teal-50 text-teal-700">
-                <Scale className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-xl font-black text-emerald-800 font-mono">
-              Rs. {perBirdEconomics.revenuePerBird.toLocaleString()}{' '}
-              <span className="text-xs font-normal text-slate-500">rev/bird</span>
-            </div>
-            <div className="mt-1 space-y-0.5 text-xs text-slate-600">
-              <div className="flex justify-between">
-                <span>Expense / Bird:</span>
-                <span className="font-mono font-bold text-rose-600">
-                  Rs. {perBirdEconomics.expensePerBird.toLocaleString()}
+        {/* Financial KPI Cards - 3 in a Row with Bigger Fonts & Proper UI */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Card 1: Sales Revenue */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-emerald-400 hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                  {preset === 'today' ? "Today's Sales Revenue" : 'Period Sales Revenue'}
                 </span>
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                  <DollarSign className="w-5 h-5" />
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Net Margin / Bird:</span>
-                <span
-                  className={`font-mono font-bold ${
-                    perBirdEconomics.netPerBird >= 0 ? 'text-emerald-700' : 'text-rose-600'
+              <div className="mt-4">
+                <div className="text-2xl sm:text-3xl font-black text-emerald-800 font-mono tracking-tight">
+                  Rs. {Math.round(dynamicFinance.revenue).toLocaleString()}
+                </div>
+                <p className="text-xs font-semibold text-emerald-700 mt-1.5 flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>{dynamicFinance.salesCount} Completed Sales</span>
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+              <span>Dispatched Volume:</span>
+              <span className="font-bold text-slate-900 font-mono">
+                {dynamicFinance.itemsSold.toLocaleString()} units
+              </span>
+            </div>
+          </div>
+
+          {/* Card 2: Operating Expenses & Disbursements */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-rose-400 hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                  {preset === 'today' ? "Today's Disbursements" : 'Period Farm Expenses'}
+                </span>
+                <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="text-2xl sm:text-3xl font-black text-rose-700 font-mono tracking-tight">
+                  Rs. {Math.round(dynamicFinance.expenses).toLocaleString()}
+                </div>
+                <p className="text-xs font-semibold text-rose-600 mt-1.5 flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-rose-500"></span>
+                  <span>{preset === 'today' ? 'Feed Stock Delivery & Operations' : '21 Expense Heads • All Vouchers'}</span>
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+              <span>Active Scope:</span>
+              <span className="font-bold text-slate-900 truncate max-w-[170px]">
+                {scopeLabel}
+              </span>
+            </div>
+          </div>
+
+          {/* Card 3: Net Operating Position */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-amber-400 hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                  {preset === 'today' ? "Today's Net Balance" : 'Net Operating Position'}
+                </span>
+                <div className={`p-2 rounded-xl ${dynamicFinance.net >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
+                  <Activity className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <div
+                  className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
+                    dynamicFinance.net >= 0 ? 'text-emerald-800' : 'text-rose-700'
                   }`}
                 >
-                  {perBirdEconomics.netPerBird < 0 ? '-' : ''}Rs. {Math.abs(perBirdEconomics.netPerBird).toLocaleString()}
-                </span>
+                  {dynamicFinance.net < 0 ? '-' : '+'}Rs. {Math.abs(Math.round(dynamicFinance.net)).toLocaleString()}
+                </div>
+                <p className="text-xs font-semibold text-slate-600 mt-1.5 flex items-center gap-1.5">
+                  <span className={`inline-block w-2 h-2 rounded-full ${dynamicFinance.net >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                  <span>{dynamicFinance.net >= 0 ? 'Operational Surplus' : 'Gross Procurement Adjusted'}</span>
+                </p>
               </div>
-              <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-100 flex justify-between">
-                <span>Egg Output:</span>
-                <span className="font-mono font-semibold text-amber-700">
-                  {perBirdEconomics.eggsPerBird} eggs/bird
-                </span>
-              </div>
+            </div>
+            <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+              <span>Operating Margin:</span>
+              <span className={`font-bold font-mono ${dynamicFinance.net >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                {dynamicFinance.revenue > 0 ? `${((dynamicFinance.net / dynamicFinance.revenue) * 100).toFixed(1)}% Margin` : 'Reconciled'}
+              </span>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-blue-400 transition-colors">
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Payment Channels</span>
-              <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-                <Banknote className="w-4 h-4" />
+          {/* Card 4: 1-Bird Commercial Economics */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-teal-400 hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                  {preset === 'today' ? "1 Bird Today Economics" : "1 Bird Commercial Economics"}
+                </span>
+                <div className="p-2 rounded-xl bg-teal-50 text-teal-700">
+                  <Scale className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="text-2xl sm:text-3xl font-black text-emerald-800 font-mono tracking-tight">
+                  Rs. {perBirdEconomics.revenuePerBird.toLocaleString()}
+                  <span className="text-xs font-normal text-slate-500 ml-1.5">rev / bird</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Expense / Bird</span>
+                    <span className="font-bold text-rose-600 font-mono">
+                      Rs. {perBirdEconomics.expensePerBird.toLocaleString()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Net Margin / Bird</span>
+                    <span className={`font-bold font-mono ${perBirdEconomics.netPerBird >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {perBirdEconomics.netPerBird < 0 ? '-' : '+'}Rs. {Math.abs(perBirdEconomics.netPerBird).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="text-base font-bold text-slate-800 font-mono">
-              Cash: Rs. {Math.round(dynamicFinance.cash).toLocaleString()}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+              <span>Egg Production Yield:</span>
+              <span className="font-bold text-amber-700 font-mono">
+                {perBirdEconomics.eggsPerBird} eggs/bird
+              </span>
             </div>
-            <div className="mt-0.5 text-xs text-purple-700 font-mono font-semibold">
-              Online: Rs. {Math.round(dynamicFinance.online).toLocaleString()}
+          </div>
+
+          {/* Card 5: Payment Collections & Settlement */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-purple-400 hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                  Payment Channels &amp; Settlements
+                </span>
+                <div className="p-2 rounded-xl bg-purple-50 text-purple-700">
+                  <Banknote className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tracking-tight">
+                  Rs. {Math.round(dynamicFinance.cash + dynamicFinance.online).toLocaleString()}
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Cash Counter</span>
+                    <span className="font-bold text-emerald-700 font-mono">
+                      Rs. {Math.round(dynamicFinance.cash).toLocaleString()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-500 block">Bank / Online</span>
+                    <span className="font-bold text-purple-700 font-mono">
+                      Rs. {Math.round(dynamicFinance.online).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+              <span>Online Share:</span>
+              <span className="font-bold text-purple-800 font-mono">
+                {dynamicFinance.revenue > 0 ? `${((dynamicFinance.online / dynamicFinance.revenue) * 100).toFixed(1)}% settled online` : '0%'}
+              </span>
+            </div>
+          </div>
+
+          {/* Card 6: Feed Stock Procurement Logistics */}
+          <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-indigo-400 hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                  Feed Stock &amp; Logistics
+                </span>
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
+                  <Package className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="text-2xl sm:text-3xl font-black text-indigo-950 font-mono tracking-tight">
+                  {dynamicStock.bags.toLocaleString()}
+                  <span className="text-xs font-normal text-slate-500 ml-1.5">bags procured</span>
+                </div>
+                <p className="text-xs font-semibold text-indigo-700 mt-1.5 flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-indigo-500"></span>
+                  <span>{dynamicStock.shipments} Verified Shipments</span>
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+              <span>Feed Cost Disbursed:</span>
+              <span className="font-bold text-slate-900 font-mono">
+                Rs. {Math.round(dynamicStock.amount).toLocaleString()}
+              </span>
             </div>
           </div>
         </div>
@@ -863,22 +985,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {/* 3 UNITS PRODUCTION & TEMPERATURE CARDS - REACTIVE TO TODAY */}
         <div>
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center space-x-1.5">
-              <Building2 className="w-4 h-4 text-emerald-700" />
-              <span>Unit Environmental &amp; Production Telemetry (Unit 1, Unit 2, Unit 3)</span>
-            </h3>
-            <span className="text-xs text-slate-500 font-medium">
-              {preset === 'today' ? 'Displaying output for 24 Oct 2026' : 'Displaying period totals'}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center space-x-2">
+                <Building2 className="w-4 h-4 text-emerald-700" />
+                <span>Unit Environmental &amp; Production Telemetry (Unit 1, Unit 2, Unit 3)</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {preset === 'today'
+                  ? 'Real-time telemetry and operational yields for 24 Oct 2026'
+                  : 'Aggregated yield telemetry and environmental performance'}
+              </p>
+            </div>
+            <span className="text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full font-bold border border-emerald-200 self-start sm:self-auto">
+              {preset === 'today' ? 'Live Telemetry Active' : 'Period Overview'}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {unitCards.map((unit) => {
               const isSelected =
                 selectedFlock === unit.unit ||
-                selectedFlock === unit.id ||
-                selectedFlock === 'all';
+                selectedFlock === unit.id;
 
               const displayEggs =
                 preset === 'today' ? unit.todayEggs : unit.allTimeProduction;
@@ -893,124 +1021,160 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div
                   key={unit.unit}
                   onClick={() => setSelectedFlock(selectedFlock === unit.unit ? 'all' : unit.unit)}
-                  className={`bg-white rounded-2xl p-5 border transition-all cursor-pointer flex flex-col justify-between ${
-                    selectedFlock === unit.unit || selectedFlock === unit.id
-                      ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-md bg-emerald-50/10'
-                      : 'border-slate-200 hover:border-emerald-300 shadow-xs'
+                  className={`bg-white rounded-2xl p-6 border transition-all cursor-pointer flex flex-col justify-between hover:shadow-lg ${
+                    isSelected
+                      ? 'border-emerald-500 ring-2 ring-emerald-500/25 shadow-md bg-emerald-50/15'
+                      : 'border-slate-200 hover:border-emerald-300 shadow-sm'
                   }`}
                 >
                   <div>
-                    <div className="flex justify-between items-start mb-3">
+                    {/* Header: Bigger Title and Details */}
+                    <div className="flex justify-between items-start">
                       <div>
                         <div className="flex items-center space-x-2">
-                          <span className="text-base font-black text-slate-900">{unit.unit}</span>
-                          <span className="text-xs text-slate-500">({unit.shed})</span>
+                          <h4 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                            {unit.unit}
+                          </h4>
+                          <span className="text-xs font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 uppercase tracking-wider">
+                            {unit.shed}
+                          </span>
                         </div>
-                        <span className="text-[11px] text-slate-500 font-medium">{unit.breed}</span>
+                        <span className="text-xs text-slate-500 font-medium mt-1 block">
+                          {unit.breed}
+                        </span>
                       </div>
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          selectedFlock === unit.unit || selectedFlock === unit.id
+                        className={`text-xs font-black px-3 py-1 rounded-full shadow-2xs ${
+                          isSelected
                             ? 'bg-emerald-600 text-white'
                             : 'bg-emerald-100 text-emerald-800'
                         }`}
                       >
-                        {selectedFlock === unit.unit ? 'Selected Focus' : `${unit.birds.toLocaleString()} Birds`}
+                        {isSelected ? 'Selected Focus' : `${unit.birds.toLocaleString()} Birds`}
                       </span>
                     </div>
 
-                    {/* Live Temperature & Humidity Sensor Gauges */}
-                    <div className="grid grid-cols-2 gap-2 p-2.5 bg-slate-50 rounded-xl mb-4 border border-slate-100">
-                      <div className="flex items-center space-x-2">
-                        <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg">
-                          <Thermometer className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-slate-500 font-bold uppercase">Shed Temp</div>
-                          <div className="text-sm font-black text-slate-900 font-mono">
-                            {unit.temperature}°C
+                    {/* Section 1: Environmental Sensor Gauges */}
+                    <div className="mt-4 pt-3.5 border-t border-slate-200/80">
+                      <div className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2.5 flex items-center gap-1.5">
+                        <Thermometer className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Shed Climate Telemetry</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50/90 rounded-xl border border-slate-200/70">
+                        <div className="flex items-center space-x-2.5">
+                          <div className="p-2 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+                            <Thermometer className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Shed Temp</div>
+                            <div className="text-base font-black text-slate-900 font-mono">
+                              {unit.temperature}°C
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center space-x-2">
-                        <div className="p-1.5 bg-sky-100 text-sky-700 rounded-lg">
-                          <Droplets className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-slate-500 font-bold uppercase">Humidity</div>
-                          <div className="text-sm font-black text-slate-900 font-mono">
-                            {unit.humidity}% RH
+                        <div className="flex items-center space-x-2.5 border-l border-slate-200 pl-3">
+                          <div className="p-2 bg-sky-100 text-sky-700 rounded-lg shrink-0">
+                            <Droplets className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Humidity</div>
+                            <div className="text-base font-black text-slate-900 font-mono">
+                              {unit.humidity}% RH
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Dynamic Operational Yields */}
-                    <div className="space-y-2 text-xs border-t border-slate-100 pt-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-600">
-                          {preset === 'today' ? "Today's Production:" : 'Total Production:'}
-                        </span>
-                        <span className="font-bold text-amber-700 font-mono text-sm">
-                          {displayEggs.toLocaleString()} eggs
-                        </span>
+                    {/* Section 2: Production Yield & Commercial Turnover with Clean Dividers */}
+                    <div className="mt-4 pt-3.5 border-t border-slate-200/80">
+                      <div className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2.5 flex items-center gap-1.5">
+                        <Egg className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Production Yield &amp; Commercial Sales</span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-600">Clean Commercial Trays:</span>
-                        <span className="font-semibold text-slate-800 font-mono">
-                          {displayTrays.toLocaleString()} trays
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-600">Laying Efficiency:</span>
-                        <span className="font-bold text-emerald-700 font-mono">
-                          {displayLayRate}% rate
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-600">
-                          {preset === 'today' ? "Today's Egg Revenue:" : 'Sales Turnover:'}
-                        </span>
-                        <span className="font-bold text-slate-900 font-mono">
-                          Rs. {displayRevenue.toLocaleString()}
-                        </span>
-                      </div>
-
-                      {/* Flock-Specific One Bird Economics Sub-Card */}
-                      <div className="mt-2.5 pt-2 border-t border-slate-100 bg-slate-50/80 rounded-lg p-2">
-                        <div className="flex justify-between items-center text-[10px] font-bold uppercase text-slate-500 mb-1">
-                          <span className="flex items-center space-x-1">
-                            <Scale className="w-3 h-3 text-teal-600" />
-                            <span>1-Bird Economics</span>
+                      <div className="space-y-0 text-xs">
+                        {/* Row 1 */}
+                        <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">
+                            {preset === 'today' ? "Today's Egg Production:" : 'Period Egg Yield:'}
                           </span>
-                          <span className="font-mono text-emerald-700 font-semibold text-[10px]">
-                            {preset === 'today' ? 'Today' : 'Cumulative'}
+                          <span className="font-black text-amber-700 font-mono text-base">
+                            {displayEggs.toLocaleString()}{' '}
+                            <span className="text-xs font-normal text-slate-500">eggs</span>
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-[11px]">
-                          <div>
-                            <span className="text-slate-500 text-[10px] block">Rev / Bird:</span>
-                            <span className="font-bold font-mono text-emerald-700">
-                              Rs. {preset === 'today' ? unit.todayRevPerBird : unit.allTimeRevPerBird}
+
+                        {/* Row 2 */}
+                        <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">Clean Commercial Trays:</span>
+                          <span className="font-bold text-slate-900 font-mono text-sm">
+                            {displayTrays.toLocaleString()} trays
+                          </span>
+                        </div>
+
+                        {/* Row 3 */}
+                        <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">Laying Efficiency:</span>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-black text-emerald-700 font-mono text-sm">
+                              {displayLayRate}%
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800">
+                              Active
                             </span>
                           </div>
-                          <div>
-                            <span className="text-slate-500 text-[10px] block">Exp / Bird:</span>
-                            <span className="font-bold font-mono text-rose-600">
-                              Rs. {preset === 'today' ? unit.todayExpPerBird : unit.allTimeExpPerBird}
-                            </span>
-                          </div>
+                        </div>
+
+                        {/* Row 4 */}
+                        <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">
+                            {preset === 'today' ? "Today's Egg Revenue:" : 'Sales Turnover:'}
+                          </span>
+                          <span className="font-black text-slate-900 font-mono text-base">
+                            Rs. {displayRevenue.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Flock-Specific 1-Bird Economics */}
+                    <div className="mt-4 pt-3.5 border-t border-slate-200/80">
+                      <div className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+                        <span className="flex items-center space-x-1.5">
+                          <Scale className="w-3.5 h-3.5 text-teal-600" />
+                          <span>Flock 1-Bird Economics</span>
+                        </span>
+                        <span className="font-mono text-emerald-700 font-bold text-[10px]">
+                          {preset === 'today' ? 'Today' : 'Cumulative'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 p-3 bg-slate-50/90 rounded-xl border border-slate-200/70 text-xs">
+                        <div className="pr-3 border-r border-slate-200">
+                          <span className="text-[10px] text-slate-500 font-semibold block uppercase">Revenue / Bird</span>
+                          <span className="font-black font-mono text-emerald-700 text-sm mt-0.5 block">
+                            Rs. {preset === 'today' ? unit.todayRevPerBird : unit.allTimeRevPerBird}
+                          </span>
+                        </div>
+                        <div className="pl-3">
+                          <span className="text-[10px] text-slate-500 font-semibold block uppercase">Expense / Bird</span>
+                          <span className="font-black font-mono text-rose-600 text-sm mt-0.5 block">
+                            Rs. {preset === 'today' ? unit.todayExpPerBird : unit.allTimeExpPerBird}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                  {/* Section 4: Hardware & Shed Status Footer */}
+                  <div className="mt-5 pt-3.5 border-t border-slate-200/80 flex items-center justify-between text-xs">
                     <div className="flex items-center text-emerald-700 font-bold truncate">
-                      <CheckCircle className="w-3.5 h-3.5 mr-1 shrink-0" />
+                      <CheckCircle className="w-4 h-4 mr-1.5 shrink-0 text-emerald-600" />
                       <span className="truncate">{unit.status}</span>
                     </div>
+                    <span className="text-[11px] font-bold text-slate-400 hover:text-emerald-700 transition-colors shrink-0 ml-2">
+                      Click to filter &rarr;
+                    </span>
                   </div>
                 </div>
               );

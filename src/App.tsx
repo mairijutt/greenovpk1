@@ -653,7 +653,11 @@ export default function App() {
           )}
 
           {currentTab === 'stocks' && (
-            <StocksView inventory={inventory} onRestock={handleRestock} />
+            <StocksView
+              inventory={inventory}
+              onRestock={handleRestock}
+              onAddTransaction={handleAddTransaction}
+            />
           )}
 
           {currentTab === 'salaries' && (
