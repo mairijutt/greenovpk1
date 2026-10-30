@@ -14,6 +14,7 @@ interface HeaderProps {
   onOpenLogin: () => void;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  onNavigateHome?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenLogin,
   isSidebarOpen = false,
   onToggleSidebar,
+  onNavigateHome,
 }) => {
   return (
     <header className="bg-emerald-950 text-white border-b border-emerald-800/60 sticky top-0 z-30 shadow-md">
@@ -40,26 +42,34 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-600/30 border border-emerald-500/40 p-1 flex-shrink-0">
-              <img
-                src="/assets/greenova-logo-CHK5q5vz.png"
-                alt="GreenOva Logo"
-                className="h-full w-full object-contain"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-            </div>
-            <div>
-              <div className="flex items-center space-x-1.5 sm:space-x-2">
-                <span className="font-bold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">Intelligence Poultry</span>
-                <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Smart OS
-                </span>
+            <div
+              onClick={onNavigateHome}
+              className={`flex items-center space-x-2 sm:space-x-3 ${onNavigateHome ? 'cursor-pointer group' : ''}`}
+              title="Return to Dashboard"
+            >
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-600/30 border border-emerald-500/40 p-1 flex-shrink-0 group-hover:scale-105 transition-transform">
+                <img
+                  src="/assets/greenova-logo-CHK5q5vz.png"
+                  alt="GreenOva Logo"
+                  className="h-full w-full object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
               </div>
-              <p className="text-[11px] sm:text-xs text-emerald-300/80 hidden sm:block">
-                Smarter Poultry. Stronger Profits.
-              </p>
+              <div>
+                <div className="flex items-center space-x-1.5 sm:space-x-2">
+                  <span className="font-bold text-base sm:text-lg tracking-tight text-white whitespace-nowrap group-hover:text-emerald-300 transition-colors">
+                    Intelligence Poultry
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Smart OS
+                  </span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-emerald-300/80 hidden sm:block">
+                  Smarter Poultry. Stronger Profits.
+                </p>
+              </div>
             </div>
           </div>
 

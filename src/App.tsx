@@ -57,12 +57,42 @@ import {
   AdvanceSalaryRecord,
 } from './types/farm';
 
+const VALID_TABS: NavTab[] = [
+  'dashboard',
+  'flocks',
+  'egg-production',
+  'daily-consumption',
+  'bird-health',
+  'sales',
+  'expenses',
+  'stocks',
+  'salaries',
+  'reports',
+  'farms',
+  'users',
+];
+
+const getTabFromPath = (pathname: string): NavTab => {
+  try {
+    const clean = pathname.replace(/^\/+/, '').split('/')[0].trim().toLowerCase();
+    if (VALID_TABS.includes(clean as NavTab)) {
+      return clean as NavTab;
+    }
+  } catch (e) {}
+  return 'dashboard';
+};
+
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
+  const [currentTab, setCurrentTab] = useState<NavTab>(() => {
+    if (typeof window !== 'undefined') {
+      return getTabFromPath(window.location.pathname);
+    }
+    return 'dashboard';
+  });
   const [activeFarm, setActiveFarm] = useState<string>('all');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Authenticated user state - initialized to null so every page refresh requires login credentials
+  // Authenticated user state - restored from localStorage so refreshing page keeps session until manual logout
   const [currentUser, setCurrentUser] = useState<{
     name: string;
     email: string;
@@ -71,14 +101,60 @@ export default function App() {
     role?: string;
     emailVerified?: boolean;
     initials?: string;
-  } | null>(null);
-
-  useEffect(() => {
-    // Remove persistent user credentials from localStorage so login is required on each refresh
+  } | null>(() => {
     try {
-      localStorage.removeItem('greenova_user');
+      const saved = localStorage.getItem('greenova_user');
+      if (saved) {
+        return JSON.parse(saved);
+      }
     } catch (e) {}
-  }, []);
+    return null;
+  });
+
+  // Navigate tab and sync browser URL path (e.g., /dashboard, /sales, /flocks)
+  const handleNavigateTab = (tab: NavTab) => {
+    setCurrentTab(tab);
+    const targetPath = tab === 'dashboard' ? '/dashboard' : `/${tab}`;
+    if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
+      try {
+        window.history.pushState({ tab }, '', targetPath);
+      } catch (e) {}
+    }
+  };
+
+  // Keep browser URL path and history state in sync
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (currentUser) {
+      const currentPath = window.location.pathname;
+      const detectedTab = getTabFromPath(currentPath);
+      const expectedPath = detectedTab === 'dashboard' ? '/dashboard' : `/${detectedTab}`;
+      if (currentPath === '/' || currentPath === '' || currentPath === '/login') {
+        try {
+          window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
+        } catch (e) {}
+      } else if (currentPath !== expectedPath) {
+        try {
+          window.history.replaceState({ tab: detectedTab }, '', expectedPath);
+        } catch (e) {}
+      }
+    } else {
+      if (window.location.pathname !== '/login') {
+        try {
+          window.history.replaceState(null, '', '/login');
+        } catch (e) {}
+      }
+    }
+
+    const handlePopState = () => {
+      const tab = getTabFromPath(window.location.pathname);
+      setCurrentTab(tab);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentUser]);
 
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [recordModalType, setRecordModalType] = useState<'egg' | 'mortality' | 'feed' | null>(null);
@@ -518,10 +594,15 @@ export default function App() {
     );
   };
 
-  // Sign out handler
+  // Sign out handler - explicitly removes session and redirects to /login
   const handleSignOut = () => {
-    localStorage.removeItem('greenova_user');
+    try {
+      localStorage.removeItem('greenova_user');
+    } catch (e) {}
     setCurrentUser(null);
+    try {
+      window.history.pushState(null, '', '/login');
+    } catch (e) {}
   };
 
   // Update profile handler
@@ -535,7 +616,9 @@ export default function App() {
   }) => {
     setCurrentUser((prev) => {
       const next = prev ? { ...prev, ...updated } : { ...updated };
-      localStorage.setItem('greenova_user', JSON.stringify(next));
+      try {
+        localStorage.setItem('greenova_user', JSON.stringify(next));
+      } catch (e) {}
       return next;
     });
   };
@@ -555,6 +638,14 @@ export default function App() {
             emailVerified: true,
           };
           setCurrentUser(profile);
+          try {
+            localStorage.setItem('greenova_user', JSON.stringify(profile));
+          } catch (e) {}
+          const targetTab = currentTab && currentTab !== 'dashboard' ? currentTab : 'dashboard';
+          const targetPath = targetTab === 'dashboard' ? '/dashboard' : `/${targetTab}`;
+          try {
+            window.history.pushState({ tab: targetTab }, '', targetPath);
+          } catch (e) {}
         }}
       />
     );
@@ -569,6 +660,7 @@ export default function App() {
         onOpenLogin={() => setShowLoginModal(true)}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        onNavigateHome={() => handleNavigateTab('dashboard')}
       />
 
       {/* Main Body */}
@@ -576,7 +668,7 @@ export default function App() {
         {/* Navigation Sidebar matching live menu */}
         <Sidebar
           currentTab={currentTab}
-          onSelectTab={(tab) => setCurrentTab(tab)}
+          onSelectTab={handleNavigateTab}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           currentUser={currentUser}
@@ -595,7 +687,7 @@ export default function App() {
               consumptionLogs={consumptionLogs}
               financials={financials}
               onOpenRecordModal={(type) => setRecordModalType(type)}
-              onNavigateTab={(tab) => setCurrentTab(tab)}
+              onNavigateTab={handleNavigateTab}
             />
           )}
 
