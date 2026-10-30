@@ -364,7 +364,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
   }, [liveBirdsCount, dynamicFinance, dynamicConsumption, dynamicEggs]);
 
-  // Fully Dynamic 3-Unit Telemetry cards
+  // Dedicated helper to strictly match a record to a specific unit (ignoring selectedFlock filter)
+  const isRecordForUnit = (recordFid: any, recordFname: any, unitId: string, unitName: string) => {
+    const fidStr = String(recordFid || '').trim().toLowerCase();
+    const fnameStr = String(recordFname || '').trim().toLowerCase();
+    if (unitId === '8' || unitName === 'Unit 1') {
+      return fidStr === '8' || fnameStr.includes('unit 1') || fnameStr === 'shed 1';
+    }
+    if (unitId === '9' || unitName === 'Unit 2') {
+      return fidStr === '9' || fnameStr.includes('unit 2') || fnameStr === 'shed 2';
+    }
+    if (unitId === '10' || unitName === 'Unit 3') {
+      return fidStr === '10' || fnameStr.includes('unit 3') || fnameStr === 'shed 3';
+    }
+    return fidStr === unitId.toLowerCase() || fnameStr.includes(unitName.toLowerCase());
+  };
+
+  // Fully Dynamic 3-Unit Telemetry cards - ALWAYS strictly Unit 1, Unit 2, Unit 3 specific
   const unitCards = useMemo(() => {
     const units = [
       {
@@ -411,33 +427,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       },
     ];
 
+    // All sales in the active date range (unfiltered by selectedFlock so each card gets its unit's sales)
+    const allPeriodSales = [
+      ...financials.filter((f) => f.type === 'Income'),
+      ...liveSalesRecords.filter((ls) => !financials.some((f) => f.id === ls.id)),
+    ].filter((s) => isDateMatch(s.date));
+
+    // All egg logs in the active date range
+    const sourceEggs = eggProductions && eggProductions.length > 0 ? eggProductions : liveEggProductions;
+    const allPeriodEggs = sourceEggs.filter((e) => isDateMatch(e.date));
+
     return units.map((u) => {
-      // Unit eggs
-      const sourceEggs = eggProductions && eggProductions.length > 0 ? eggProductions : liveEggProductions;
-      const unitEggLogs = sourceEggs.filter((e) => isFlockMatch(u.id, u.unit) && isDateMatch(e.date));
+      // Filter specifically for this unit only
+      const unitEggLogs = allPeriodEggs.filter((e) => isRecordForUnit(e.flockId, e.flockName, u.id, u.unit));
       const eggs = unitEggLogs.reduce((sum, e) => sum + (e.totalEggs || 0), 0);
       const cleanTrays = unitEggLogs.reduce(
         (sum, e) => sum + (e.cleanTrays || Math.floor((e.totalEggs - (e.damagedEggs || 0)) / 30)),
         0
       );
-      const broken = unitEggLogs.reduce((sum, e) => sum + (e.damagedEggs || 0), 0);
+      const broken = unitEggLogs.reduce((sum, e: any) => sum + (e.damagedEggs || e.brokenEggs || 0), 0);
       const avgLay =
         unitEggLogs.length > 0
           ? Number((unitEggLogs.reduce((sum, e) => sum + (e.layingRatePercent || 0), 0) / unitEggLogs.length).toFixed(1))
           : Number(((eggs / u.birds) * 100).toFixed(1));
 
-      // Unit sales
-      const unitSales = activeSales.filter((s: any) => isFlockMatch(u.id, u.unit));
+      // Unit sales specifically for this unit
+      const unitSales = allPeriodSales.filter((s: any) => isRecordForUnit(s.flockId, s.flockName || s.flock, u.id, u.unit));
       const revenue = unitSales.reduce((sum, s) => sum + (s.amount || 0), 0);
 
-      // Unit expenses
+      // Unit expenses based on preset
       let expenses = 0;
       if (preset === 'all' && !fromDate && !toDate) {
         expenses = u.allTimeExp;
       } else if (preset === 'today') {
         expenses = u.dailyBags * 5850;
       } else {
-        const days = Math.max(1, Math.min(30, unitEggLogs.length));
+        const days = Math.max(1, Math.min(30, unitEggLogs.length > 0 ? unitEggLogs.length : 30));
         expenses = u.dailyBags * 5850 * days;
       }
 
@@ -481,7 +506,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         status: u.status,
       };
     });
-  }, [eggProductions, activeSales, preset, fromDate, toDate]);
+  }, [eggProductions, financials, preset, fromDate, toDate]);
 
   // Month-by-month financial ledger (Apr – Oct 2026)
   const monthlyFinanceData = [
