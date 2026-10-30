@@ -1028,29 +1028,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   }`}
                 >
                   <div>
-                    {/* Header: Bigger Title and Details */}
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h4 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                            {unit.unit}
-                          </h4>
-                          <span className="text-xs font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 uppercase tracking-wider">
-                            {unit.shed}
-                          </span>
-                        </div>
-                        <span className="text-xs text-slate-500 font-medium mt-1 block">
-                          {unit.breed}
+                    {/* Header: All in one single row with refined font size */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <h4 className="text-base sm:text-lg font-black text-slate-900 tracking-tight whitespace-nowrap">
+                          {unit.unit}
+                        </h4>
+                        <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 uppercase tracking-wider whitespace-nowrap">
+                          {unit.shed}
+                        </span>
+                        <span
+                          className={`text-xs font-bold px-2 py-0.5 rounded-full shadow-2xs whitespace-nowrap ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {unit.birds.toLocaleString()} Birds
                         </span>
                       </div>
-                      <span
-                        className={`text-xs font-black px-3 py-1 rounded-full shadow-2xs ${
-                          isSelected
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {isSelected ? 'Selected Focus' : `${unit.birds.toLocaleString()} Birds`}
+                      <span className="text-xs text-slate-500 font-semibold truncate text-right ml-1" title={unit.breed}>
+                        {unit.breed}
                       </span>
                     </div>
 
