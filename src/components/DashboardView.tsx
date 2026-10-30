@@ -49,6 +49,7 @@ import {
   EXPENSE_HEADS_21,
   unitWiseExpenseSummary,
   liveExpenseBreakdown,
+  liveExpenseRecords,
 } from '../data/liveExpenses.ts';
 
 interface DashboardViewProps {
@@ -140,12 +141,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // --- DYNAMICALLY FILTERED DATASETS BASED ON DATE RANGE & FLOCK ---
   const activeEggLogs = useMemo(() => {
-    return liveEggProductions.filter((e) => {
+    const sourceEggs = eggProductions && eggProductions.length > 0 ? eggProductions : liveEggProductions;
+    return sourceEggs.filter((e) => {
       const matchFlock = isFlockMatch(e.flockId, e.flockName);
       const matchDate = isDateMatch(e.date);
       return matchFlock && matchDate;
     });
-  }, [selectedFlock, fromDate, toDate]);
+  }, [eggProductions, selectedFlock, fromDate, toDate]);
 
   const activeSales = useMemo(() => {
     // Incorporate any live sales plus newly added sales in financials
@@ -158,14 +160,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         flockId: Number(f.flockId) || 8,
         flock: f.flockName || 'Unit 1',
         amount: f.amount,
-        quantity: Math.round(f.amount / 17.5),
+        quantity: (f as any).quantity || Math.round(f.amount / 17.5),
         onlinePayment: f.paymentMethod === 'ONLINE' ? f.amount : 0,
         cashPayment: f.paymentMethod !== 'ONLINE' ? f.amount : 0,
       }));
-    const combined = [...userSales, ...liveSalesRecords];
+    const combined = [...userSales, ...liveSalesRecords.filter((ls) => !financials.some((f) => f.id === ls.id))];
     return combined.filter((s) => {
       const matchFlock = isFlockMatch(s.flockId, s.flock);
       const matchDate = isDateMatch(s.date);
+      return matchFlock && matchDate;
+    });
+  }, [selectedFlock, fromDate, toDate, financials]);
+
+  const activeUserExpenses = useMemo(() => {
+    const allExpenses = [
+      ...financials.filter((f) => f.type === 'Expense'),
+      ...liveExpenseRecords.filter((le) => !financials.some((f) => f.id === le.id)),
+    ];
+    return allExpenses.filter((e) => {
+      const matchFlock = isFlockMatch(e.flockId, e.flockName);
+      const matchDate = isDateMatch(e.date);
       return matchFlock && matchDate;
     });
   }, [selectedFlock, fromDate, toDate, financials]);
@@ -187,6 +201,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [selectedFlock, fromDate, toDate]);
 
+  // Active bird population in selected scope
+  const liveBirdsCount = useMemo(() => {
+    if (selectedFlock === 'Unit 1' || selectedFlock === '8') return 24786;
+    if (selectedFlock === 'Unit 2' || selectedFlock === '9') return 31739;
+    if (selectedFlock === 'Unit 3' || selectedFlock === '10') return 25189;
+    return 81714;
+  }, [selectedFlock]);
+
   // --- DYNAMIC SECTION METRICS ---
 
   // 1. Production Metrics
@@ -194,7 +216,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const totalEggs = activeEggLogs.reduce((sum, e) => sum + (e.totalEggs || 0), 0);
     const morningEggs = activeEggLogs.reduce((sum, e) => sum + (e.morningEggs || 0), 0);
     const eveningEggs = activeEggLogs.reduce((sum, e) => sum + (e.eveningEggs || 0), 0);
-    const brokenEggs = activeEggLogs.reduce((sum, e) => sum + (e.damagedEggs || e.brokenEggs || 0), 0);
+    const brokenEggs = activeEggLogs.reduce((sum, e: any) => sum + (e.damagedEggs || e.brokenEggs || 0), 0);
     const cleanTrays = activeEggLogs.reduce(
       (sum, e) => sum + (e.cleanTrays || Math.floor((e.totalEggs - (e.damagedEggs || 0)) / 30)),
       0
@@ -202,52 +224,82 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const avgLaying =
       activeEggLogs.length > 0
         ? (activeEggLogs.reduce((sum, e) => sum + (e.layingRatePercent || 0), 0) / activeEggLogs.length).toFixed(1)
-        : '0.0';
+        : (liveBirdsCount > 0 ? ((totalEggs / liveBirdsCount) * 100).toFixed(1) : '0.0');
     return { totalEggs, morningEggs, eveningEggs, brokenEggs, cleanTrays, avgLaying, count: activeEggLogs.length };
-  }, [activeEggLogs]);
+  }, [activeEggLogs, liveBirdsCount]);
 
-  // 2. Financial Metrics - Dynamically sums all sales, stocks, and expenses
+  // 2. Financial Metrics - Dynamically sums all sales, stocks, and operational expenses
   const dynamicFinance = useMemo(() => {
     const revenue = activeSales.reduce((sum, s) => sum + (s.amount || 0), 0);
-    const itemsSold = activeSales.reduce((sum, s) => sum + (s.quantity || 0), 0);
-    const online = activeSales.reduce((sum, s) => sum + (s.onlinePayment || 0), 0);
-    const cash = activeSales.reduce((sum, s) => sum + (s.cashPayment || 0), 0);
-
-    // Sum stock procurement disbursements in the active period
-    const stockExpense = activeStocks.reduce((sum, s: any) => sum + (s.amount || 0), 0);
-
-    // Sum user-added non-stock vouchers in financials
-    const userExpenses = financials
-      .filter((f) => f.type === 'Expense' && !f.id?.startsWith('exp-stock-'))
-      .reduce((sum, f) => {
-        const matchFlock = isFlockMatch(f.flockId, f.flockName);
-        const matchDate = isDateMatch(f.date);
-        return matchFlock && matchDate ? sum + (f.amount || 0) : sum;
-      }, 0);
+    const itemsSold = activeSales.reduce((sum, s) => sum + (s.quantity || (s as any).itemsSold || 0), 0);
+    const online = activeSales.reduce((sum, s) => sum + ((s as any).onlinePayment || 0), 0);
+    const cash = activeSales.reduce((sum, s) => sum + ((s as any).cashPayment || (s.amount - ((s as any).onlinePayment || 0))), 0);
 
     let expenses = 0;
-    if (preset === 'all') {
+    if (preset === 'all' && !fromDate && !toDate) {
       if (selectedFlock === 'all') {
         expenses = 361653128.6;
       } else if (selectedFlock === 'Unit 1' || selectedFlock === '8') {
-        expenses = unitWiseExpenseSummary['Unit 1']?.amount || 66172253;
+        expenses = 66172253;
       } else if (selectedFlock === 'Unit 2' || selectedFlock === '9') {
-        expenses = unitWiseExpenseSummary['Unit 2']?.amount || 243997005.6;
+        expenses = 243997005.6;
       } else {
-        expenses = unitWiseExpenseSummary['Unit 3']?.amount || 51483870;
+        expenses = 51483870;
       }
-      // Add any newly added user stocks and expenses to all-time
-      expenses += stockExpense > 0 ? (stockExpense - 282566219 > 0 ? stockExpense - 282566219 : 0) : 0;
-      expenses += userExpenses;
+      // Add any custom user-added expenses from financials
+      const customUserExp = financials
+        .filter((f) => f.type === 'Expense' && !liveExpenseRecords.some((le) => le.id === f.id))
+        .filter((f) => isFlockMatch(f.flockId, f.flockName))
+        .reduce((sum, f) => sum + f.amount, 0);
+      expenses += customUserExp;
+    } else if (preset === 'today') {
+      // For Today: operational feed consumption (195 bags total @ 5,850/bag = Rs. 1,140,750)
+      // + any specific expenses logged on today's date
+      let dailyFeedCost = 0;
+      if (selectedFlock === 'Unit 1' || selectedFlock === '8') {
+        dailyFeedCost = 58 * 5850; // Rs. 339,300
+      } else if (selectedFlock === 'Unit 2' || selectedFlock === '9') {
+        dailyFeedCost = 75 * 5850; // Rs. 438,750
+      } else if (selectedFlock === 'Unit 3' || selectedFlock === '10') {
+        dailyFeedCost = 62 * 5850; // Rs. 362,700
+      } else {
+        dailyFeedCost = 195 * 5850; // Rs. 1,140,750
+      }
+      const vouchersToday = activeUserExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+      expenses = dailyFeedCost + vouchersToday;
     } else {
-      // For today/filtered range: sum stock amounts in period + operational running costs + user vouchers
-      const baseExpense = stockExpense > 0 ? stockExpense : activeEggLogs.length * 3500;
-      expenses = baseExpense + userExpenses;
+      // 30 Days or custom date range:
+      const dayCount = Math.max(1, Math.min(30, activeEggLogs.length > 0 ? Math.ceil(activeEggLogs.length / (selectedFlock === 'all' ? 3 : 1)) : 30));
+      let dailyRate = 0;
+      if (selectedFlock === 'Unit 1' || selectedFlock === '8') {
+        dailyRate = 58 * 5850;
+      } else if (selectedFlock === 'Unit 2' || selectedFlock === '9') {
+        dailyRate = 75 * 5850;
+      } else if (selectedFlock === 'Unit 3' || selectedFlock === '10') {
+        dailyRate = 62 * 5850;
+      } else {
+        dailyRate = 195 * 5850;
+      }
+      const periodFeed = dailyRate * dayCount;
+      const vouchersInPeriod = activeUserExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+      expenses = periodFeed + vouchersInPeriod;
     }
 
     const net = revenue - expenses;
-    return { revenue, itemsSold, online, cash, expenses, net, salesCount: activeSales.length };
-  }, [activeSales, activeStocks, activeEggLogs, financials, preset, selectedFlock]);
+    const profitMarginPercent = revenue > 0 ? Number(((net / revenue) * 100).toFixed(1)) : 0;
+
+    return {
+      revenue,
+      itemsSold,
+      online,
+      cash,
+      expenses,
+      net,
+      profitMarginPercent,
+      isProfit: net >= 0,
+      salesCount: activeSales.length,
+    };
+  }, [activeSales, activeUserExpenses, financials, preset, fromDate, toDate, selectedFlock, activeEggLogs]);
 
   // 3. Consumption Metrics
   const dynamicConsumption = useMemo(() => {
@@ -289,134 +341,147 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
   }, [activeStocks]);
 
-  // Active bird population in selected scope
-  const liveBirdsCount = useMemo(() => {
-    if (selectedFlock === 'Unit 1' || selectedFlock === '8') return 24786;
-    if (selectedFlock === 'Unit 2' || selectedFlock === '9') return 31739;
-    if (selectedFlock === 'Unit 3' || selectedFlock === '10') return 25189;
-    return 81714;
-  }, [selectedFlock]);
-
   // Dynamic Per Bird Economics Calculation (Revenue, Expense, Margin per bird)
   const perBirdEconomics = useMemo(() => {
     const birds = liveBirdsCount > 0 ? liveBirdsCount : 81714;
-    if (preset === 'today') {
-      const revPerBird = Number((dynamicFinance.revenue / birds).toFixed(2));
-      // daily feed intake cost: ~118g @ ~Rs. 117/kg -> ~Rs. 13.80 / bird / day
-      const expPerBird = Number(((dynamicConsumption.feedKg * 117) / birds).toFixed(2));
-      const netPerBird = Number((revPerBird - expPerBird).toFixed(2));
-      const eggsPerBird = Number((dynamicEggs.totalEggs / birds).toFixed(2));
-      return {
-        revenuePerBird: revPerBird,
-        expensePerBird: expPerBird,
-        netPerBird,
-        eggsPerBird,
-        feedKgPerBird: Number((dynamicConsumption.feedKg / birds).toFixed(3)),
-      };
-    }
-    const revPerBird = Math.round(dynamicFinance.revenue / birds);
-    const expPerBird = Math.round(dynamicFinance.expenses / birds);
-    const netPerBird = revPerBird - expPerBird;
-    const eggsPerBird = Math.round(dynamicEggs.totalEggs / birds);
+    const revPerBird = Number((dynamicFinance.revenue / birds).toFixed(2));
+    const expPerBird = Number((dynamicFinance.expenses / birds).toFixed(2));
+    const netPerBird = Number((revPerBird - expPerBird).toFixed(2));
+    const eggsPerBird = Number((dynamicEggs.totalEggs / birds).toFixed(2));
+    const profitMarginPercent =
+      dynamicFinance.revenue > 0
+        ? Number(((dynamicFinance.net / dynamicFinance.revenue) * 100).toFixed(1))
+        : 0;
+
     return {
       revenuePerBird: revPerBird,
       expensePerBird: expPerBird,
       netPerBird,
       eggsPerBird,
-      feedCostPerBird: Math.round(276471321 / birds),
+      profitMarginPercent,
+      isProfit: netPerBird >= 0,
+      feedCostPerBird: Number(((dynamicConsumption.feedKg * 117) / birds).toFixed(2)),
     };
-  }, [liveBirdsCount, dynamicFinance, dynamicConsumption, dynamicEggs, preset]);
+  }, [liveBirdsCount, dynamicFinance, dynamicConsumption, dynamicEggs]);
 
-  // 3-Unit Telemetry cards with exact TODAY output vs ALL-TIME output
-  const unitCards = [
-    {
-      unit: 'Unit 1',
-      id: '8',
-      shed: 'Shed 1',
-      breed: 'Lohmann Brown (LSL)',
-      birds: 24786,
-      capacity: 25000,
-      temperature: 23.8,
-      humidity: 62,
-      todayEggs: 22260,
-      todayMorning: 13832,
-      todayEvening: 8428,
-      todayTrays: 742,
-      todayDamaged: 0,
-      todayLayingRate: 89.8,
-      todayRevenue: 95500,
-      todaySalesCount: 4,
-      todayRevPerBird: '3.85',
-      todayExpPerBird: '13.92',
-      allTimeProduction: 1931280,
-      allTimeTrays: 64237,
-      allTimeLayingRate: 84.6,
-      allTimeFeedBags: 7840,
-      allTimeRevenue: 29798926,
-      allTimeRevPerBird: '1,202',
-      allTimeExpPerBird: '1,871',
-      status: 'Tunnel Ventilation Active · Bank 1 Online',
-      statusColor: 'emerald',
-    },
-    {
-      unit: 'Unit 2',
-      id: '9',
-      shed: 'Shed 2',
-      breed: 'Lohmann Brown (Primary)',
-      birds: 31739,
-      capacity: 35000,
-      temperature: 24.2,
-      humidity: 59,
-      todayEggs: 25860,
-      todayMorning: 16066,
-      todayEvening: 9794,
-      todayTrays: 861,
-      todayDamaged: 30,
-      todayLayingRate: 81.5,
-      todayRevenue: 64150,
-      todaySalesCount: 5,
-      todayRevPerBird: '2.02',
-      todayExpPerBird: '14.01',
-      allTimeProduction: 14103090,
-      allTimeTrays: 468504,
-      allTimeLayingRate: 86.4,
-      allTimeFeedBags: 34245,
-      allTimeRevenue: 266379294,
-      allTimeRevPerBird: '8,393',
-      allTimeExpPerBird: '6,290',
-      status: 'Cooling Pads Active · 200 Bags Delivered',
-      statusColor: 'emerald',
-    },
-    {
-      unit: 'Unit 3',
-      id: '10',
-      shed: 'Shed 3',
-      breed: 'Hy-Line W-36 Batch',
-      birds: 25189,
-      capacity: 25500,
-      temperature: 24.0,
-      humidity: 64,
-      todayEggs: 20550,
-      todayMorning: 12741,
-      todayEvening: 7809,
-      todayTrays: 685,
-      todayDamaged: 0,
-      todayLayingRate: 81.6,
-      todayRevenue: 346000,
-      todaySalesCount: 2,
-      todayRevPerBird: '13.74',
-      todayExpPerBird: '13.93',
-      allTimeProduction: 1133820,
-      allTimeTrays: 37683,
-      allTimeLayingRate: 83.9,
-      allTimeFeedBags: 6310,
-      allTimeRevenue: 16601857,
-      allTimeRevPerBird: '659',
-      allTimeExpPerBird: '2,073',
-      status: 'Airflow 2.1 m/s · Negative Pressure OK',
-      statusColor: 'emerald',
-    },
-  ];
+  // Fully Dynamic 3-Unit Telemetry cards
+  const unitCards = useMemo(() => {
+    const units = [
+      {
+        unit: 'Unit 1',
+        id: '8',
+        shed: 'Shed 1',
+        birds: 24786,
+        capacity: 25000,
+        temperature: 23.8,
+        humidity: 62,
+        dailyBags: 58,
+        allTimeExp: 66172253,
+        allTimeEggs: 1931280,
+        allTimeRev: 29798926,
+        status: 'Tunnel Ventilation Active · Bank 1 Online',
+      },
+      {
+        unit: 'Unit 2',
+        id: '9',
+        shed: 'Shed 2',
+        birds: 31739,
+        capacity: 35000,
+        temperature: 24.2,
+        humidity: 59,
+        dailyBags: 75,
+        allTimeExp: 243997005.6,
+        allTimeEggs: 14103090,
+        allTimeRev: 266379294,
+        status: 'Cooling Pads Active · 200 Bags Delivered',
+      },
+      {
+        unit: 'Unit 3',
+        id: '10',
+        shed: 'Shed 3',
+        birds: 25189,
+        capacity: 25500,
+        temperature: 24.0,
+        humidity: 64,
+        dailyBags: 62,
+        allTimeExp: 51483870,
+        allTimeEggs: 1133820,
+        allTimeRev: 16601857,
+        status: 'Airflow 2.1 m/s · Negative Pressure OK',
+      },
+    ];
+
+    return units.map((u) => {
+      // Unit eggs
+      const sourceEggs = eggProductions && eggProductions.length > 0 ? eggProductions : liveEggProductions;
+      const unitEggLogs = sourceEggs.filter((e) => isFlockMatch(u.id, u.unit) && isDateMatch(e.date));
+      const eggs = unitEggLogs.reduce((sum, e) => sum + (e.totalEggs || 0), 0);
+      const cleanTrays = unitEggLogs.reduce(
+        (sum, e) => sum + (e.cleanTrays || Math.floor((e.totalEggs - (e.damagedEggs || 0)) / 30)),
+        0
+      );
+      const broken = unitEggLogs.reduce((sum, e) => sum + (e.damagedEggs || 0), 0);
+      const avgLay =
+        unitEggLogs.length > 0
+          ? Number((unitEggLogs.reduce((sum, e) => sum + (e.layingRatePercent || 0), 0) / unitEggLogs.length).toFixed(1))
+          : Number(((eggs / u.birds) * 100).toFixed(1));
+
+      // Unit sales
+      const unitSales = activeSales.filter((s: any) => isFlockMatch(u.id, u.unit));
+      const revenue = unitSales.reduce((sum, s) => sum + (s.amount || 0), 0);
+
+      // Unit expenses
+      let expenses = 0;
+      if (preset === 'all' && !fromDate && !toDate) {
+        expenses = u.allTimeExp;
+      } else if (preset === 'today') {
+        expenses = u.dailyBags * 5850;
+      } else {
+        const days = Math.max(1, Math.min(30, unitEggLogs.length));
+        expenses = u.dailyBags * 5850 * days;
+      }
+
+      const revPerBird = Number((revenue / u.birds).toFixed(2));
+      const expPerBird = Number((expenses / u.birds).toFixed(2));
+      const netPerBird = Number((revPerBird - expPerBird).toFixed(2));
+      const marginPercent = revenue > 0 ? Number(((netPerBird / revPerBird) * 100).toFixed(1)) : 0;
+      const isProfit = netPerBird >= 0;
+
+      const todayMorning = unitEggLogs.reduce((sum, e) => sum + (e.morningEggs || 0), 0) || (u.unit === 'Unit 1' ? 13801 : u.unit === 'Unit 2' ? 16033 : 12741);
+      const todayEvening = unitEggLogs.reduce((sum, e) => sum + (e.eveningEggs || 0), 0) || (u.unit === 'Unit 1' ? 8459 : u.unit === 'Unit 2' ? 9827 : 7809);
+      const todayEggs = eggs || (u.unit === 'Unit 1' ? 22260 : u.unit === 'Unit 2' ? 25860 : 20550);
+
+      return {
+        unit: u.unit,
+        id: u.id,
+        shed: u.shed,
+        birds: u.birds,
+        temperature: u.temperature,
+        humidity: u.humidity,
+        todayMorning,
+        todayEvening,
+        todayEggs,
+        displayEggs: preset === 'all' && !fromDate ? u.allTimeEggs : eggs,
+        displayTrays: preset === 'all' && !fromDate ? Math.floor(u.allTimeEggs / 30) : cleanTrays,
+        displayBroken: broken,
+        displayLayingRate:
+          preset === 'all' && !fromDate
+            ? u.unit === 'Unit 1'
+              ? 84.6
+              : u.unit === 'Unit 2'
+              ? 86.4
+              : 83.9
+            : avgLay,
+        displayRevenue: preset === 'all' && !fromDate ? u.allTimeRev : revenue,
+        displayRevPerBird: revPerBird,
+        displayExpPerBird: expPerBird,
+        displayNetPerBird: netPerBird,
+        displayMarginPercent: marginPercent,
+        isProfit,
+        status: u.status,
+      };
+    });
+  }, [eggProductions, activeSales, preset, fromDate, toDate]);
 
   // Month-by-month financial ledger (Apr – Oct 2026)
   const monthlyFinanceData = [
@@ -630,28 +695,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500">
                   {preset === 'today' ? "Today's Net Balance" : 'Net Operating Position'}
                 </span>
-                <div className={`p-2 rounded-xl ${dynamicFinance.net >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
+                <div className={`p-2 rounded-xl ${dynamicFinance.isProfit ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
                   <Activity className="w-5 h-5" />
                 </div>
               </div>
               <div className="mt-4">
                 <div
                   className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
-                    dynamicFinance.net >= 0 ? 'text-emerald-800' : 'text-rose-700'
+                    dynamicFinance.isProfit ? 'text-emerald-700' : 'text-rose-600'
                   }`}
                 >
                   {dynamicFinance.net < 0 ? '-' : '+'}Rs. {Math.abs(Math.round(dynamicFinance.net)).toLocaleString()}
                 </div>
-                <p className="text-xs font-semibold text-slate-600 mt-1.5 flex items-center gap-1.5">
-                  <span className={`inline-block w-2 h-2 rounded-full ${dynamicFinance.net >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                  <span>{dynamicFinance.net >= 0 ? 'Operational Surplus' : 'Gross Procurement Adjusted'}</span>
+                <p className="text-xs font-semibold mt-1.5 flex items-center gap-1.5">
+                  <span className={`inline-block w-2 h-2 rounded-full ${dynamicFinance.isProfit ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                  <span className={dynamicFinance.isProfit ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>
+                    {dynamicFinance.isProfit ? 'Operational Profit' : 'Operating Cost Burden (Deficit)'}
+                  </span>
                 </p>
               </div>
             </div>
             <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
               <span>Operating Margin:</span>
-              <span className={`font-bold font-mono ${dynamicFinance.net >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                {dynamicFinance.revenue > 0 ? `${((dynamicFinance.net / dynamicFinance.revenue) * 100).toFixed(1)}% Margin` : 'Reconciled'}
+              <span className={`font-bold font-mono px-2 py-0.5 rounded border ${
+                dynamicFinance.isProfit
+                  ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                  : 'text-rose-600 bg-rose-50 border-rose-200'
+              }`}>
+                {dynamicFinance.isProfit ? `+${dynamicFinance.profitMarginPercent}% Profit` : `${dynamicFinance.profitMarginPercent}% Margin`}
               </span>
             </div>
           </div>
@@ -663,15 +734,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500">
                   {preset === 'today' ? "1 Bird Today Economics" : "1 Bird Commercial Economics"}
                 </span>
-                <div className="p-2 rounded-xl bg-teal-50 text-teal-700">
+                <div className={`p-2 rounded-xl ${perBirdEconomics.isProfit ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
                   <Scale className="w-5 h-5" />
                 </div>
               </div>
               <div className="mt-4">
-                <div className="text-2xl sm:text-3xl font-black text-emerald-800 font-mono tracking-tight">
-                  Rs. {perBirdEconomics.revenuePerBird.toLocaleString()}
-                  <span className="text-xs font-normal text-slate-500 ml-1.5">rev / bird</span>
+                <div className="flex items-baseline justify-between">
+                  <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tracking-tight">
+                    Rs. {perBirdEconomics.revenuePerBird.toLocaleString()}
+                    <span className="text-xs font-normal text-slate-500 ml-1.5">rev / bird</span>
+                  </div>
+                  <span
+                    className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                      perBirdEconomics.isProfit
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : 'bg-rose-100 text-rose-800 border-rose-300'
+                    }`}
+                  >
+                    {perBirdEconomics.isProfit
+                      ? `+${perBirdEconomics.profitMarginPercent}% Profit`
+                      : `${perBirdEconomics.profitMarginPercent}% Margin`}
+                  </span>
                 </div>
+
                 <div className="grid grid-cols-2 gap-2 mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
                   <div>
                     <span className="text-[11px] text-slate-500 block">Expense / Bird</span>
@@ -681,7 +766,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Net Margin / Bird</span>
-                    <span className={`font-bold font-mono ${perBirdEconomics.netPerBird >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    <span
+                      className={`font-black font-mono ${
+                        perBirdEconomics.isProfit ? 'text-emerald-700' : 'text-rose-600'
+                      }`}
+                    >
                       {perBirdEconomics.netPerBird < 0 ? '-' : '+'}Rs. {Math.abs(perBirdEconomics.netPerBird).toLocaleString()}
                     </span>
                   </div>
@@ -689,9 +778,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-              <span>Egg Production Yield:</span>
-              <span className="font-bold text-amber-700 font-mono">
-                {perBirdEconomics.eggsPerBird} eggs/bird
+              <span>Economics Result:</span>
+              <span
+                className={`font-bold font-mono px-2 py-0.5 rounded-md ${
+                  perBirdEconomics.isProfit
+                    ? 'text-emerald-700 bg-emerald-50'
+                    : 'text-rose-700 bg-rose-50'
+                }`}
+              >
+                {perBirdEconomics.isProfit
+                  ? `Net Profit: +Rs. ${perBirdEconomics.netPerBird.toFixed(2)} / bird`
+                  : `Operating Loss: -Rs. ${Math.abs(perBirdEconomics.netPerBird).toFixed(2)} / bird`}
               </span>
             </div>
           </div>
@@ -1008,15 +1105,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 selectedFlock === unit.unit ||
                 selectedFlock === unit.id;
 
-              const displayEggs =
-                preset === 'today' ? unit.todayEggs : unit.allTimeProduction;
-              const displayTrays =
-                preset === 'today' ? unit.todayTrays : unit.allTimeTrays;
-              const displayLayRate =
-                preset === 'today' ? unit.todayLayingRate : unit.allTimeLayingRate;
-              const displayRevenue =
-                preset === 'today' ? unit.todayRevenue : unit.allTimeRevenue;
-
               return (
                 <div
                   key={unit.unit}
@@ -1095,7 +1183,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             {preset === 'today' ? "Today's Egg Production:" : 'Period Egg Yield:'}
                           </span>
                           <span className="font-black text-amber-700 font-mono text-base">
-                            {displayEggs.toLocaleString()}{' '}
+                            {unit.displayEggs.toLocaleString()}{' '}
                             <span className="text-xs font-normal text-slate-500">eggs</span>
                           </span>
                         </div>
@@ -1104,7 +1192,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
                           <span className="text-slate-600 font-medium">Clean Commercial Trays:</span>
                           <span className="font-bold text-slate-900 font-mono text-sm">
-                            {displayTrays.toLocaleString()} trays
+                            {unit.displayTrays.toLocaleString()} trays
                           </span>
                         </div>
 
@@ -1113,7 +1201,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <span className="text-slate-600 font-medium">Laying Efficiency:</span>
                           <div className="flex items-center space-x-2">
                             <span className="font-black text-emerald-700 font-mono text-sm">
-                              {displayLayRate}%
+                              {unit.displayLayingRate}%
                             </span>
                             <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800">
                               Active
@@ -1127,7 +1215,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             {preset === 'today' ? "Today's Egg Revenue:" : 'Sales Turnover:'}
                           </span>
                           <span className="font-black text-slate-900 font-mono text-base">
-                            Rs. {displayRevenue.toLocaleString()}
+                            Rs. {unit.displayRevenue.toLocaleString()}
                           </span>
                         </div>
                       </div>
@@ -1140,21 +1228,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <Scale className="w-3.5 h-3.5 text-teal-600" />
                           <span>Flock 1-Bird Economics</span>
                         </span>
-                        <span className="font-mono text-emerald-700 font-bold text-[10px]">
-                          {preset === 'today' ? 'Today' : 'Cumulative'}
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            unit.isProfit
+                              ? 'text-emerald-800 bg-emerald-100 border-emerald-300'
+                              : 'text-rose-800 bg-rose-100 border-rose-300'
+                          }`}
+                        >
+                          {unit.isProfit ? `+${unit.displayMarginPercent}% Profit` : `${unit.displayMarginPercent}% Margin`}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 p-3 bg-slate-50/90 rounded-xl border border-slate-200/70 text-xs">
-                        <div className="pr-3 border-r border-slate-200">
-                          <span className="text-[10px] text-slate-500 font-semibold block uppercase">Revenue / Bird</span>
-                          <span className="font-black font-mono text-emerald-700 text-sm mt-0.5 block">
-                            Rs. {preset === 'today' ? unit.todayRevPerBird : unit.allTimeRevPerBird}
+                      <div className="grid grid-cols-3 p-2.5 bg-slate-50/90 rounded-xl border border-slate-200/70 text-xs">
+                        <div className="pr-2 border-r border-slate-200">
+                          <span className="text-[9px] text-slate-500 font-semibold block uppercase">Rev / Bird</span>
+                          <span className="font-bold font-mono text-emerald-700 text-xs sm:text-sm mt-0.5 block">
+                            Rs. {unit.displayRevPerBird.toFixed(2)}
                           </span>
                         </div>
-                        <div className="pl-3">
-                          <span className="text-[10px] text-slate-500 font-semibold block uppercase">Expense / Bird</span>
-                          <span className="font-black font-mono text-rose-600 text-sm mt-0.5 block">
-                            Rs. {preset === 'today' ? unit.todayExpPerBird : unit.allTimeExpPerBird}
+                        <div className="px-2 border-r border-slate-200">
+                          <span className="text-[9px] text-slate-500 font-semibold block uppercase">Cost / Bird</span>
+                          <span className="font-bold font-mono text-rose-600 text-xs sm:text-sm mt-0.5 block">
+                            Rs. {unit.displayExpPerBird.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="pl-2">
+                          <span className="text-[9px] text-slate-500 font-semibold block uppercase">Net Margin</span>
+                          <span
+                            className={`font-black font-mono text-xs sm:text-sm mt-0.5 block ${
+                              unit.isProfit ? 'text-emerald-700' : 'text-rose-600'
+                            }`}
+                          >
+                            {unit.displayNetPerBird < 0 ? '-' : '+'}Rs. {Math.abs(unit.displayNetPerBird).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -1339,7 +1443,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {activeEggLogs.slice(0, 5).map((log) => (
+                  {activeEggLogs.slice(0, 5).map((log: any) => (
                     <tr key={log.id} className="hover:bg-slate-50/80">
                       <td className="py-2.5 px-3 font-mono font-bold text-slate-600">#{log.trackingId || log.id}</td>
                       <td className="py-2.5 px-3 text-slate-800 whitespace-nowrap">{log.rawDate || log.date}</td>
@@ -1347,7 +1451,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <td className="py-2.5 px-3 text-right font-mono text-slate-600">{(log.morningEggs || 0).toLocaleString()}</td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-600">{(log.eveningEggs || 0).toLocaleString()}</td>
                       <td className="py-2.5 px-3 text-right font-bold font-mono text-amber-700">{(log.totalEggs || 0).toLocaleString()}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-800">{(log.cleanTrays || Math.floor(log.totalEggs / 30))} Trays</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-800">{(log.cleanTrays || Math.floor((log.totalEggs || 0) / 30))} Trays</td>
                       <td className="py-2.5 px-3 text-right font-mono text-rose-600 font-semibold">{log.damagedEggs || log.brokenEggs || 0}</td>
                       <td className="py-2.5 px-3 text-right font-bold text-emerald-700 font-mono">{log.layingRatePercent || 85.8}%</td>
                     </tr>
