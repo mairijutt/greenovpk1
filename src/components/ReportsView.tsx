@@ -633,7 +633,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  Rs. 312.78M <span className="text-[10px] font-normal">(17.00M Items)</span>
+                  Rs. 312.78M <span className="text-[10px] font-normal">(47,226 Cartons / 17.00M Eggs)</span>
                 </div>
               </button>
 
@@ -656,7 +656,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  Rs. 29.80M <span className="text-[10px] font-normal">(9.5%)</span>
+                  Rs. 29.80M <span className="text-[10px] font-normal">(4,514 Cartons / 9.5%)</span>
                 </div>
               </button>
 
@@ -679,7 +679,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  Rs. 266.38M <span className="text-[10px] font-normal">(85.2%)</span>
+                  Rs. 266.38M <span className="text-[10px] font-normal">(40,238 Cartons / 85.2%)</span>
                 </div>
               </button>
 
@@ -702,7 +702,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  Rs. 16.60M <span className="text-[10px] font-normal">(5.3%)</span>
+                  Rs. 16.60M <span className="text-[10px] font-normal">(2,474 Cartons / 5.3%)</span>
                 </div>
               </button>
             </>
@@ -1193,13 +1193,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             />
 
             <StatCard
-              title="Total Items Sold"
-              value={salesTotals.totalItems}
-              unit="Units"
+              title="Total Cartons Sold"
+              value={Math.round(salesTotals.totalItems / 360)}
+              unit="Cartons"
               icon={Package}
               color="blue"
-              badge={{ text: 'Eggs & Byproducts', color: 'blue' }}
-              subtext="Aggregate volume of units shipped"
+              badge={{ text: '360 Eggs / Carton', color: 'blue' }}
+              subtext={`${salesTotals.totalItems.toLocaleString()} total eggs shipped`}
             />
 
             <StatCard
@@ -1246,8 +1246,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     <th className="py-3 px-3">Date</th>
                     <th className="py-3 px-3">Flock / Unit</th>
                     <th className="py-3 px-3">Category</th>
-                    <th className="py-3 px-3 text-right">Quantity</th>
-                    <th className="py-3 px-3 text-right">Unit Price</th>
+                    <th className="py-3 px-3 text-right">Cartons Sold (Eggs)</th>
+                    <th className="py-3 px-3 text-right">Rate / Carton</th>
                     <th className="py-3 px-3 text-right">Online Pay</th>
                     <th className="py-3 px-3 text-right">Cash Pay</th>
                     <th className="py-3 px-3 text-right">Total Amount</th>
@@ -1298,10 +1298,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                           </span>
                         </td>
                         <td className="py-3 px-3 text-right font-mono font-semibold text-slate-700">
-                          {(sale.quantity || 0).toLocaleString()}
+                          <div>
+                            <span className="font-bold text-slate-900">{(sale.quantity / 360).toFixed(1)}</span> <span className="text-[10px] text-slate-500">ctn</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-normal">({(sale.quantity || 0).toLocaleString()} eggs)</div>
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-slate-600">
-                          Rs. {(sale.unitPrice || 0).toLocaleString()}
+                          <div className="font-semibold text-emerald-800">Rs. {Math.round((sale.unitPrice || 0) * 360).toLocaleString()}</div>
+                          <div className="text-[10px] text-slate-400 font-normal">Rs. {(sale.unitPrice || 0).toFixed(2)}/egg</div>
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-purple-700 font-medium">
                           {(sale.onlinePayment || 0) > 0 ? `Rs. ${sale.onlinePayment.toLocaleString()}` : '-'}

@@ -706,7 +706,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
             <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-              <span>Dispatched Volume: <strong className="text-slate-900 font-mono">{dynamicFinance.itemsSold.toLocaleString()} units</strong></span>
+              <span>Dispatched Volume: <strong className="text-slate-900 font-mono">{(dynamicFinance.itemsSold / 360).toFixed(1)} cartons</strong> <span className="text-[11px] text-slate-400">({dynamicFinance.itemsSold.toLocaleString()} eggs)</span></span>
               <span className="font-bold text-emerald-700 group-hover:text-emerald-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
                 <span>Open Sales</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -1006,7 +1006,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     Rs. 95,500
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    5,520 Eggs sold • Online: Rs. 31.5k | Cash: Rs. 64k
+                    15.3 Cartons (5,520 eggs) • Online: Rs. 31.5k | Cash: Rs. 64k
                   </div>
                 </div>
 
@@ -1021,7 +1021,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     Rs. 64,150
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    3,840 Eggs sold • Online: Rs. 29.4k | Cash: Rs. 34.75k
+                    10.7 Cartons (3,840 eggs) • Online: Rs. 29.4k | Cash: Rs. 34.75k
                   </div>
                 </div>
 
@@ -1036,7 +1036,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     Rs. 346,000
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    21,660 Eggs sold • Online: Rs. 345k | Cash: Rs. 1k
+                    60.2 Cartons (21,660 eggs) • Online: Rs. 345k | Cash: Rs. 1k
                   </div>
                 </div>
               </div>
@@ -1045,7 +1045,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div>
                 <div className="flex justify-between text-xs text-slate-600 font-bold mb-1">
                   <span>Today's Total Egg Turnover: Rs. 505,650</span>
-                  <span>31,020 Total Eggs Dispatched</span>
+                  <span>86.2 Cartons Dispatched (31,020 Total Eggs)</span>
                 </div>
                 <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden flex">
                   <div style={{ width: '18.9%' }} className="bg-blue-600" title="Unit 1: 18.9%"></div>

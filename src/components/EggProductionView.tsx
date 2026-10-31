@@ -1035,14 +1035,14 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
         />
 
         <StatCard
-          title="Commercial Trays"
+          title="Commercial Trays & Cartons"
           value={totalTrays}
-          unit="Trays (30s)"
+          unit="Trays"
           icon={Layers}
           color="emerald"
           valueColor="text-emerald-700"
-          badge={{ text: 'Wholesale Ready', color: 'emerald' }}
-          subtext="Packaged for market dispatch"
+          badge={{ text: `${Math.round(totalTrays / 12).toLocaleString()} Cartons`, color: 'emerald' }}
+          subtext={`${Math.round(totalTrays / 12).toLocaleString()} standard cartons (360 eggs/ctn)`}
         />
 
         <StatCard

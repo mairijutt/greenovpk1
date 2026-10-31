@@ -512,7 +512,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
               {selectedType === 'Income'
-                ? `${salesStats.all.items.toLocaleString()} units sold`
+                ? `${Math.round(salesStats.all.items / 360).toLocaleString()} cartons sold (${(salesStats.all.items / 1000000).toFixed(2)}M eggs)`
                 : 'Farm GVF2025 Combined'}
             </div>
           </button>
@@ -542,7 +542,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
               {selectedType === 'Income'
-                ? `${salesStats.unit1.items.toLocaleString()} units sold`
+                ? `${Math.round(salesStats.unit1.items / 360).toLocaleString()} cartons sold (${(salesStats.unit1.items / 1000).toFixed(0)}k eggs)`
                 : 'Flock ID 8 (25,000 birds)'}
             </div>
           </button>
@@ -572,7 +572,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
               {selectedType === 'Income'
-                ? `${salesStats.unit2.items.toLocaleString()} units sold`
+                ? `${Math.round(salesStats.unit2.items / 360).toLocaleString()} cartons sold (${(salesStats.unit2.items / 1000000).toFixed(2)}M eggs)`
                 : 'Flock ID 9 (35,000 birds)'}
             </div>
           </button>
@@ -602,7 +602,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
               {selectedType === 'Income'
-                ? `${salesStats.unit3.items.toLocaleString()} units sold`
+                ? `${Math.round(salesStats.unit3.items / 360).toLocaleString()} cartons sold (${(salesStats.unit3.items / 1000).toFixed(0)}k eggs)`
                 : 'Flock ID 10 (25,500 birds)'}
             </div>
           </button>
@@ -638,12 +638,16 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               subtext="Verified commercial sales"
             />
             <StatCard
-              title="Total Items Sold"
-              value={`${totalItemsSold.toLocaleString()} Units`}
+              title="Total Cartons Sold"
+              value={`${Math.round(totalItemsSold / 360).toLocaleString()}`}
+              unit="Cartons"
               icon={TrendingUp}
               color="blue"
-              badge={{ text: `Avg Rs. ${(totalIncome / (totalItemsSold || 1)).toFixed(2)}/unit`, color: 'blue' }}
-              subtext="Eggs, manure & feed bags sold"
+              badge={{
+                text: `Avg Rs. ${Math.round((totalIncome / (totalItemsSold || 1)) * 360).toLocaleString()}/carton`,
+                color: 'blue',
+              }}
+              subtext={`${totalItemsSold.toLocaleString()} eggs sold (360 eggs/carton)`}
             />
             <StatCard
               title="Online Banking Payments"
@@ -810,7 +814,9 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   </div>
 
                   <div className="text-[10px] text-slate-500 mt-0.5">
-                    {b.items.toLocaleString()} units sold
+                    {b.head === 'EGG'
+                      ? `${(b.items / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })} cartons (${b.items.toLocaleString()} eggs)`
+                      : `${b.items.toLocaleString()} ${b.head === 'Feed BAGS' ? 'bags' : 'units'} sold`}
                   </div>
 
                   {/* Progress bar */}
@@ -1034,8 +1040,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-3 px-3">Date</th>
                   <th className="py-3 px-3">Flock / Unit</th>
                   <th className="py-3 px-3">Category</th>
-                  <th className="py-3 px-3 text-right">Quantity</th>
-                  <th className="py-3 px-3 text-right">Unit Price</th>
+                  <th className="py-3 px-3 text-right">Cartons Sold (Eggs)</th>
+                  <th className="py-3 px-3 text-right">Rate / Carton</th>
                   <th className="py-3 px-3 text-right">Online Payment</th>
                   <th className="py-3 px-3 text-right">Cash Payment</th>
                   <th className="py-3 px-3 text-right">Total Amount</th>
@@ -1108,10 +1114,24 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                           </span>
                         </td>
                         <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                          {(s.quantity !== undefined ? s.quantity : 0).toLocaleString()}
+                          {s.quantity !== undefined ? (
+                            <div>
+                              <div>{(s.quantity / 360).toFixed(1)} <span className="text-[10px] font-normal text-slate-500">ctn</span></div>
+                              <div className="text-[10px] font-normal text-slate-400">({s.quantity.toLocaleString()} eggs)</div>
+                            </div>
+                          ) : (
+                            '0'
+                          )}
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-slate-600">
-                          {s.unitPrice !== undefined && s.unitPrice > 0 ? `Rs. ${s.unitPrice.toFixed(3)}` : 'Rs. 0'}
+                          {s.unitPrice !== undefined && s.unitPrice > 0 ? (
+                            <div>
+                              <div className="font-semibold text-emerald-800">Rs. {Math.round(s.unitPrice * 360).toLocaleString()}</div>
+                              <div className="text-[10px] text-slate-400 font-normal">Rs. {s.unitPrice.toFixed(2)}/egg</div>
+                            </div>
+                          ) : (
+                            'Rs. 0'
+                          )}
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-teal-700 font-semibold">
                           {s.onlinePayment !== undefined && s.onlinePayment > 0 ? `Rs. ${s.onlinePayment.toLocaleString()}` : 'Rs. 0'}

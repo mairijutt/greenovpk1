@@ -254,7 +254,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                       Packaging Standard
                     </label>
                     <div className="py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-mono text-xs font-semibold">
-                      30 Eggs / Commercial Tray
+                      30 Eggs/Tray • 1 Carton = 360 Eggs
                     </div>
                   </div>
                 </div>
@@ -278,10 +278,11 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                       </span>
                     </div>
                     <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
-                      <span className="text-[10px] text-slate-500 font-semibold block">Clean Trays (30s)</span>
+                      <span className="text-[10px] text-slate-500 font-semibold block">Market Ready</span>
                       <span className="font-mono font-black text-emerald-800 text-sm">
-                        {cleanTrays.toLocaleString()}
+                        {(cleanTrays / 12).toFixed(1)} <span className="text-xs font-bold text-slate-500">Ctn</span>
                       </span>
+                      <span className="text-[9px] text-slate-400 block">({cleanTrays.toLocaleString()} trays)</span>
                     </div>
                     <div className="bg-white/80 p-1.5 rounded-lg border border-amber-100">
                       <span className="text-[10px] text-slate-500 font-semibold block">Breakage</span>
