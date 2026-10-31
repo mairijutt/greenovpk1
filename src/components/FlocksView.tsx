@@ -8,6 +8,7 @@ interface FlocksViewProps {
   onAddFlock: (flock: Flock) => void;
   onEditFlock?: (flock: Flock) => void;
   onDeleteFlock?: (id: string) => void;
+  isSuperAdmin?: boolean;
 }
 
 export const FlocksView: React.FC<FlocksViewProps> = ({
@@ -16,6 +17,7 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
   onAddFlock,
   onEditFlock,
   onDeleteFlock,
+  isSuperAdmin = false,
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingFlock, setEditingFlock] = useState<Flock | null>(null);
@@ -238,24 +240,32 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
                       </td>
                       <td className="py-4 px-6 text-slate-800 font-medium">{flock.mortality || 0}</td>
                       <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end space-x-3">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(flock)}
-                            aria-label={`Edit ${flock.name}`}
-                            className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer p-1"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirmId(flock.id)}
-                            aria-label={`Delete ${flock.name}`}
-                            className="text-red-500 hover:text-red-700 transition-colors cursor-pointer p-1"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {isSuperAdmin ? (
+                          <div className="flex items-center justify-end space-x-3">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(flock)}
+                              aria-label={`Edit ${flock.name}`}
+                              title="Edit Flock"
+                              className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer p-1"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmId(flock.id)}
+                              aria-label={`Delete ${flock.name}`}
+                              title="Delete Flock"
+                              className="text-red-500 hover:text-red-700 transition-colors cursor-pointer p-1"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded">
+                            Protected
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

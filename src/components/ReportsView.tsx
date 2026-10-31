@@ -325,11 +325,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const handleExportCSV = () => {
     if (activeReport === 'egg-production') {
       const headers =
-        'Tracking ID,Date,Flock/Unit,Morning Eggs,Evening Eggs,Total Eggs,Damaged/Broken,Clean Trays (30s),Avg Weight (g),Laying Rate %\n';
+        'Tracking ID,Date,Flock/Unit,Morning Eggs,Evening Eggs,Total Eggs,Cartons (360/ctn),Damaged/Broken,Clean Trays (30s),Avg Weight (g),Laying Rate %\n';
       const rows = filteredEggs
         .map(
           (e) =>
-            `${e.trackingId || e.id},"${e.date}","${e.flockName || 'Unit'}",${e.morningEggs || 0},${e.eveningEggs || 0},${e.totalEggs || 0},${e.damagedEggs || e.brokenEggs || 0},${e.cleanTrays || 0},${e.averageWeight || 60},${e.layingRatePercent || 0}%`
+            `${e.trackingId || e.id},"${e.date}","${e.flockName || 'Unit'}",${e.morningEggs || 0},${e.eveningEggs || 0},${e.totalEggs || 0},${((e.totalEggs || 0) / 360).toFixed(1)},${e.damagedEggs || e.brokenEggs || 0},${e.cleanTrays || 0},${e.averageWeight || 60},${e.layingRatePercent || 0}%`
         )
         .join('\n');
       const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
@@ -341,11 +341,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       URL.revokeObjectURL(url);
     } else if (activeReport === 'sales-revenue') {
       const headers =
-        'Tracking ID,Date,Flock/Unit,Category,Quantity,Unit Price (PKR),Online Payment (PKR),Cash Payment (PKR),Total Amount (PKR),Vehicle/Challan,Buyer Notes\n';
+        'Tracking ID,Date,Flock/Unit,Category,Cartons Sold,Total Eggs,Rate Per Carton (PKR),Unit Price Per Egg (PKR),Online Payment (PKR),Cash Payment (PKR),Total Amount (PKR),Vehicle/Challan,Buyer Notes\n';
       const rows = filteredSales
         .map(
           (s) =>
-            `${s.trackingId || s.id},"${s.date}","${s.flockName || s.flock || 'Unit'}",${s.category},${s.quantity || 0},${s.unitPrice || 0},${s.onlinePayment || 0},${s.cashPayment || 0},${s.amount || 0},"${s.vehicleNumber || '-'}-${s.challanNo || ''}","${(s.notes || '').replace(/"/g, '""')}"`
+            `${s.trackingId || s.id},"${s.date}","${s.flockName || s.flock || 'Unit'}",${s.category},${(s.quantity / 360).toFixed(1)},${s.quantity || 0},${Math.round((s.unitPrice || 0) * 360)},${s.unitPrice || 0},${s.onlinePayment || 0},${s.cashPayment || 0},${s.amount || 0},"${s.vehicleNumber || '-'}-${s.challanNo || ''}","${(s.notes || '').replace(/"/g, '""')}"`
         )
         .join('\n');
       const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
@@ -539,7 +539,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  17,168,190 <span className="text-[10px] font-normal">Eggs</span>
+                  47,689 Cartons <span className="text-[10px] font-normal">(17.17M Eggs)</span>
                 </div>
               </button>
 
@@ -562,7 +562,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  1,931,280 <span className="text-[10px] font-normal">Eggs (11.3%)</span>
+                  5,365 Cartons <span className="text-[10px] font-normal">(1.93M Eggs • 11.3%)</span>
                 </div>
               </button>
 
@@ -585,7 +585,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  14,103,090 <span className="text-[10px] font-normal">Eggs (82.2%)</span>
+                  39,175 Cartons <span className="text-[10px] font-normal">(14.10M Eggs • 82.2%)</span>
                 </div>
               </button>
 
@@ -608,7 +608,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  1,133,820 <span className="text-[10px] font-normal">Eggs (6.6%)</span>
+                  3,149 Cartons <span className="text-[10px] font-normal">(1.13M Eggs • 6.6%)</span>
                 </div>
               </button>
             </>
@@ -973,8 +973,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               unit="Eggs"
               icon={Egg}
               color="amber"
-              badge={{ text: `${eggTotals.count} Logs`, color: 'amber' }}
-              subtext={`${eggTotals.cleanTrays.toLocaleString()} clean trays (30 eggs/tray)`}
+              badge={{ text: `${Math.round(eggTotals.totalEggs / 360).toLocaleString()} Cartons`, color: 'amber' }}
+              subtext={`${Math.round(eggTotals.totalEggs / 360).toLocaleString()} standard cartons (360 eggs/ctn)`}
             />
 
             <StatCard
@@ -992,14 +992,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             />
 
             <StatCard
-              title="Commercial Clean Trays"
-              value={eggTotals.cleanTrays}
-              unit="Trays"
+              title="Commercial Cartons & Trays"
+              value={`${Math.round(eggTotals.cleanTrays / 12).toLocaleString()}`}
+              unit="Cartons"
               icon={Package}
               color="emerald"
               valueColor="text-emerald-700"
-              badge={{ text: '30 Eggs/Tray', color: 'emerald' }}
-              subtext={`${(eggTotals.totalEggs - eggTotals.brokenEggs).toLocaleString()} marketable clean eggs`}
+              badge={{ text: `${eggTotals.cleanTrays.toLocaleString()} Trays`, color: 'emerald' }}
+              subtext={`${eggTotals.cleanTrays.toLocaleString()} trays (12 trays = 1 carton / 360 eggs)`}
             />
 
             <StatCard
@@ -1031,8 +1031,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     <th className="py-3 px-3">Flock / Unit</th>
                     <th className="py-3 px-3 text-right">Morning Eggs</th>
                     <th className="py-3 px-3 text-right">Evening Eggs</th>
-                    <th className="py-3 px-3 text-right">Total Production</th>
-                    <th className="py-3 px-3 text-right">Clean Trays</th>
+                    <th className="py-3 px-3 text-right">Total Production (Cartons)</th>
+                    <th className="py-3 px-3 text-right">Clean Trays / Cartons</th>
                     <th className="py-3 px-3 text-right">Broken Eggs</th>
                     <th className="py-3 px-3 text-right">Avg Weight</th>
                     <th className="py-3 px-3 text-right">Laying Rate</th>
@@ -1074,10 +1074,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                           {(log.eveningEggs || 0).toLocaleString()}
                         </td>
                         <td className="py-3 px-3 text-right font-bold font-mono text-amber-700">
-                          {(log.totalEggs || 0).toLocaleString()}
+                          <div>
+                            <span className="font-bold text-slate-900">{((log.totalEggs || 0) / 360).toFixed(1)}</span> <span className="text-[10px] text-slate-500 font-normal">ctn</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-normal">({(log.totalEggs || 0).toLocaleString()} eggs)</div>
                         </td>
                         <td className="py-3 px-3 text-right font-semibold font-mono text-slate-800">
-                          {(log.cleanTrays || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">Trays</span>
+                          <div>{(log.cleanTrays || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">Trays</span></div>
+                          <div className="text-[10px] text-emerald-700 font-bold">{((log.cleanTrays || 0) / 12).toFixed(1)} ctn</div>
                         </td>
                         <td className="py-3 px-3 text-right font-mono font-medium">
                           {(log.damagedEggs || log.brokenEggs || 0) > 0 ? (

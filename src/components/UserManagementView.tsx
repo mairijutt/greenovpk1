@@ -11,10 +11,14 @@ import {
   X,
   Edit2,
   KeyRound,
+  Trash2,
+  Eye,
+  EyeOff,
+  ShieldAlert,
 } from 'lucide-react';
 import { StatCard, PageHeader, UIButton, UIInput, UISelect, UISearchInput, UIFilterBar, TableCard } from './ui';
 
-interface UserRecord {
+export interface UserRecord {
   id: string;
   name: string;
   email: string;
@@ -22,6 +26,7 @@ interface UserRecord {
   farmAssigned: string;
   status: 'Active' | 'Inactive';
   lastLogin: string;
+  password?: string;
 }
 
 const initialUsers: UserRecord[] = [
@@ -33,6 +38,7 @@ const initialUsers: UserRecord[] = [
     farmAssigned: 'All Farm Complexes',
     status: 'Active',
     lastLogin: 'Just now',
+    password: 'GreenovaAdmin@2026',
   },
   {
     id: 'usr-2',
@@ -42,6 +48,7 @@ const initialUsers: UserRecord[] = [
     farmAssigned: 'All Farm Complexes',
     status: 'Active',
     lastLogin: 'Today, 08:30 AM',
+    password: 'Greenova@2026',
   },
   {
     id: 'usr-3',
@@ -51,6 +58,7 @@ const initialUsers: UserRecord[] = [
     farmAssigned: 'Unit 1 & Unit 2',
     status: 'Active',
     lastLogin: 'Yesterday',
+    password: 'Greenova@2026',
   },
   {
     id: 'usr-4',
@@ -60,6 +68,7 @@ const initialUsers: UserRecord[] = [
     farmAssigned: 'GreenOva Unit 2',
     status: 'Active',
     lastLogin: 'Today, 07:15 AM',
+    password: 'Greenova@2026',
   },
   {
     id: 'usr-5',
@@ -69,6 +78,7 @@ const initialUsers: UserRecord[] = [
     farmAssigned: 'GreenOva Unit 3',
     status: 'Active',
     lastLogin: 'Today, 06:45 AM',
+    password: 'Greenova@2026',
   },
   {
     id: 'usr-6',
@@ -78,6 +88,7 @@ const initialUsers: UserRecord[] = [
     farmAssigned: 'Head Office',
     status: 'Active',
     lastLogin: '2 days ago',
+    password: 'Greenova@2026',
   },
 ];
 
@@ -89,7 +100,25 @@ const roleLabels: Record<string, { label: string; badgeClass: string }> = {
   accountant: { label: 'Accountant', badgeClass: 'bg-purple-100 text-purple-800' },
 };
 
-export const UserManagementView: React.FC = () => {
+interface UserManagementViewProps {
+  currentUser?: {
+    email: string;
+    name: string;
+    role?: string;
+    isSuperAdmin?: boolean;
+  } | null;
+}
+
+export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentUser }) => {
+  const isSuperAdmin = Boolean(
+    currentUser?.isSuperAdmin ||
+    currentUser?.role === 'super_admin' ||
+    currentUser?.email?.toLowerCase() === 'aaglobal500@gmail.com' ||
+    currentUser?.email?.toLowerCase().includes('aaglobal') ||
+    currentUser?.role?.toLowerCase().includes('managing director') ||
+    currentUser?.role?.toLowerCase().includes('super admin')
+  );
+
   const [users, setUsers] = useState<UserRecord[]>(() => {
     const saved = localStorage.getItem('greenova_users_v2');
     if (saved) {
@@ -112,6 +141,7 @@ export const UserManagementView: React.FC = () => {
     email: '',
     role: 'supervisor' as UserRecord['role'],
     farmAssigned: 'GreenOva Unit 1',
+    password: '',
   });
 
   // Edit user form state
@@ -121,6 +151,14 @@ export const UserManagementView: React.FC = () => {
   const [editRole, setEditRole] = useState<UserRecord['role']>('supervisor');
   const [editFarm, setEditFarm] = useState('GreenOva Unit 1');
   const [editStatus, setEditStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [editPassword, setEditPassword] = useState('');
+
+  // Password change modal state
+  const [passwordModalUser, setPasswordModalUser] = useState<UserRecord | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // Persist users to localStorage
   const handleUpdateUsers = (updatedList: UserRecord[]) => {
@@ -143,6 +181,11 @@ export const UserManagementView: React.FC = () => {
 
   const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isSuperAdmin) {
+      setToastMessage('Access Denied: Only Super Admin can add new user accounts.');
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
     if (!newUser.name.trim() || !newUser.email.trim()) return;
     const user: UserRecord = {
       id: `usr-${Date.now()}`,
@@ -152,6 +195,7 @@ export const UserManagementView: React.FC = () => {
       farmAssigned: newUser.farmAssigned,
       status: 'Active',
       lastLogin: 'Invited',
+      password: newUser.password.trim() || 'Greenova@2026',
     };
     handleUpdateUsers([...users, user]);
     setNewUser({
@@ -159,6 +203,7 @@ export const UserManagementView: React.FC = () => {
       email: '',
       role: 'supervisor',
       farmAssigned: 'GreenOva Unit 1',
+      password: '',
     });
     setShowAddModal(false);
     setToastMessage(`User "${user.name}" created successfully!`);
@@ -166,16 +211,65 @@ export const UserManagementView: React.FC = () => {
   };
 
   const handleOpenEdit = (user: UserRecord) => {
+    if (!isSuperAdmin) {
+      setToastMessage('Access Denied: Only Super Admin can edit accounts.');
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
     setEditingUser(user);
     setEditName(user.name);
     setEditEmail(user.email);
     setEditRole(user.role);
     setEditFarm(user.farmAssigned);
     setEditStatus(user.status);
+    setEditPassword('');
+  };
+
+  const handleOpenPasswordModal = (user: UserRecord) => {
+    if (!isSuperAdmin) {
+      setToastMessage('Access Denied: Only Super Admin can change account passwords.');
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
+    setPasswordModalUser(user);
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError(null);
+    setShowNewPassword(false);
+  };
+
+  const handleChangePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSuperAdmin) {
+      setPasswordError('Permission denied: Only Super Admin can update passwords.');
+      return;
+    }
+    if (!passwordModalUser) return;
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match. Please verify.');
+      return;
+    }
+
+    const updated = users.map((u) =>
+      u.id === passwordModalUser.id ? { ...u, password: newPassword } : u
+    );
+    handleUpdateUsers(updated);
+    setToastMessage(`Password for "${passwordModalUser.name}" successfully updated!`);
+    setTimeout(() => setToastMessage(null), 4000);
+    setPasswordModalUser(null);
   };
 
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isSuperAdmin) {
+      setToastMessage('Access Denied: Only Super Admin can modify account details.');
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
     if (!editingUser || !editName.trim() || !editEmail.trim()) return;
 
     const updated = users.map((u) =>
@@ -187,6 +281,7 @@ export const UserManagementView: React.FC = () => {
             role: editRole,
             farmAssigned: editFarm,
             status: editStatus,
+            ...(editPassword ? { password: editPassword } : {}),
           }
         : u
     );
@@ -198,10 +293,20 @@ export const UserManagementView: React.FC = () => {
   };
 
   const handleDeleteUser = (id: string) => {
-    if (confirm('Are you sure you want to remove this user account?')) {
+    if (!isSuperAdmin) {
+      setToastMessage('Access Denied: Only Super Admin can delete user accounts.');
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
+    const target = users.find((u) => u.id === id);
+    if (target?.email === 'aaglobal500@gmail.com') {
+      alert('The primary Super Administrator account cannot be deleted.');
+      return;
+    }
+    if (confirm(`Are you sure you want to delete user account "${target?.name || id}"? This action cannot be undone.`)) {
       const updated = users.filter((u) => u.id !== id);
       handleUpdateUsers(updated);
-      setToastMessage('User account deleted.');
+      setToastMessage('User account deleted successfully.');
       setTimeout(() => setToastMessage(null), 4000);
       setEditingUser(null);
     }
@@ -215,15 +320,22 @@ export const UserManagementView: React.FC = () => {
         subtitle="Manage system administrators, veterinarians, supervisors, and role-based permissions."
         icon={UserCheck}
         iconColor="teal"
-        badge="Access Control Active"
+        badge={isSuperAdmin ? 'Super Admin Mode' : 'Read-Only Access'}
         actions={
-          <UIButton
-            variant="primary"
-            icon={Plus}
-            onClick={() => setShowAddModal(true)}
-          >
-            Add New User
-          </UIButton>
+          isSuperAdmin ? (
+            <UIButton
+              variant="primary"
+              icon={Plus}
+              onClick={() => setShowAddModal(true)}
+            >
+              Add New User
+            </UIButton>
+          ) : (
+            <div className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-500 text-xs font-semibold flex items-center gap-1.5 border border-slate-200">
+              <Lock className="w-3.5 h-3.5 text-slate-400" />
+              <span>Super Admin Protected</span>
+            </div>
+          )
         }
       />
 
@@ -356,14 +468,43 @@ export const UserManagementView: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEdit(u)}
-                      className="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center space-x-1"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      <span>Edit</span>
-                    </button>
+                    {isSuperAdmin ? (
+                      <div className="flex items-center justify-end space-x-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPasswordModal(u)}
+                          title="Change Account Password (Super Admin)"
+                          className="text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
+                        >
+                          <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Password</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(u)}
+                          title="Edit User Details"
+                          className="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUser(u.id)}
+                          disabled={u.email === 'aaglobal500@gmail.com'}
+                          title={u.email === 'aaglobal500@gmail.com' ? 'Primary Super Admin account cannot be deleted' : 'Delete User Account'}
+                          className="text-xs font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center space-x-1 shadow-2xs"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-slate-400 inline-flex items-center space-x-1 bg-slate-50 border border-slate-200/60 px-2 py-1 rounded-md">
+                        <Lock className="w-3 h-3 text-slate-400" />
+                        <span>Super Admin Only</span>
+                      </span>
+                    )}
                   </td>
                 </tr>
               );
@@ -554,6 +695,112 @@ export const UserManagementView: React.FC = () => {
                     Save Changes
                   </UIButton>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal (Super Admin Exclusive) */}
+      {passwordModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200/50">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Change Account Password</h2>
+                  <p className="text-xs text-slate-500">Super Administrator credential control</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPasswordModalUser(null)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePasswordSubmit} className="mt-4 space-y-4 text-xs">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Account User:</span>
+                  <span className="font-bold text-slate-900">{passwordModalUser.name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Email / Login ID:</span>
+                  <span className="font-mono text-slate-700">{passwordModalUser.email}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Role:</span>
+                  <span className="font-bold text-emerald-700">{roleLabels[passwordModalUser.role]?.label || passwordModalUser.role}</span>
+                </div>
+              </div>
+
+              {passwordError && (
+                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+                  {passwordError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  New Password *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    placeholder="Enter new password (min. 6 characters)"
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      setPasswordError(null);
+                    }}
+                    className="w-full px-3 py-2.5 pr-10 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-amber-500 font-medium bg-slate-50 focus:bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Confirm New Password *
+                </label>
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  required
+                  placeholder="Re-type new password"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setPasswordError(null);
+                  }}
+                  className="w-full px-3 py-2.5 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-amber-500 font-medium bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                <UIButton
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setPasswordModalUser(null)}
+                >
+                  Cancel
+                </UIButton>
+                <UIButton type="submit" variant="primary" className="bg-amber-600 hover:bg-amber-700 text-white">
+                  Update Password
+                </UIButton>
               </div>
             </form>
           </div>

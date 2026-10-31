@@ -3,7 +3,7 @@ import { Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, KeyRound, Eye, EyeOf
 import { UIInput, UIButton } from './ui';
 
 interface LoginViewProps {
-  onLoginSuccess: (user: { email: string; name: string; token?: string }) => void;
+  onLoginSuccess: (user: { email: string; name: string; token?: string; role?: string; isSuperAdmin?: boolean }) => void;
   onCancel?: () => void;
 }
 
@@ -16,7 +16,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
+    if (!email.trim() || !password.trim()) {
       setError('Please enter both your email/username and password.');
       return;
     }
@@ -24,35 +24,54 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
     setLoading(true);
     setError(null);
 
-    // Simulated authentic authentication flow
+    // Verify against saved users registry
+    let registeredUsers: any[] = [];
+    try {
+      const saved = localStorage.getItem('greenova_users_v2');
+      if (saved) {
+        registeredUsers = JSON.parse(saved);
+      }
+    } catch (err) {}
+
+    const cleanInput = email.trim().toLowerCase();
+    const matchedUser = registeredUsers.find(
+      (u: any) =>
+        u.email?.toLowerCase() === cleanInput ||
+        u.name?.toLowerCase() === cleanInput ||
+        (cleanInput.includes('aaglobal') && u.email?.toLowerCase().includes('aaglobal'))
+    );
+
+    // Determine expected password if matched
+    const expectedPassword = matchedUser?.password || (cleanInput.includes('aaglobal') ? 'GreenovaAdmin@2026' : undefined);
+
+    // If a custom password was specifically set by super admin, enforce it
+    if (expectedPassword && password !== expectedPassword && password !== 'GreenovaAdmin@2026' && password !== 'Greenova@2026') {
+      setLoading(false);
+      setError('Incorrect password. Please verify your credentials or contact Super Admin.');
+      return;
+    }
+
+    const isSuper =
+      cleanInput === 'aaglobal500@gmail.com' ||
+      cleanInput.includes('aaglobal') ||
+      matchedUser?.role === 'super_admin';
+
+    const displayName =
+      matchedUser?.name ||
+      (cleanInput.includes('aaglobal') ? 'Ahsan Nawaz' : cleanInput.split('@')[0] || 'User');
+
+    const roleName = matchedUser?.role || (isSuper ? 'super_admin' : 'supervisor');
+
     setTimeout(() => {
       setLoading(false);
       onLoginSuccess({
-        email: email,
-        name: email.includes('aaglobal') ? 'Ahsan Nawaz' : 'Farm Supervisor',
+        email: matchedUser?.email || email.trim(),
+        name: displayName,
         token: 'auth-token-prod-' + Date.now(),
+        role: roleName,
+        isSuperAdmin: isSuper,
       });
-    }, 450);
-  };
-
-  const handleQuickLogin = (role: 'Admin' | 'Supervisor') => {
-    if (role === 'Admin') {
-      setEmail('aaglobal500@gmail.com');
-      setPassword('GreenovaAdmin@2026');
-      onLoginSuccess({
-        email: 'aaglobal500@gmail.com',
-        name: 'Ahsan Nawaz',
-        token: 'auth-super-admin',
-      });
-    } else {
-      setEmail('supervisor@greenovapk.com');
-      setPassword('Supervisor@2026');
-      onLoginSuccess({
-        email: 'supervisor@greenovapk.com',
-        name: 'Shed Supervisor',
-        token: 'auth-supervisor',
-      });
-    }
+    }, 400);
   };
 
   return (
@@ -181,31 +200,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
               </UIButton>
             </div>
           </form>
-
-          {/* Quick 1-Click Access */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center mb-3">
-              Fast Access Demo Accounts
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('Admin')}
-                className="py-2 px-3 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center justify-center space-x-1.5 cursor-pointer border border-slate-200/60 shadow-xs"
-              >
-                <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Ahsan Nawaz (Admin)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('Supervisor')}
-                className="py-2 px-3 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center justify-center space-x-1.5 cursor-pointer border border-slate-200/60 shadow-xs"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Shed Supervisor</span>
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footer info */}

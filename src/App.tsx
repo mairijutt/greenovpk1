@@ -101,6 +101,7 @@ export default function App() {
     role?: string;
     emailVerified?: boolean;
     initials?: string;
+    isSuperAdmin?: boolean;
   } | null>(() => {
     try {
       const saved = localStorage.getItem('greenova_user');
@@ -624,6 +625,7 @@ export default function App() {
     role?: string;
     emailVerified?: boolean;
     initials?: string;
+    isSuperAdmin?: boolean;
   }) => {
     setCurrentUser((prev) => {
       const next = prev ? { ...prev, ...updated } : { ...updated };
@@ -634,18 +636,33 @@ export default function App() {
     });
   };
 
+  const isSuperAdmin = Boolean(
+    currentUser?.isSuperAdmin ||
+    currentUser?.role === 'super_admin' ||
+    currentUser?.email?.toLowerCase() === 'aaglobal500@gmail.com' ||
+    currentUser?.email?.toLowerCase().includes('aaglobal') ||
+    currentUser?.role?.toLowerCase().includes('managing director') ||
+    currentUser?.role?.toLowerCase().includes('super admin')
+  );
+
   // If not logged in, render the Login View directly
   if (!currentUser) {
     return (
       <LoginView
         onLoginSuccess={(user) => {
+          const isSuper = Boolean(
+            user.isSuperAdmin ||
+            user.role === 'super_admin' ||
+            user.email?.toLowerCase().includes('aaglobal')
+          );
           const profile = {
-            name: user.name || (user.email.includes('aaglobal') ? 'Ahsan Nawaz' : 'Farm Supervisor'),
+            name: user.name || (isSuper ? 'Ahsan Nawaz' : 'Farm Supervisor'),
             email: user.email,
             token: user.token || 'auth-prod-' + Date.now(),
-            phone: user.email.includes('aaglobal') ? '+92 300 8645210' : '+92 301 7654321',
-            role: user.email.includes('aaglobal') ? 'Managing Director & Farm Admin' : 'Shed Supervisor',
-            initials: user.email.includes('aaglobal') ? 'CN' : 'FS',
+            phone: isSuper ? '+92 300 8645210' : '+92 301 7654321',
+            role: user.role || (isSuper ? 'super_admin' : 'supervisor'),
+            isSuperAdmin: isSuper,
+            initials: isSuper ? 'AN' : 'FS',
             emailVerified: true,
           };
           setCurrentUser(profile);
@@ -709,6 +726,7 @@ export default function App() {
               onAddFlock={handleAddFlock}
               onEditFlock={handleEditFlock}
               onDeleteFlock={handleDeleteFlock}
+              isSuperAdmin={isSuperAdmin}
             />
           )}
 
@@ -790,7 +808,7 @@ export default function App() {
             <FarmsView farms={farms} flocks={flocks} />
           )}
 
-          {currentTab === 'users' && <UserManagementView />}
+          {currentTab === 'users' && <UserManagementView currentUser={currentUser} />}
         </main>
       </div>
 
@@ -800,13 +818,19 @@ export default function App() {
           <div className="relative max-w-md w-full">
             <LoginView
               onLoginSuccess={(user) => {
+                const isSuper = Boolean(
+                  user.isSuperAdmin ||
+                  user.role === 'super_admin' ||
+                  user.email?.toLowerCase().includes('aaglobal')
+                );
                 const profile = {
-                  name: user.name || (user.email.includes('aaglobal') ? 'Ahsan Nawaz' : 'Farm Supervisor'),
+                  name: user.name || (isSuper ? 'Ahsan Nawaz' : 'Farm Supervisor'),
                   email: user.email,
                   token: user.token || 'auth-prod-' + Date.now(),
-                  phone: user.email.includes('aaglobal') ? '+92 300 8645210' : '+92 301 7654321',
-                  role: user.email.includes('aaglobal') ? 'Managing Director & Farm Admin' : 'Shed Supervisor',
-                  initials: user.email.includes('aaglobal') ? 'CN' : 'FS',
+                  phone: isSuper ? '+92 300 8645210' : '+92 301 7654321',
+                  role: user.role || (isSuper ? 'super_admin' : 'supervisor'),
+                  isSuperAdmin: isSuper,
+                  initials: isSuper ? 'AN' : 'FS',
                   emailVerified: true,
                 };
                 setCurrentUser(profile);
