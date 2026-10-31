@@ -231,7 +231,18 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= 2049) {
-          return parsed;
+          return parsed.map((item: any) => {
+            if (item.id === 'sale-766') {
+              return { ...item, onlinePayment: 345000, cashPayment: 0, paymentMethod: 'Online' };
+            }
+            if (item.id === 'sale-815') {
+              return { ...item, paymentMethod: 'Online' };
+            }
+            if (item.id === 'sale-797') {
+              return { ...item, paymentMethod: 'Split (Online/Cash)' };
+            }
+            return item;
+          });
         }
       } catch (e) {}
     }

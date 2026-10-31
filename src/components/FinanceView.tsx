@@ -121,6 +121,9 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     flockName: 'Unit 1',
     flockId: 8,
     amount: defaultType === 'Income' ? 250000 : 150000,
+    paymentMode: 'Online' as 'Online' | 'Cash' | 'Split',
+    onlineAmount: defaultType === 'Income' ? 250000 : 0,
+    cashAmount: 0,
     referenceNo: `INV-${Date.now().toString().slice(-4)}`,
     challanNo: `${Math.floor(100 + Math.random() * 900)}`,
     description: '',
@@ -369,7 +372,23 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     e.preventDefault();
     const fid = newRecord.flockName === 'Unit 1' ? 8 : newRecord.flockName === 'Unit 2' ? 9 : 10;
     const trackingId = Date.now().toString().slice(-4);
-    const record: FinancialRecord = {
+
+    let onlinePayment = 0;
+    let cashPayment = 0;
+    if (newRecord.type === 'Income') {
+      if (newRecord.paymentMode === 'Online') {
+        onlinePayment = Number(newRecord.amount);
+        cashPayment = 0;
+      } else if (newRecord.paymentMode === 'Cash') {
+        onlinePayment = 0;
+        cashPayment = Number(newRecord.amount);
+      } else {
+        onlinePayment = Number(newRecord.onlineAmount) || 0;
+        cashPayment = Number(newRecord.cashAmount) || Math.max(0, Number(newRecord.amount) - onlinePayment);
+      }
+    }
+
+    const record: FinancialRecord & { onlinePayment?: number; cashPayment?: number; quantity?: number; unitPrice?: number } = {
       id: `${newRecord.type === 'Income' ? 'inc' : 'exp'}-${trackingId}`,
       trackingId: Number(trackingId),
       type: newRecord.type,
@@ -384,10 +403,17 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       description: newRecord.description || `${newRecord.head}: Manual entry`,
       notes: newRecord.description,
       status: 'Paid',
+      paymentMethod: newRecord.type === 'Income'
+        ? (newRecord.paymentMode === 'Online' ? 'Online / Bank' : newRecord.paymentMode === 'Cash' ? 'Cash Counter' : 'Split (Online/Cash)')
+        : 'Bank Transfer',
+      onlinePayment: onlinePayment,
+      cashPayment: cashPayment,
+      quantity: Math.round(Number(newRecord.amount) / 17.5),
+      unitPrice: 17.5,
       attachment: attachmentData || null,
       attachmentName: attachmentName || null,
     };
-    onAddTransaction(record);
+    onAddTransaction(record as FinancialRecord);
     setShowModal(false);
     handleRemoveAttachment();
   };
@@ -1409,9 +1435,73 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   min="1"
                   required
                   value={newRecord.amount}
-                  onChange={(e) => setNewRecord({ ...newRecord, amount: Number(e.target.value) })}
+                  onChange={(e) => {
+                    const amt = Number(e.target.value);
+                    setNewRecord({
+                      ...newRecord,
+                      amount: amt,
+                      onlineAmount: newRecord.paymentMode === 'Online' ? amt : newRecord.paymentMode === 'Cash' ? 0 : Math.round(amt * 0.8),
+                      cashAmount: newRecord.paymentMode === 'Cash' ? amt : newRecord.paymentMode === 'Online' ? 0 : Math.round(amt * 0.2),
+                    });
+                  }}
                 />
               </div>
+
+              {/* Payment Channel Selector for Sales Receipts */}
+              {newRecord.type === 'Income' && (
+                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2.5">
+                  <UISelect
+                    label="Payment Channel / Receipt Method"
+                    value={newRecord.paymentMode}
+                    onChange={(e) => {
+                      const mode = e.target.value as 'Online' | 'Cash' | 'Split';
+                      setNewRecord({
+                        ...newRecord,
+                        paymentMode: mode,
+                        onlineAmount: mode === 'Online' ? newRecord.amount : mode === 'Cash' ? 0 : Math.round(newRecord.amount * 0.8),
+                        cashAmount: mode === 'Cash' ? newRecord.amount : mode === 'Online' ? 0 : Math.round(newRecord.amount * 0.2),
+                      });
+                    }}
+                  >
+                    <option value="Online">Online / Direct Bank Transfer (100% Online)</option>
+                    <option value="Cash">Cash Counter / Direct Cash (100% Cash)</option>
+                    <option value="Split">Split Payment (Online Bank + Cash Counter)</option>
+                  </UISelect>
+
+                  {newRecord.paymentMode === 'Split' && (
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <UIInput
+                        label="Online Bank Amount (PKR)"
+                        type="number"
+                        min="0"
+                        value={newRecord.onlineAmount}
+                        onChange={(e) => {
+                          const online = Number(e.target.value);
+                          setNewRecord({
+                            ...newRecord,
+                            onlineAmount: online,
+                            cashAmount: Math.max(0, newRecord.amount - online),
+                          });
+                        }}
+                      />
+                      <UIInput
+                        label="Cash Counter Amount (PKR)"
+                        type="number"
+                        min="0"
+                        value={newRecord.cashAmount}
+                        onChange={(e) => {
+                          const cash = Number(e.target.value);
+                          setNewRecord({
+                            ...newRecord,
+                            cashAmount: cash,
+                            onlineAmount: Math.max(0, newRecord.amount - cash),
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <UIInput

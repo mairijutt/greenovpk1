@@ -153,17 +153,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     // Incorporate any live sales plus newly added sales in financials
     const userSales = financials
       .filter((f) => f.type === 'Income')
-      .map((f) => ({
-        id: f.id,
-        trackingId: Number(f.trackingId) || 9999,
-        date: f.date,
-        flockId: Number(f.flockId) || 8,
-        flock: f.flockName || 'Unit 1',
-        amount: f.amount,
-        quantity: (f as any).quantity || Math.round(f.amount / 17.5),
-        onlinePayment: f.paymentMethod === 'ONLINE' ? f.amount : 0,
-        cashPayment: f.paymentMethod !== 'ONLINE' ? f.amount : 0,
-      }));
+      .map((f: any) => {
+        let online = 0;
+        let cash = 0;
+
+        if (typeof f.onlinePayment === 'number' || typeof f.cashPayment === 'number') {
+          online = Number(f.onlinePayment) || 0;
+          cash = typeof f.cashPayment === 'number' ? Number(f.cashPayment) : Math.max(0, (Number(f.amount) || 0) - online);
+        } else if (f.paymentMethod) {
+          const pm = String(f.paymentMethod).toUpperCase();
+          if (pm.includes('ONLINE') || pm.includes('BANK')) {
+            online = Number(f.amount) || 0;
+            cash = 0;
+          } else if (pm.includes('SPLIT')) {
+            online = Math.round((Number(f.amount) || 0) * 0.8);
+            cash = Math.max(0, (Number(f.amount) || 0) - online);
+          } else {
+            online = 0;
+            cash = Number(f.amount) || 0;
+          }
+        } else {
+          online = Number(f.onlinePayment) || 0;
+          cash = typeof f.cashPayment === 'number' ? Number(f.cashPayment) : Math.max(0, (Number(f.amount) || 0) - online);
+        }
+
+        return {
+          id: f.id,
+          trackingId: Number(f.trackingId) || 9999,
+          date: f.date,
+          flockId: Number(f.flockId) || 8,
+          flock: f.flockName || f.flock || 'Unit 1',
+          amount: Number(f.amount) || 0,
+          quantity: Number(f.quantity) || Math.round((Number(f.amount) || 0) / 17.5),
+          onlinePayment: online,
+          cashPayment: cash,
+          paymentMethod: f.paymentMethod || (online > 0 ? (cash > 0 ? 'Split' : 'Online') : 'Cash'),
+        };
+      });
     const combined = [...userSales, ...liveSalesRecords.filter((ls) => !financials.some((f) => f.id === ls.id))];
     return combined.filter((s) => {
       const matchFlock = isFlockMatch(s.flockId, s.flock);
@@ -1010,7 +1036,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     Rs. 346,000
                   </div>
                   <div className="text-[11px] text-slate-500 mt-0.5">
-                    21,660 Eggs sold • 100% Cash Counter
+                    21,660 Eggs sold • Online: Rs. 345k | Cash: Rs. 1k
                   </div>
                 </div>
               </div>
