@@ -51,6 +51,7 @@ import {
   liveExpenseBreakdown,
   liveExpenseRecords,
 } from '../data/liveExpenses.ts';
+import { liveMortalityLogs } from '../data/liveBirdHealth.ts';
 
 interface DashboardViewProps {
   farms: Farm[];
@@ -463,6 +464,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const sourceEggs = eggProductions && eggProductions.length > 0 ? eggProductions : liveEggProductions;
     const allPeriodEggs = sourceEggs.filter((e) => isDateMatch(e.date));
 
+    // All mortality logs in the active date range
+    const sourceMortality = mortalityLogs && mortalityLogs.length > 0 ? mortalityLogs : liveMortalityLogs;
+    const allPeriodMortality = sourceMortality.filter((m) => isDateMatch(m.date));
+
     return units.map((u) => {
       // Filter specifically for this unit only
       const unitEggLogs = allPeriodEggs.filter((e) => isRecordForUnit(e.flockId, e.flockName, u.id, u.unit));
@@ -491,6 +496,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         const days = Math.max(1, Math.min(30, unitEggLogs.length > 0 ? unitEggLogs.length : 30));
         expenses = u.dailyBags * 5850 * days;
       }
+
+      // Unit mortality specifically for this unit
+      const unitMortLogs = allPeriodMortality.filter((m) => isRecordForUnit(m.flockId, m.flockName, u.id, u.unit));
+      const mortalityPeriod = unitMortLogs.reduce((sum, m) => sum + (m.count || 0), 0);
+      const allTimeMort = u.unit === 'Unit 1' ? 5 : u.unit === 'Unit 2' ? 7 : 3;
+      const displayMortality = preset === 'all' && !fromDate ? allTimeMort : (mortalityPeriod || (preset === 'today' ? 1 : 0));
 
       const revPerBird = Number((revenue / u.birds).toFixed(2));
       const expPerBird = Number((expenses / u.birds).toFixed(2));
@@ -524,6 +535,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               : 83.9
             : avgLay,
         displayRevenue: preset === 'all' && !fromDate ? u.allTimeRev : revenue,
+        displayExpenses: expenses,
+        displayMortality,
         displayRevPerBird: revPerBird,
         displayExpPerBird: expPerBird,
         displayNetPerBird: netPerBird,
@@ -532,7 +545,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         status: u.status,
       };
     });
-  }, [eggProductions, financials, preset, fromDate, toDate]);
+  }, [eggProductions, financials, mortalityLogs, preset, fromDate, toDate]);
 
   // Month-by-month financial ledger (Apr – Oct 2026)
   const monthlyFinanceData = [
@@ -555,9 +568,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [selectedFlock]);
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-12 sm:space-y-16 pb-20">
       {/* Top Banner / Hero Bar */}
-      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 rounded-2xl p-6 text-white shadow-md relative overflow-hidden border border-emerald-500/20">
+      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 rounded-2xl p-6 sm:p-7 text-white shadow-md relative overflow-hidden border border-emerald-500/20">
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold mb-3 border border-emerald-400/30">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -568,7 +581,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="font-bold text-white">{scopeLabel}</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-            Intelligence Poultry Management System
+            GreenOva Poultry Management System
           </h1>
           <p className="mt-1 text-sm sm:text-base font-bold text-emerald-400 tracking-wide">
             Smarter Poultry. Stronger Profits.
@@ -602,66 +615,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Date & Flock Filter Bar */}
-      <DateRangePickerBar
-        selectedFlock={selectedFlock}
-        onSelectFlock={setSelectedFlock}
-        flocks={flocks.map((f) => ({ id: f.id, name: f.name }))}
-        fromDate={fromDate}
-        toDate={toDate}
-        onDateChange={(from, to) => {
-          setFromDate(from);
-          setToDate(to);
-        }}
-        activePreset={preset}
-        onPresetChange={handlePresetChange}
-        onReset={handleReset}
-      />
+      {/* Date & Flock Filter Controls Container */}
+      <div className="space-y-3.5">
+        <DateRangePickerBar
+          selectedFlock={selectedFlock}
+          onSelectFlock={setSelectedFlock}
+          flocks={flocks.map((f) => ({ id: f.id, name: f.name }))}
+          fromDate={fromDate}
+          toDate={toDate}
+          onDateChange={(from, to) => {
+            setFromDate(from);
+            setToDate(to);
+          }}
+          activePreset={preset}
+          onPresetChange={handlePresetChange}
+          onReset={handleReset}
+        />
 
-      {/* Active Filter Period Context Notice */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-xs text-emerald-950">
-        <div className="flex items-center space-x-2 flex-wrap">
-          <span className="font-black uppercase tracking-wider text-[11px] bg-emerald-200/70 text-emerald-900 px-2 py-0.5 rounded-md">
-            Active Scope
-          </span>
-          <span className="font-bold text-emerald-900">
-            {preset === 'today' ? 'Today: 24 Oct 2026' : preset === '30d' ? 'Last 30 Days' : preset === 'all' ? 'All-Time Records' : `${fromDate} to ${toDate}`}
-          </span>
-          <span className="text-emerald-400">•</span>
-          <span className="font-semibold text-slate-800">Flock: {scopeLabel}</span>
-          <span className="text-emerald-400">•</span>
-          <span className="text-slate-600 font-medium">Population: {liveBirdsCount.toLocaleString()} birds</span>
-        </div>
-        <div className="flex items-center space-x-3 text-xs">
-          {preset !== 'today' && (
-            <button
-              onClick={() => handlePresetChange('today')}
-              className="font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
-            >
-              Switch to Today
-            </button>
-          )}
-          {preset !== 'all' && (
-            <button
-              onClick={() => handlePresetChange('all')}
-              className="font-bold text-slate-600 hover:text-slate-900 underline cursor-pointer"
-            >
-              View All-Time
-            </button>
-          )}
+        {/* Active Filter Period Context Notice */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-xs text-emerald-950 shadow-2xs">
+          <div className="flex items-center space-x-2 flex-wrap">
+            <span className="font-black uppercase tracking-wider text-[11px] bg-emerald-200/70 text-emerald-900 px-2 py-0.5 rounded-md">
+              Active Scope
+            </span>
+            <span className="font-bold text-emerald-900">
+              {preset === 'today' ? 'Today: 24 Oct 2026' : preset === '30d' ? 'Last 30 Days' : preset === 'all' ? 'All-Time Records' : `${fromDate} to ${toDate}`}
+            </span>
+            <span className="text-emerald-400">•</span>
+            <span className="font-semibold text-slate-800">Flock: {scopeLabel}</span>
+            <span className="text-emerald-400">•</span>
+            <span className="text-slate-600 font-medium">Population: {liveBirdsCount.toLocaleString()} birds</span>
+          </div>
+          <div className="flex items-center space-x-3 text-xs">
+            {preset !== 'today' && (
+              <button
+                onClick={() => handlePresetChange('today')}
+                className="font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
+              >
+                Switch to Today
+              </button>
+            )}
+            {preset !== 'all' && (
+              <button
+                onClick={() => handlePresetChange('all')}
+                className="font-bold text-slate-600 hover:text-slate-900 underline cursor-pointer"
+              >
+                View All-Time
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
       {/* SECTION 1: FINANCIAL OVERVIEW, INCOME VS EXPENSES & 3-UNIT CARDS */}
       {/* ========================================================================= */}
-      <section className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+      <section className="space-y-8 sm:space-y-9">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-4">
           <div>
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-sm bg-emerald-600"></span>
               <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">
-                1. Financial Section &amp; 3-Unit Environmental Telemetry
+                1. Financial Management
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -722,7 +737,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-rose-600 transition-colors">
-                  {preset === 'today' ? "Today's Disbursements" : 'Period Farm Expenses'}
+                  {preset === 'today' ? "Today's Expense" : 'Period Farm Expenses'}
                 </span>
                 <div className="p-2 rounded-xl bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors">
                   <CreditCard className="w-5 h-5" />
@@ -804,21 +819,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-teal-700 transition-colors">
-                  {preset === 'today' ? "1 Bird Today Economics" : "1 Bird Commercial Economics"}
+                  Cost per Bird
                 </span>
-                <div className={`p-2 rounded-xl transition-colors ${
-                  perBirdEconomics.isProfit
-                    ? 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white'
-                    : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'
-                }`}>
+                <div className="p-2 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition-colors">
                   <Scale className="w-5 h-5" />
                 </div>
               </div>
               <div className="mt-4">
                 <div className="flex items-baseline justify-between">
-                  <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tracking-tight">
-                    Rs. {perBirdEconomics.revenuePerBird.toLocaleString()}
-                    <span className="text-xs font-normal text-slate-500 ml-1.5">rev / bird</span>
+                  <div className="text-2xl sm:text-3xl font-black text-rose-700 font-mono tracking-tight">
+                    Rs. {perBirdEconomics.expensePerBird.toFixed(2)}
+                    <span className="text-xs font-normal text-slate-500 ml-1.5">cost / bird</span>
                   </div>
                   <span
                     className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
@@ -828,16 +839,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     }`}
                   >
                     {perBirdEconomics.isProfit
-                      ? `+${perBirdEconomics.profitMarginPercent}% Profit`
+                      ? `+${perBirdEconomics.profitMarginPercent}% Margin`
                       : `${perBirdEconomics.profitMarginPercent}% Margin`}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
                   <div>
-                    <span className="text-[11px] text-slate-500 block">Expense / Bird</span>
-                    <span className="font-bold text-rose-600 font-mono">
-                      Rs. {perBirdEconomics.expensePerBird.toLocaleString()}
+                    <span className="text-[11px] text-slate-500 block">Revenue / Bird</span>
+                    <span className="font-bold text-emerald-700 font-mono">
+                      Rs. {perBirdEconomics.revenuePerBird.toFixed(2)}
                     </span>
                   </div>
                   <div>
@@ -847,23 +858,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         perBirdEconomics.isProfit ? 'text-emerald-700' : 'text-rose-600'
                       }`}
                     >
-                      {perBirdEconomics.netPerBird < 0 ? '-' : '+'}Rs. {Math.abs(perBirdEconomics.netPerBird).toLocaleString()}
+                      {perBirdEconomics.netPerBird < 0 ? '-' : '+'}Rs. {Math.abs(perBirdEconomics.netPerBird).toFixed(2)}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-              <span
-                className={`font-bold font-mono px-2 py-0.5 rounded-md text-[11px] ${
-                  perBirdEconomics.isProfit
-                    ? 'text-emerald-700 bg-emerald-50'
-                    : 'text-rose-700 bg-rose-50'
-                }`}
-              >
-                {perBirdEconomics.isProfit
-                  ? `+Rs. ${perBirdEconomics.netPerBird.toFixed(2)}/bird`
-                  : `-Rs. ${Math.abs(perBirdEconomics.netPerBird).toFixed(2)}/bird`}
+              <span className="text-[11px] text-slate-600 font-medium">
+                Scope: <strong className="text-slate-900 font-mono">{liveBirdsCount.toLocaleString()}</strong> birds
               </span>
               <span className="font-bold text-teal-700 group-hover:text-teal-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
                 <span>Flock Details</span>
@@ -880,7 +883,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-purple-700 transition-colors">
-                  Payment Channels &amp; Settlements
+                  Payment Collection
                 </span>
                 <div className="p-2 rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-colors">
                   <Banknote className="w-5 h-5" />
@@ -958,7 +961,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <h3 className="text-sm font-black text-slate-900">
                 {preset === 'today' && financeViewMode === 'today'
-                  ? "Today's Commercial Revenue Distribution by Unit (24 Oct 2026)"
+                  ? "Today's Revenue by Units"
                   : 'Commercial Revenue vs. Expenses Timeline (April – October 2026)'}
               </h3>
               <p className="text-xs text-slate-500">
@@ -1170,12 +1173,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* 3 UNITS PRODUCTION & TEMPERATURE CARDS - REACTIVE TO TODAY */}
-        <div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+        <div className="pt-10 sm:pt-12 border-t border-slate-200/90 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
             <div>
               <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center space-x-2">
                 <Building2 className="w-4 h-4 text-emerald-700" />
-                <span>Unit Environmental &amp; Production Telemetry (Unit 1, Unit 2, Unit 3)</span>
+                <span>Units Comparison Report</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 {preset === 'today'
@@ -1188,7 +1191,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-7">
             {unitCards.map((unit) => {
               const isSelected =
                 selectedFlock === unit.unit ||
@@ -1259,17 +1262,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Section 2: Production Yield & Commercial Turnover with Clean Dividers */}
+                    {/* Section 2: Egg Production and Sales with Clean Dividers */}
                     <div className="mt-4 pt-3.5 border-t border-slate-200/80">
                       <div className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2.5 flex items-center gap-1.5">
                         <Egg className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Production Yield &amp; Commercial Sales</span>
+                        <span>Egg Production and Sales</span>
                       </div>
                       <div className="space-y-0 text-xs">
                         {/* Row 1 */}
                         <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
                           <span className="text-slate-600 font-medium">
-                            {preset === 'today' ? "Today's Egg Production:" : 'Period Egg Yield:'}
+                            {preset === 'today' ? "Today's Egg Production:" : 'Period Egg Production:'}
                           </span>
                           <span className="font-black text-amber-700 font-mono text-base">
                             {unit.displayEggs.toLocaleString()}{' '}
@@ -1298,7 +1301,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </div>
                         </div>
 
-                        {/* Row 4 */}
+                        {/* Row 4: Total Mortality */}
+                        <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">Total Mortality:</span>
+                          <span className="font-black text-rose-600 font-mono text-base">
+                            {unit.displayMortality.toLocaleString()}{' '}
+                            <span className="text-xs font-normal text-slate-500">birds</span>
+                          </span>
+                        </div>
+
+                        {/* Row 5: Today's Egg Revenue (directly above Total Expenses) */}
                         <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
                           <span className="text-slate-600 font-medium">
                             {preset === 'today' ? "Today's Egg Revenue:" : 'Sales Turnover:'}
@@ -1307,10 +1319,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             Rs. {unit.displayRevenue.toLocaleString()}
                           </span>
                         </div>
+
+                        {/* Row 6: Total Expenses */}
+                        <div className="flex justify-between items-center py-2.5">
+                          <span className="text-slate-600 font-medium">Total Expenses:</span>
+                          <span className="font-black text-slate-900 font-mono text-base">
+                            Rs. {Math.round(unit.displayExpenses).toLocaleString()}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Section 3: Flock-Specific 1-Bird Economics */}
+                    {/* Section 3 (At Last): Flock-Specific 1-Bird Economics */}
                     <div className="mt-4 pt-3.5 border-t border-slate-200/80">
                       <div className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
                         <span className="flex items-center space-x-1.5">
@@ -1353,17 +1373,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </div>
                   </div>
-
-                  {/* Section 4: Hardware & Shed Status Footer */}
-                  <div className="mt-5 pt-3.5 border-t border-slate-200/80 flex items-center justify-between text-xs">
-                    <div className="flex items-center text-emerald-700 font-bold truncate">
-                      <CheckCircle className="w-4 h-4 mr-1.5 shrink-0 text-emerald-600" />
-                      <span className="truncate">{unit.status}</span>
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-400 hover:text-emerald-700 transition-colors shrink-0 ml-2">
-                      Click to filter &rarr;
-                    </span>
-                  </div>
                 </div>
               );
             })}
@@ -1374,13 +1383,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* ========================================================================= */}
       {/* SECTION 2: EGG PRODUCTION WITH INTERACTIVE GRAPHS */}
       {/* ========================================================================= */}
-      <section className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+      <section className="space-y-8 sm:space-y-9">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-4">
           <div>
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-sm bg-amber-500"></span>
               <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">
-                2. Egg Production Section (Real Output &amp; Collections)
+                2. Egg Production Section
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -1399,7 +1408,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Egg Production KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
             <div className="text-[11px] font-bold uppercase text-slate-500">
               {preset === 'today' ? "Today's Total Output" : 'Period Production Output'}
@@ -1451,12 +1460,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Interactive Production Visualizer & Daily Logs */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
+        <div className="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200/90 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-black text-slate-900">
                 {preset === 'today'
-                  ? `Today's Shift Yield & Morning vs. Evening Distribution (24 Oct 2026)`
+                  ? `Today's Productions Morning vs Evening`
                   : 'Daily Production Yield Curve & Flocks Output'}
               </h3>
               <p className="text-xs text-slate-500">
@@ -1562,13 +1571,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* ========================================================================= */}
       {/* SECTION 3: CONSUMPTION ANALYTICS (FEED & WATER) */}
       {/* ========================================================================= */}
-      <section className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+      <section className="space-y-8 sm:space-y-9">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-4">
           <div>
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-sm bg-blue-600"></span>
               <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">
-                3. Feed Mash &amp; Water Consumption Section
+                3. Feed &amp; Water Consumption
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -1587,17 +1596,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Nutritional KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
             <div className="text-[11px] font-bold uppercase text-slate-500">
-              {preset === 'today' ? "Today's Mash Consumed" : 'Period Feed Consumed'}
+              {preset === 'today' ? "Today Feed Consumed" : 'Period Feed Consumed'}
             </div>
             <div className="text-2xl font-black text-slate-900 font-mono mt-1">
               {dynamicConsumption.bags.toLocaleString()}{' '}
               <span className="text-xs text-slate-400 font-normal">bags</span>
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
-              {dynamicConsumption.feedKg.toLocaleString()} kg nutritional mash
+              {dynamicConsumption.feedKg.toLocaleString()} kg nutritional feed
             </div>
           </div>
 
@@ -1636,47 +1645,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Today's Unit-Wise Consumption Breakdown */}
-        <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex justify-between items-center mb-3">
+        <div className="p-6 sm:p-7 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div className="flex justify-between items-center">
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
               {preset === 'today' ? "Today's Feed Intake by Unit" : 'Cumulative Feed Intake by Unit'}
             </h3>
             <span className="text-xs text-slate-500 font-medium">50kg Feed Bags</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
+            <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold text-slate-900">Unit 1 (Shed 1)</span>
                 <span className="font-mono font-bold text-blue-700">
                   {preset === 'today' ? '58 Bags (2,900 kg)' : '7,840 Bags'}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">
+              <div className="text-[11px] text-slate-500 mt-1.5">
                 Water: {preset === 'today' ? '6,400 L' : '878,000 L'} • 117 g/bird
               </div>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold text-slate-900">Unit 2 (Shed 2)</span>
                 <span className="font-mono font-bold text-blue-700">
                   {preset === 'today' ? '75 Bags (3,750 kg)' : '34,245 Bags'}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">
+              <div className="text-[11px] text-slate-500 mt-1.5">
                 Water: {preset === 'today' ? '8,500 L' : '3,835,000 L'} • 118 g/bird
               </div>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-bold text-slate-900">Unit 3 (Shed 3)</span>
                 <span className="font-mono font-bold text-blue-700">
                   {preset === 'today' ? '62 Bags (3,100 kg)' : '6,310 Bags'}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">
+              <div className="text-[11px] text-slate-500 mt-1.5">
                 Water: {preset === 'today' ? '6,900 L' : '707,000 L'} • 119 g/bird
               </div>
             </div>
@@ -1687,13 +1696,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* ========================================================================= */}
       {/* SECTION 4: STOCKS & REPLENISHMENTS */}
       {/* ========================================================================= */}
-      <section className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+      <section className="space-y-8 sm:space-y-9">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-4">
           <div>
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-sm bg-indigo-600"></span>
               <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">
-                4. Stock &amp; Warehouse Inventory Section
+                4. Stock &amp; Inventory Management
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -1712,8 +1721,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         {/* Stock KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
             <div className="text-[11px] font-bold uppercase text-slate-500">
               {preset === 'today' ? "Today's Stock Received" : 'Total Stock Received'}
             </div>
@@ -1726,7 +1735,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
+          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
             <div className="text-[11px] font-bold uppercase text-slate-500">
               {preset === 'today' ? "Today's Invoice Paid" : 'Total Amount Disbursed'}
             </div>
@@ -1738,7 +1747,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
+          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
             <div className="text-[11px] font-bold uppercase text-slate-500">Warehouse Safety Buffer</div>
             <div className="text-2xl font-black text-amber-700 font-mono mt-1">
               2,150 Bags
@@ -1748,7 +1757,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
+          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
             <div className="text-[11px] font-bold uppercase text-slate-500">Commercial Trays Stock</div>
             <div className="text-2xl font-black text-slate-800 font-mono mt-1">
               42,500 Trays
@@ -1761,29 +1770,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {/* Today's Delivery Highlight Card */}
         {activeStocks.length > 0 && (
-          <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-200 shadow-2xs">
-            <div className="flex items-center space-x-2 text-indigo-950 font-bold text-xs mb-2">
+          <div className="p-6 sm:p-7 bg-indigo-50/40 rounded-2xl border border-indigo-200/80 shadow-xs space-y-4">
+            <div className="flex items-center space-x-2 text-indigo-950 font-bold text-xs">
               <Truck className="w-4 h-4 text-indigo-700" />
               <span>
                 {preset === 'today' ? "Today's Feed Delivery Log (24 Oct 2026)" : 'Recent Stock Deliveries'}
               </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {activeStocks.slice(0, 3).map((stk) => (
-                <div key={stk.id} className="p-3 bg-white rounded-xl border border-indigo-200/80 shadow-xs">
+                <div key={stk.id} className="p-4 bg-white rounded-xl border border-indigo-200/80 shadow-xs">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-black text-slate-900">#{stk.trackingId} • {stk.flockName}</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
                       Feed {stk.type}
                     </span>
                   </div>
-                  <div className="text-base font-black text-indigo-900 font-mono mt-1">
+                  <div className="text-base font-black text-indigo-900 font-mono mt-1.5">
                     {stk.quantity} Bags • Rs. {stk.amount.toLocaleString()}
                   </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
+                  <div className="text-[11px] text-slate-500 mt-1">
                     Challan: {stk.challanNo ? `CH-${stk.challanNo}` : '-'} • {stk.paymentType}
                   </div>
-                  <div className="text-[10px] text-slate-600 mt-1 italic truncate">
+                  <div className="text-[11px] text-slate-600 mt-1 italic truncate">
                     {stk.notes}
                   </div>
                 </div>

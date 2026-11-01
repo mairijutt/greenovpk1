@@ -80,7 +80,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <img
           src="/src/assets/images/poultry_login_bg_1793271065125.jpg"
-          alt="Intelligence Poultry Facility"
+          alt="GreenOva Poultry Facility"
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover scale-105 filter brightness-80 contrast-105"
         />
@@ -96,7 +96,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
       <div className="relative z-10 mb-4 sm:mb-6 flex items-center justify-center">
         <div className="flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/30 backdrop-blur-md shadow-lg text-xs font-semibold">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="text-white">Intelligence Poultry OS</span>
+          <span className="text-white">GreenOva Poultry OS</span>
           <span className="text-emerald-400">•</span>
           <span className="text-emerald-300">Enterprise Cloud</span>
         </div>
@@ -124,7 +124,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
               }}
             />
           </div>
-          <h1 className="text-xl font-black tracking-tight">Intelligence Poultry Management System</h1>
+          <h1 className="text-xl font-black tracking-tight">GreenOva Poultry Management System</h1>
           <p className="text-xs text-emerald-200/90 mt-1">
             Smarter Poultry. Stronger Profits.
           </p>
@@ -205,7 +205,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
         {/* Footer info */}
         <div className="bg-slate-50/90 backdrop-blur-xs p-3.5 text-center border-t border-slate-100 flex flex-col items-center gap-1 text-[11px] text-slate-500">
           <div className="font-semibold text-slate-700">
-            Intelligence Poultry Management System
+            GreenOva Poultry Management System
           </div>
           <div className="text-[10px] text-slate-400 flex items-center justify-center space-x-1.5">
             <ShieldCheck className="w-3 h-3 text-emerald-600" />

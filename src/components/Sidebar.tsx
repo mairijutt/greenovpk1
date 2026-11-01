@@ -298,7 +298,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               />
             </div>
             <div>
-              <div className="text-xs font-bold leading-tight">Intelligence Poultry</div>
+              <div className="text-xs font-bold leading-tight">GreenOva Poultry</div>
               <div className="text-[10px] text-emerald-300">Navigation Menu</div>
             </div>
           </div>

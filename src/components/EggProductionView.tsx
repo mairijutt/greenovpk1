@@ -365,10 +365,11 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
               </span>
             </div>
             <div className="mt-1 text-base font-black text-slate-900 font-mono">
-              {unitEggStats.all.eggs.toLocaleString()}
+              {(unitEggStats.all.eggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
+              <span className="text-xs font-semibold text-slate-500">Cartons</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">
-              Broken: {unitEggStats.all.broken.toLocaleString()} ({((unitEggStats.all.broken / (unitEggStats.all.eggs || 1)) * 100).toFixed(2)}%)
+            <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
+              {unitEggStats.all.eggs.toLocaleString()} eggs • Broken: {unitEggStats.all.broken.toLocaleString()} ({((unitEggStats.all.broken / (unitEggStats.all.eggs || 1)) * 100).toFixed(2)}%)
             </div>
           </button>
 
@@ -391,10 +392,11 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
               </span>
             </div>
             <div className="mt-1 text-base font-black text-emerald-700 font-mono">
-              {unitEggStats.unit1.eggs.toLocaleString()}
+              {(unitEggStats.unit1.eggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
+              <span className="text-xs font-semibold text-slate-500">Cartons</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">
-              11.25% of total • {unitEggStats.unit1.broken.toLocaleString()} broken
+            <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
+              {unitEggStats.unit1.eggs.toLocaleString()} eggs (11.25%) • {unitEggStats.unit1.broken.toLocaleString()} broken
             </div>
           </button>
 
@@ -417,10 +419,11 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
               </span>
             </div>
             <div className="mt-1 text-base font-black text-blue-700 font-mono">
-              {unitEggStats.unit2.eggs.toLocaleString()}
+              {(unitEggStats.unit2.eggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
+              <span className="text-xs font-semibold text-slate-500">Cartons</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">
-              82.15% of total • {unitEggStats.unit2.broken.toLocaleString()} broken
+            <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
+              {unitEggStats.unit2.eggs.toLocaleString()} eggs (82.15%) • {unitEggStats.unit2.broken.toLocaleString()} broken
             </div>
           </button>
 
@@ -443,10 +446,11 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
               </span>
             </div>
             <div className="mt-1 text-base font-black text-amber-700 font-mono">
-              {unitEggStats.unit3.eggs.toLocaleString()}
+              {(unitEggStats.unit3.eggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
+              <span className="text-xs font-semibold text-slate-500">Cartons</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">
-              6.60% of total • {unitEggStats.unit3.broken.toLocaleString()} broken
+            <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
+              {unitEggStats.unit3.eggs.toLocaleString()} eggs (6.60%) • {unitEggStats.unit3.broken.toLocaleString()} broken
             </div>
           </button>
         </div>
@@ -916,7 +920,7 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                   <div className="flex justify-between items-center text-slate-200">
                     <span className="text-slate-300">Total Output:</span>
                     <span className="font-mono font-bold text-amber-400 text-sm">
-                      {activeTooltipData.totalEggs.toLocaleString()} eggs
+                      {(activeTooltipData.totalEggs / 360).toFixed(1)} ctn ({activeTooltipData.totalEggs.toLocaleString()} eggs)
                     </span>
                   </div>
 
@@ -941,9 +945,9 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                   </div>
 
                   <div className="flex justify-between items-center text-[11px] text-slate-300">
-                    <span>Clean Trays (30s):</span>
+                    <span>Clean Trays &amp; Cartons:</span>
                     <span className="font-mono font-bold text-emerald-400">
-                      {activeTooltipData.cleanTrays.toLocaleString()} trays
+                      {(activeTooltipData.cleanTrays / 12).toFixed(1)} ctn ({activeTooltipData.cleanTrays.toLocaleString()} trays)
                     </span>
                   </div>
 
@@ -1026,23 +1030,23 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Eggs Collected"
-          value={totalEggs}
-          unit="Eggs"
+          value={Math.round(totalEggs / 360).toLocaleString()}
+          unit="Cartons"
           icon={Egg}
           color="amber"
-          badge={{ text: `${filtered.length} Total Logs`, color: 'amber' }}
-          subtext="Morning & evening collections in period"
+          badge={{ text: `${totalEggs.toLocaleString()} Eggs`, color: 'amber' }}
+          subtext={`${totalEggs.toLocaleString()} eggs collected (${(totalEggs / 360).toFixed(1)} ctn @ 360 eggs/ctn)`}
         />
 
         <StatCard
-          title="Commercial Trays & Cartons"
-          value={totalTrays}
-          unit="Trays"
+          title="Commercial Cartons & Trays"
+          value={Math.round(totalTrays / 12).toLocaleString()}
+          unit="Cartons"
           icon={Layers}
           color="emerald"
           valueColor="text-emerald-700"
-          badge={{ text: `${Math.round(totalTrays / 12).toLocaleString()} Cartons`, color: 'emerald' }}
-          subtext={`${Math.round(totalTrays / 12).toLocaleString()} standard cartons (360 eggs/ctn)`}
+          badge={{ text: `${totalTrays.toLocaleString()} Trays`, color: 'emerald' }}
+          subtext={`${totalTrays.toLocaleString()} clean 30-egg trays (12 trays/carton)`}
         />
 
         <StatCard
@@ -1121,8 +1125,8 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                 <th className="py-3 px-4">Flock / Shed</th>
                 <th className="py-3 px-4 text-right">Morning (A.M.)</th>
                 <th className="py-3 px-4 text-right">Evening (P.M.)</th>
-                <th className="py-3 px-4 text-right">Total Eggs</th>
-                <th className="py-3 px-4 text-right">Clean Trays</th>
+                <th className="py-3 px-4 text-right">Total Production</th>
+                <th className="py-3 px-4 text-right">Clean Trays / Cartons</th>
                 <th className="py-3 px-4 text-right">Broken</th>
                 <th className="py-3 px-4 text-center">Laying %</th>
                 <th className="py-3 px-4">Notes</th>
@@ -1155,11 +1159,21 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                     <td className="py-3 px-4 text-right text-slate-600 font-mono">
                       {entry.eveningEggs.toLocaleString()}
                     </td>
-                    <td className="py-3 px-4 text-right font-bold text-emerald-800 font-mono">
-                      {entry.totalEggs.toLocaleString()}
+                    <td className="py-3 px-4 text-right font-mono">
+                      <div className="font-bold text-emerald-800">
+                        {(entry.totalEggs / 360).toFixed(1)} ctn
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-medium">
+                        {entry.totalEggs.toLocaleString()} eggs
+                      </div>
                     </td>
-                    <td className="py-3 px-4 text-right font-semibold text-slate-700 font-mono">
-                      {entry.cleanTrays.toLocaleString()}
+                    <td className="py-3 px-4 text-right font-mono">
+                      <div className="font-semibold text-slate-700">
+                        {entry.cleanTrays.toLocaleString()} trays
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-medium">
+                        {(entry.cleanTrays / 12).toFixed(1)} ctn
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-right font-medium text-rose-600 font-mono">
                       {entry.damagedEggs.toLocaleString()}

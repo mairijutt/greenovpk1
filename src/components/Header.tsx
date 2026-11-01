@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
               <div>
                 <div className="flex items-center space-x-1.5 sm:space-x-2">
                   <span className="font-bold text-base sm:text-lg tracking-tight text-white whitespace-nowrap group-hover:text-emerald-300 transition-colors">
-                    Intelligence Poultry
+                    GreenOva Poultry
                   </span>
                   <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     Smart OS
