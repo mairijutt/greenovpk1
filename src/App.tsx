@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Header, HealthNotification } from './components/Header';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
 import { EggProductionView } from './components/EggProductionView';
@@ -91,6 +91,23 @@ export default function App() {
   });
   const [activeFarm, setActiveFarm] = useState<string>('all');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('greenova_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('greenova_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Authenticated user state - restored from localStorage so refreshing page keeps session until manual logout
   const [currentUser, setCurrentUser] = useState<{
@@ -210,6 +227,7 @@ export default function App() {
     }
     return liveVaccineSchedules;
   });
+  const [latestHealthPrompt, setLatestHealthPrompt] = useState<HealthNotification | null>(null);
   const [consumptionLogs, setConsumptionLogs] = useState<FeedConsumption[]>(() => {
     const saved = localStorage.getItem('greenova_feed_v2');
     if (saved) {
@@ -438,6 +456,38 @@ export default function App() {
 
   const handleAddVaccine = (newVaccine: VaccineLog) => {
     setVaccines((prev) => [newVaccine, ...prev]);
+
+    // Save to localStorage
+    try {
+      const stored = localStorage.getItem('greenova_vaccines_v2');
+      const parsed = stored ? JSON.parse(stored) : [];
+      localStorage.setItem('greenova_vaccines_v2', JSON.stringify([newVaccine, ...(Array.isArray(parsed) ? parsed : [])]));
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    // Trigger immediate prompt on Bell icon in Header
+    const isMed =
+      newVaccine.vaccineName.toLowerCase().includes('medicin') ||
+      newVaccine.vaccineName.toLowerCase().includes('antibiotic') ||
+      newVaccine.vaccineName.toLowerCase().includes('vitamin') ||
+      newVaccine.vaccineName.toLowerCase().includes('tonic') ||
+      newVaccine.vaccineName.toLowerCase().includes('powder') ||
+      newVaccine.vaccineName.toLowerCase().includes('dewormer');
+
+    const promptNotification: HealthNotification = {
+      id: newVaccine.id,
+      title: newVaccine.vaccineName,
+      message: `${newVaccine.flockName || 'Layer Shed'} • ${newVaccine.method || 'Standard'} • ${newVaccine.dosage || ''}`,
+      date: newVaccine.scheduledDate || new Date().toISOString().split('T')[0],
+      flockName: newVaccine.flockName || 'Unit 1',
+      status: newVaccine.status as any,
+      method: newVaccine.method,
+      dosage: newVaccine.dosage,
+      type: isMed ? 'medicine' : 'vaccine',
+      isNew: true,
+    };
+    setLatestHealthPrompt(promptNotification);
   };
 
   const handleAddFlock = (flock: Flock) => {
@@ -472,18 +522,22 @@ export default function App() {
   };
 
   const handleToggleVaccine = (id: string) => {
-    setVaccines(
-      vaccines.map((v) =>
+    setVaccines((prev) => {
+      const updated = prev.map((v) =>
         v.id === id
           ? {
               ...v,
-              status: v.status === 'Completed' ? 'Scheduled' : 'Completed',
+              status: (v.status === 'Completed' ? 'Scheduled' : 'Completed') as any,
               administeredDate:
                 v.status === 'Completed' ? undefined : new Date().toISOString().split('T')[0],
             }
           : v
-      )
-    );
+      );
+      try {
+        localStorage.setItem('greenova_vaccines_v2', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
   };
 
   const handleRestock = (id: string, amount: number) => {
@@ -679,16 +733,51 @@ export default function App() {
     );
   }
 
+  // Health notifications derived strictly from scheduled vaccines & medications
+  const healthNotifications: HealthNotification[] = useMemo(() => {
+    return vaccines
+      .filter((v) => v.status === 'Scheduled')
+      .map((v) => {
+      const isMed =
+        v.vaccineName.toLowerCase().includes('medicin') ||
+        v.vaccineName.toLowerCase().includes('antibiotic') ||
+        v.vaccineName.toLowerCase().includes('vitamin') ||
+        v.vaccineName.toLowerCase().includes('tonic') ||
+        v.vaccineName.toLowerCase().includes('powder') ||
+        v.vaccineName.toLowerCase().includes('dewormer');
+
+      return {
+        id: v.id,
+        title: v.vaccineName,
+        message: `${v.flockName || 'Layer Shed'} • ${v.method || 'Standard'} • ${v.dosage || ''}`,
+        date: v.scheduledDate || `Week ${v.scheduledWeek}`,
+        flockName: v.flockName,
+        status: v.status as any,
+        method: v.method,
+        dosage: v.dosage,
+        type: isMed ? 'medicine' : 'vaccine',
+        isNew: latestHealthPrompt?.id === v.id,
+      };
+    });
+  }, [vaccines, latestHealthPrompt]);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans antialiased">
-      {/* Top Header with Mobile Hamburger Menu */}
+      {/* Top Header with Mobile Hamburger Menu, Desktop Collapse Toggle, and Bell Notification Prompt */}
       <Header
         currentUser={currentUser}
         onSignOut={handleSignOut}
         onOpenLogin={() => setShowLoginModal(true)}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebarCollapse}
         onNavigateHome={() => handleNavigateTab('dashboard')}
+        notifications={healthNotifications}
+        latestPrompt={latestHealthPrompt}
+        onClearPrompt={() => setLatestHealthPrompt(null)}
+        onNavigateTab={(tab) => handleNavigateTab(tab as NavTab)}
+        onToggleVaccineStatus={handleToggleVaccine}
       />
 
       {/* Main Body */}
@@ -702,6 +791,8 @@ export default function App() {
           currentUser={currentUser}
           onSignOut={handleSignOut}
           onUpdateUser={handleUpdateUser}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={handleToggleSidebarCollapse}
         />
 
         {/* Dynamic Content View Area */}
@@ -742,6 +833,7 @@ export default function App() {
             <ConsumptionView
               consumptionLogs={consumptionLogs}
               flocks={flocks}
+              mortalityLogs={mortalityLogs}
               onOpenRecordModal={() => setRecordModalType('feed')}
             />
           )}

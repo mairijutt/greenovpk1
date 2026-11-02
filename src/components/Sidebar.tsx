@@ -26,6 +26,8 @@ import {
   AlertCircle,
   Smartphone,
   Check,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 
 export type NavTab =
@@ -59,6 +61,8 @@ interface SidebarProps {
   currentUser?: UserProfileData | null;
   onSignOut?: () => void;
   onUpdateUser?: (updated: UserProfileData) => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 interface NavSection {
@@ -79,6 +83,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentUser,
   onSignOut,
   onUpdateUser,
+  isCollapsed = false,
+  onToggleCollapse,
 }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [activeProfileModal, setActiveProfileModal] = useState<
@@ -280,7 +286,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className={`bg-white border-r border-slate-200 w-72 md:w-64 flex-shrink-0 flex flex-col justify-between transition-transform duration-300 ease-in-out shadow-2xl md:shadow-sm fixed md:static inset-y-0 left-0 z-50 md:z-auto ${
+        className={`bg-white border-r border-slate-200 ${
+          isCollapsed ? 'w-72 md:w-[72px]' : 'w-72 md:w-64'
+        } flex-shrink-0 flex flex-col justify-between transition-all duration-300 ease-in-out shadow-2xl md:shadow-sm fixed md:static inset-y-0 left-0 z-50 md:z-auto ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
@@ -312,17 +320,105 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
+        {/* Desktop Collapse Header (Closing right to left) */}
+        <div
+          className={`hidden md:flex items-center ${
+            isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3.5 py-3'
+          } border-b border-slate-100 bg-slate-50/70`}
+        >
+          {!isCollapsed && (
+            <div className="flex items-center space-x-2 pl-0.5">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                Menu
+              </span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            title={
+              isCollapsed
+                ? 'Expand menu (left to right)'
+                : 'Collapse menu (right to left, only icons display)'
+            }
+            aria-label={isCollapsed ? 'Expand menu' : 'Collapse menu'}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/80 transition-colors cursor-pointer"
+          >
+            {isCollapsed ? (
+              <PanelLeftOpen className="w-4 h-4 text-emerald-700 hover:scale-110 transition-transform" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4 text-slate-600 hover:scale-110 transition-transform" />
+            )}
+          </button>
+        </div>
+
         {/* Scrollable Navigation Menu */}
-        <div className="p-3.5 space-y-4 overflow-y-auto flex-1">
+        <div
+          className={`space-y-4 overflow-y-auto flex-1 ${
+            isCollapsed ? 'p-2' : 'p-3.5'
+          }`}
+        >
           {sections.map((section, idx) => (
-            <div key={section.title} className={idx > 0 ? 'pt-2' : ''}>
-              <div className="px-3 py-1.5 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-                {section.title}
-              </div>
+            <div
+              key={section.title}
+              className={idx > 0 ? (isCollapsed ? 'pt-1' : 'pt-2') : ''}
+            >
+              {!isCollapsed ? (
+                <div className="px-3 py-1.5 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+                  {section.title}
+                </div>
+              ) : (
+                <div
+                  className="h-px bg-slate-200/80 my-2 mx-1.5"
+                  title={section.title}
+                />
+              )}
               <div className="space-y-1 mt-1">
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = currentTab === item.id;
+
+                  if (isCollapsed) {
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          onSelectTab(item.id);
+                          onClose?.();
+                        }}
+                        title={item.label}
+                        aria-label={item.label}
+                        className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all cursor-pointer group relative ${
+                          isActive
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800'
+                        }`}
+                      >
+                        <div className="relative flex items-center justify-center">
+                          <Icon
+                            className={`w-5 h-5 ${
+                              isActive
+                                ? 'text-white'
+                                : 'text-slate-600 group-hover:text-emerald-700'
+                            }`}
+                          />
+                          {item.badge && (
+                            <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
+                          )}
+                        </div>
+                        {/* Hover Tooltip for icon-only mode */}
+                        <div className="absolute left-[calc(100%+10px)] px-2.5 py-1.5 bg-slate-900 text-white text-[11px] font-semibold rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl border border-slate-800">
+                          {item.label}
+                          {item.badge && (
+                            <span className="ml-1.5 text-[9px] text-emerald-300 font-bold uppercase">
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  }
+
                   return (
                     <button
                       key={item.id}
@@ -337,7 +433,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     >
                       <div className="flex items-center space-x-2.5">
-                        <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                        <Icon
+                          className={`w-4 h-4 ${
+                            isActive ? 'text-white' : 'text-slate-500'
+                          }`}
+                        />
                         <span>{item.label}</span>
                       </div>
                       {item.badge && (
@@ -360,7 +460,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* User Profile Card with Popover matching sc1.png */}
-        <div className="p-3 border-t border-slate-200 bg-slate-50/60 relative">
+        <div
+          className={`border-t border-slate-200 bg-slate-50/60 relative ${
+            isCollapsed ? 'p-2' : 'p-3'
+          }`}
+        >
           {/* Popover Menu matching sc1.png exactly */}
           {isProfileOpen && (
             <>
@@ -370,7 +474,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setIsProfileOpen(false)}
               />
 
-              <div className="absolute bottom-[calc(100%+8px)] left-2.5 right-2.5 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
+              <div
+                className={`absolute bottom-[calc(100%+8px)] bg-white rounded-xl shadow-xl border border-slate-200/90 py-1.5 z-50 text-xs animate-in fade-in zoom-in-95 duration-150 ${
+                  isCollapsed ? 'left-2 w-64' : 'left-2.5 right-2.5'
+                }`}
+              >
                 {/* Profile Card Header */}
                 <div className="flex items-center space-x-2.5 px-3 py-2">
                   <div className="w-9 h-9 rounded-full bg-[#dbeee0] text-slate-700 flex items-center justify-center font-bold text-xs flex-shrink-0">
@@ -399,7 +507,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className="w-full flex items-center space-x-3 px-3.5 py-2 text-slate-800 hover:bg-slate-50 transition-colors text-left cursor-pointer"
                   >
                     <Key className="w-4 h-4 text-slate-700" />
-                    <span className="font-normal text-xs text-slate-800">Change Password</span>
+                    <span className="font-normal text-xs text-slate-800">
+                      Change Password
+                    </span>
                   </button>
 
                   <button
@@ -412,7 +522,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <div className="flex items-center space-x-3">
                       <Mail className="w-4 h-4 text-slate-700" />
-                      <span className="font-normal text-xs text-slate-800">Verify Email</span>
+                      <span className="font-normal text-xs text-slate-800">
+                        Verify Email
+                      </span>
                     </div>
                     {isEmailVerified ? (
                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md flex items-center space-x-0.5">
@@ -435,7 +547,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className="w-full flex items-center space-x-3 px-3.5 py-2 text-slate-800 hover:bg-slate-50 transition-colors text-left cursor-pointer"
                   >
                     <User className="w-4 h-4 text-slate-700" />
-                    <span className="font-normal text-xs text-slate-800">Update Profile</span>
+                    <span className="font-normal text-xs text-slate-800">
+                      Update Profile
+                    </span>
                   </button>
                 </div>
 
@@ -451,34 +565,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className="w-full flex items-center space-x-3 px-3.5 py-2 text-slate-900 hover:bg-slate-50 transition-colors text-left cursor-pointer"
                 >
                   <LogOut className="w-4 h-4 text-slate-900" />
-                  <span className="font-normal text-xs text-slate-900">Log out</span>
+                  <span className="font-normal text-xs text-slate-900">
+                    Log out
+                  </span>
                 </button>
               </div>
             </>
           )}
 
           {/* Bottom trigger pill matching sc1.png */}
-          <button
-            type="button"
-            onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[#dcefe0] hover:bg-[#d0e8d6] border border-[#c2e2c9] shadow-2xs transition-all text-left cursor-pointer"
-          >
-            <div className="flex items-center space-x-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-[#d0e8d4] text-[#1b4d24] flex items-center justify-center font-bold text-xs flex-shrink-0">
-                {userInitials}
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-slate-900 truncate">
-                  {userName}
+          {!isCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+              className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[#dcefe0] hover:bg-[#d0e8d6] border border-[#c2e2c9] shadow-2xs transition-all text-left cursor-pointer"
+            >
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-full bg-[#d0e8d4] text-[#1b4d24] flex items-center justify-center font-bold text-xs flex-shrink-0">
+                  {userInitials}
                 </div>
-                <div className="text-[11px] text-slate-600 truncate">
-                  {userEmail}
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-slate-900 truncate">
+                    {userName}
+                  </div>
+                  <div className="text-[11px] text-slate-600 truncate">
+                    {userEmail}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <ChevronsUpDown className="w-4 h-4 text-slate-600 flex-shrink-0 ml-1" />
-          </button>
+              <ChevronsUpDown className="w-4 h-4 text-slate-600 flex-shrink-0 ml-1" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+              title={`${userName} • ${userRole}`}
+              className="w-10 h-10 rounded-full bg-[#d0e8d4] text-[#1b4d24] flex items-center justify-center font-bold text-xs mx-auto border border-[#c2e2c9] shadow-2xs hover:scale-105 transition-transform cursor-pointer"
+            >
+              {userInitials}
+            </button>
+          )}
         </div>
       </aside>
 

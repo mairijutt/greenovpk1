@@ -388,7 +388,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
               icon={Syringe}
               onClick={() => setIsScheduleModalOpen(true)}
             >
-              Schedule Vaccine
+              Schedule Vaccine / Medicine
             </UIButton>
             <UIButton
               variant="danger"
@@ -906,7 +906,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
               size="sm"
               onClick={() => setIsScheduleModalOpen(true)}
             >
-              + Schedule Vaccine
+              + Schedule Vaccine / Medicine
             </UIButton>
           </div>
 
@@ -1033,10 +1033,10 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
                 </div>
                 <div>
                   <h2 className="text-base font-black text-slate-900">
-                    Schedule Flock Vaccination
+                    Schedule Flock Vaccination / Medication
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Add preventative biological schedule to farm immunization calendar
+                    Schedules preventative vaccines or medicine with instant Header Bell prompt
                   </p>
                 </div>
               </div>
@@ -1050,16 +1050,19 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
             </div>
 
             {scheduleSuccess ? (
-              <div className="py-10 text-center space-y-3">
+              <div className="py-8 text-center space-y-3">
                 <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Vaccination Scheduled Successfully!
+                  Vaccine / Medicine Scheduled Successfully!
                 </h3>
                 <p className="text-xs text-slate-500">
-                  {vaccineName} scheduled for {flocks.find((f) => f.id === targetFlockId)?.name || 'flock'}.
+                  {vaccineName} scheduled for {flocks.find((f) => f.id === targetFlockId)?.name || 'flock'} on {scheduledDate}.
                 </p>
+                <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-semibold">
+                  <span>🔔 Prompt dispatched to Header Bell Icon!</span>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleScheduleVaccineSubmit} className="mt-4 space-y-3.5 text-xs">
@@ -1087,7 +1090,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Vaccine Formulation / Antigen
+                    Vaccine Formulation / Medication / Antigen
                   </label>
                   <input
                     type="text"
@@ -1095,19 +1098,23 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
                     list="vaccine-suggestions"
                     value={vaccineName}
                     onChange={(e) => setVaccineName(e.target.value)}
-                    placeholder="e.g. ND + IB Lasota Booster"
+                    placeholder="e.g. ND + IB Lasota Booster or Vitamin AD3E Boost"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                   />
                   <datalist id="vaccine-suggestions">
                     <option value="ND + IB Lasota Booster" />
+                    <option value="Vitamin AD3E + Selenium Solution (Medicine)" />
+                    <option value="Amoxicillin 20% Water Medication (Medicine)" />
+                    <option value="Electrolytes & Anti-Stress Powder (Medicine)" />
                     <option value="Infectious Coryza Inactivated (Avibacterium)" />
                     <option value="Salmonella Enteritidis Inactivated" />
                     <option value="Avian Influenza H9N2 Inactivated" />
                     <option value="Egg Drop Syndrome (EDS-76) Inactivated" />
+                    <option value="Dewormer Levamisole 10% (Medicine)" />
+                    <option value="Calcium & Phosphorus D3 Booster (Medicine)" />
+                    <option value="Liver Tonic & Kidney Flush Solution (Medicine)" />
                     <option value="Gumboro (IBD Intermediate Plus)" />
                     <option value="Mycoplasma Gallisepticum (MG-6/85)" />
-                    <option value="Fowl Pox + Avian Encephalomyelitis (AE)" />
-                    <option value="Infectious Bronchitis Variant (IB 4/91)" />
                     <option value="ND Clone 30 + IB H120 Live" />
                   </datalist>
                 </div>

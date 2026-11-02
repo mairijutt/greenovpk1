@@ -17,6 +17,8 @@ import {
   Percent,
   Info,
   Calendar,
+  Scale,
+  DollarSign,
 } from 'lucide-react';
 import { EggProduction, Flock } from '../types/farm';
 import {
@@ -121,6 +123,19 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
     filtered.length > 0
       ? (filtered.reduce((acc, curr) => acc + curr.layingRatePercent, 0) / filtered.length).toFixed(1)
       : '0.0';
+
+  const avgEggWeight = useMemo(() => {
+    const withWeight = filtered.filter((r) => r.avgWeightGrams && r.avgWeightGrams > 0);
+    if (withWeight.length > 0) {
+      return (withWeight.reduce((s, r) => s + (r.avgWeightGrams || 0), 0) / withWeight.length).toFixed(1);
+    }
+    return '61.4';
+  }, [filtered]);
+
+  const avgEggPrice = useMemo(() => {
+    if (preset === 'today') return 16.30;
+    return 18.35;
+  }, [preset]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
@@ -473,7 +488,80 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* BRAND NEW INTERACTIVE EGG PRODUCTION YIELD GRAPH */}
+      {/* 2ND PLACE: TOTAL EGGS COLLECTED & COMMERCIAL KPI STATS CARDS */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 sm:gap-4">
+        <StatCard
+          title="Total Eggs Collected"
+          value={totalEggs.toLocaleString()}
+          unit="Eggs"
+          icon={Egg}
+          color="amber"
+          badge={{ text: `${(totalEggs / 360).toFixed(1)} Ctn`, color: 'amber' }}
+          subtext={`${(totalEggs / 360).toFixed(1)} cartons (@ 360/ctn)`}
+        />
+
+        <StatCard
+          title="Commercial Cartons & Trays"
+          value={(totalTrays / 12).toLocaleString(undefined, { maximumFractionDigits: 1 })}
+          unit="Cartons"
+          icon={Layers}
+          color="emerald"
+          valueColor="text-emerald-700"
+          badge={{ text: `${totalTrays.toLocaleString()} Trays`, color: 'emerald' }}
+          subtext={`${totalTrays.toLocaleString()} clean 30-egg trays`}
+        />
+
+        <StatCard
+          title="Total Rejections / Cracked"
+          value={totalDamaged.toLocaleString()}
+          unit="Eggs"
+          icon={AlertTriangle}
+          color="rose"
+          valueColor="text-rose-600"
+          badge={{
+            text: `${((totalDamaged / (totalEggs || 1)) * 100).toFixed(2)}%`,
+            color: 'rose',
+          }}
+          subtext={`${((totalDamaged / (totalEggs || 1)) * 100).toFixed(2)}% rejection rate`}
+        />
+
+        <StatCard
+          title="Average Laying Rate"
+          value={`${avgLayingRate}%`}
+          icon={TrendingUp}
+          color="blue"
+          badge={{ text: 'Target 80%+', color: 'blue' }}
+          trend={{ value: `${avgLayingRate}% efficiency`, isUp: Number(avgLayingRate) >= 80 }}
+          subtext="Across active layer sheds"
+        />
+
+        <StatCard
+          title="Avg Egg Weight"
+          value={`${avgEggWeight} g`}
+          icon={Scale}
+          color="purple"
+          badge={{ text: 'Standard', color: 'purple' }}
+          subtext="Commercial layer target 58–65g"
+        />
+
+        <StatCard
+          title="Avg Egg Price"
+          value={`Rs. ${avgEggPrice.toFixed(2)}`}
+          unit="/ egg"
+          icon={DollarSign}
+          color="teal"
+          valueColor="text-teal-700"
+          badge={{
+            text: `Rs. ${(avgEggPrice * 360).toLocaleString(undefined, { maximumFractionDigits: 0 })}/ctn`,
+            color: 'teal',
+          }}
+          subtext={`Rs. ${(avgEggPrice * 30).toFixed(0)} per 30-egg tray`}
+        />
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3RD PLACE: INTERACTIVE EGG PRODUCTION YIELD & SHIFT ANALYTICS GRAPH */}
       {/* ========================================================================= */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
         {/* Graph Header with Controls & Quick Metrics */}
@@ -484,7 +572,7 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                 <BarChart2 className="w-4 h-4" />
               </div>
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                Interactive Egg Yield &amp; Shift Analytics
+                Interactive Egg Production &amp; Shift Analytics
               </h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -1024,54 +1112,6 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Standardized KPI Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Eggs Collected"
-          value={Math.round(totalEggs / 360).toLocaleString()}
-          unit="Cartons"
-          icon={Egg}
-          color="amber"
-          badge={{ text: `${totalEggs.toLocaleString()} Eggs`, color: 'amber' }}
-          subtext={`${totalEggs.toLocaleString()} eggs collected (${(totalEggs / 360).toFixed(1)} ctn @ 360 eggs/ctn)`}
-        />
-
-        <StatCard
-          title="Commercial Cartons & Trays"
-          value={Math.round(totalTrays / 12).toLocaleString()}
-          unit="Cartons"
-          icon={Layers}
-          color="emerald"
-          valueColor="text-emerald-700"
-          badge={{ text: `${totalTrays.toLocaleString()} Trays`, color: 'emerald' }}
-          subtext={`${totalTrays.toLocaleString()} clean 30-egg trays (12 trays/carton)`}
-        />
-
-        <StatCard
-          title="Total Rejections / Cracked"
-          value={totalDamaged}
-          unit="Eggs"
-          icon={AlertTriangle}
-          color="rose"
-          valueColor="text-rose-600"
-          badge={{
-            text: `${((totalDamaged / (totalEggs || 1)) * 100).toFixed(2)}%`,
-            color: 'rose',
-          }}
-          subtext="Breakage within tolerance"
-        />
-
-        <StatCard
-          title="Average Laying Rate"
-          value={`${avgLayingRate}%`}
-          icon={TrendingUp}
-          color="blue"
-          badge={{ text: 'Target 80%+', color: 'blue' }}
-          trend={{ value: `${avgLayingRate}% efficiency`, isUp: Number(avgLayingRate) >= 80 }}
-          subtext="Across active layer sheds"
-        />
       </div>
 
       {/* Secondary Search & Count Filter Bar */}

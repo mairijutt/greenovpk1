@@ -230,6 +230,96 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       .reduce((s, r: any) => s + (r.cashPayment || 0), 0);
   }, [filtered]);
 
+  // Split into Eggs Sold vs Other Items Sold (Manure, Bags, Culls, Scrap, etc.)
+  const eggSalesData = useMemo(() => {
+    const saleRecords = filtered.filter((f) => f.type === 'Income');
+    const eggRecords = saleRecords.filter((f) => {
+      const head = (f.head || f.category || '').toUpperCase();
+      return head.includes('EGG');
+    });
+    const otherRecords = saleRecords.filter((f) => {
+      const head = (f.head || f.category || '').toUpperCase();
+      return !head.includes('EGG');
+    });
+
+    const totalEggsSold = eggRecords.reduce((acc, curr: any) => {
+      if (typeof curr.quantity === 'number' && curr.quantity > 0) return acc + curr.quantity;
+      return acc + Math.round((curr.amount || 0) / 18.3);
+    }, 0);
+
+    const eggRevenue = eggRecords.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+    const otherItemsSold = otherRecords.reduce((acc, curr: any) => {
+      if (typeof curr.quantity === 'number' && curr.quantity > 0) return acc + curr.quantity;
+      return acc + 1;
+    }, 0);
+
+    const otherRevenue = otherRecords.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+    return {
+      totalEggsSold,
+      eggRevenue,
+      eggCartons: Math.round(totalEggsSold / 360),
+      otherItemsSold,
+      otherRevenue,
+      otherCount: otherRecords.length,
+    };
+  }, [filtered]);
+
+  // Projected Revenue for next 4 weeks on the basis of last 12 weeks
+  const projectionRevenue = useMemo(() => {
+    const allSales = financials.filter((f) => f.type === 'Income');
+    if (allSales.length === 0) return { projectedAmount: 0, weeklyAvg: 0, last12WeeksTotal: 0 };
+
+    // Respect flock/unit selection if filtered
+    const relevantSales = allSales.filter((fin) => {
+      if (selectedUnit === 'all') return true;
+      const finUnit = fin.flockName || (fin.flockId === 8 || fin.flockId === '8' ? 'Unit 1' : fin.flockId === 9 || fin.flockId === '9' ? 'Unit 2' : fin.flockId === 10 || fin.flockId === '10' ? 'Unit 3' : undefined);
+      return (
+        finUnit === selectedUnit ||
+        (selectedUnit === 'Unit 1' && (fin.flockId === 8 || fin.flockId === '8')) ||
+        (selectedUnit === 'Unit 2' && (fin.flockId === 9 || fin.flockId === '9')) ||
+        (selectedUnit === 'Unit 3' && (fin.flockId === 10 || fin.flockId === '10'))
+      );
+    });
+
+    if (relevantSales.length === 0) return { projectedAmount: 0, weeklyAvg: 0, last12WeeksTotal: 0 };
+
+    // Sort descending by date
+    const sortedSales = [...relevantSales].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const refDateStr = toDate || sortedSales[0]?.date || '2026-10-24';
+    const refDate = new Date(refDateStr);
+
+    // 12 weeks prior = 12 * 7 = 84 days
+    const twelveWeeksAgo = new Date(refDate);
+    twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84);
+    const twelveWeeksAgoStr = twelveWeeksAgo.toISOString().split('T')[0];
+
+    const last12WeeksSales = relevantSales.filter(
+      (s) => s.date && s.date <= refDateStr && s.date >= twelveWeeksAgoStr
+    );
+
+    const last12WeeksTotal = last12WeeksSales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+    // Calculate weekly average over 12 weeks
+    let weeklyAvg = 0;
+    if (last12WeeksTotal > 0) {
+      weeklyAvg = last12WeeksTotal / 12;
+    } else {
+      // Fallback: total relevant revenue spread over available weeks
+      const totalRev = relevantSales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+      weeklyAvg = totalRev / 16;
+    }
+
+    const projectedAmount = weeklyAvg * 4;
+
+    return {
+      projectedAmount,
+      weeklyAvg,
+      last12WeeksTotal,
+    };
+  }, [financials, selectedUnit, toDate]);
+
   // Dynamic Sales Categories breakdown (EGG, Manure, Feed BAGS, OTHER)
   const currentSalesBreakdown = useMemo(() => {
     const saleRecords = financials.filter((fin) => {
@@ -624,7 +714,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       />
 
       {/* KPI Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div
+        className={`grid gap-3.5 sm:gap-4 ${
+          selectedType === 'Income'
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+        }`}
+      >
         {selectedType === 'Income' ? (
           <>
             <StatCard
@@ -635,37 +731,77 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               valueColor="text-emerald-700"
               badge={{ text: `${filtered.length} Sales`, color: 'emerald' }}
               trend={{ value: selectedUnit !== 'all' ? selectedUnit : 'All 3 Units', isUp: true }}
-              subtext="Verified commercial sales"
+              subtext="Total commercial sales revenue"
             />
+
             <StatCard
-              title="Total Cartons Sold"
-              value={`${Math.round(totalItemsSold / 360).toLocaleString()}`}
-              unit="Cartons"
-              icon={TrendingUp}
+              title="Total Egg Sold"
+              value={eggSalesData.totalEggsSold.toLocaleString()}
+              unit="Eggs"
+              icon={Layers}
               color="blue"
               badge={{
-                text: `Avg Rs. ${Math.round((totalIncome / (totalItemsSold || 1)) * 360).toLocaleString()}/carton`,
+                text: `${eggSalesData.eggCartons.toLocaleString()} Cartons`,
                 color: 'blue',
               }}
-              subtext={`${totalItemsSold.toLocaleString()} eggs sold (360 eggs/carton)`}
+              subtext={`Rs. ${eggSalesData.eggRevenue.toLocaleString(undefined, { maximumFractionDigits: 1 })} egg revenue`}
             />
+
+            <StatCard
+              title="Othere Items Sold"
+              value={eggSalesData.otherItemsSold.toLocaleString()}
+              unit="Items"
+              icon={Tag}
+              color="amber"
+              badge={{
+                text: `Rs. ${eggSalesData.otherRevenue.toLocaleString(undefined, { maximumFractionDigits: 1 })}`,
+                color: 'amber',
+              }}
+              subtext="Manure, feed sacks & cull bird sales"
+            />
+
             <StatCard
               title="Online Banking Payments"
               value={`Rs. ${totalOnline.toLocaleString(undefined, { maximumFractionDigits: 1 })}`}
               icon={CreditCard}
               color="teal"
               valueColor="text-teal-700"
-              badge={{ text: `${((totalOnline / (totalIncome || 1)) * 100).toFixed(1)}% Online`, color: 'teal' }}
+              badge={{
+                text: `${((totalOnline / (totalIncome || 1)) * 100).toFixed(1)}% Online`,
+                color: 'teal',
+              }}
               subtext="Direct bank transfers received"
             />
+
             <StatCard
               title="Direct Cash Collections"
               value={`Rs. ${totalCash.toLocaleString(undefined, { maximumFractionDigits: 1 })}`}
               icon={ArrowUpRight}
               color="emerald"
               valueColor="text-emerald-800"
-              badge={{ text: `${((totalCash / (totalIncome || 1)) * 100).toFixed(1)}% Cash`, color: 'emerald' }}
-              subtext="Cash in hand receipts"
+              badge={{
+                text: `${((totalCash / (totalIncome || 1)) * 100).toFixed(1)}% Cash`,
+                color: 'emerald',
+              }}
+              subtext="Direct cash counter collections"
+            />
+
+            <StatCard
+              title="Projection Revenu"
+              value={`Rs. ${projectionRevenue.projectedAmount.toLocaleString(undefined, { maximumFractionDigits: 1 })}`}
+              unit="4 Weeks"
+              icon={TrendingUp}
+              color="purple"
+              valueColor="text-purple-700"
+              badge={{
+                text: `Rs. ${projectionRevenue.weeklyAvg.toLocaleString(undefined, { maximumFractionDigits: 0 })}/wk`,
+                color: 'purple',
+              }}
+              trend={{
+                value: 'Next 4 Wks',
+                isUp: true,
+              }}
+              subtext="Calculated next 4 wks based on last 12 wks"
             />
           </>
         ) : selectedType === 'Expense' ? (
