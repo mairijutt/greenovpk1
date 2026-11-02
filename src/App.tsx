@@ -378,10 +378,10 @@ export default function App() {
         morningEggs: finalEgg.morningEggs,
         eveningEggs: finalEgg.eveningEggs,
         brokenEggs: finalEgg.damagedEggs,
-        cartons: Math.floor(finalEgg.totalEggs / 360),
+        cartons: finalEgg.cartons ?? Math.floor(finalEgg.totalEggs / 360),
         trays: finalEgg.cleanTrays,
-        averageWeight: 60,
-        grade: 'standard',
+        averageWeight: finalEgg.avgWeightGrams ?? 60,
+        grade: finalEgg.eggGrade ?? 'standard',
         notes: finalEgg.notes || `Morning: ${finalEgg.morningEggs}, Evening: ${finalEgg.eveningEggs}`,
       }),
     })
@@ -851,6 +851,7 @@ export default function App() {
         onAddEgg={handleAddEgg}
         onAddFeed={handleAddFeed}
         onAddMortality={handleAddMortality}
+        onNavigateTab={(tab) => handleNavigateTab(tab as any)}
       />
     </div>
   );

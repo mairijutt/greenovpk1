@@ -42,6 +42,12 @@ export interface EggProduction {
   damagedEggs: number;
   cleanTrays: number; // 30 eggs per tray
   layingRatePercent: number;
+  cartons?: number;
+  looseEggs?: number;
+  eggGrade?: string;
+  avgWeightGrams?: number;
+  damageType?: string;
+  packagingType?: string;
   notes?: string;
 }
 
