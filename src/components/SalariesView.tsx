@@ -22,8 +22,18 @@ import {
   TrendingUp,
   UserPlus,
   Edit2,
+  UserCheck,
+  Timer,
+  CheckCheck,
+  RotateCcw,
 } from 'lucide-react';
-import { Worker, SalaryDisbursal, AdvanceSalaryRecord, Flock } from '../types/farm';
+import {
+  Worker,
+  SalaryDisbursal,
+  AdvanceSalaryRecord,
+  Flock,
+  StaffAttendanceLog,
+} from '../types/farm';
 import {
   PageHeader,
   StatCard,
@@ -45,7 +55,7 @@ interface SalariesViewProps {
   onUpdateWorker?: (worker: Worker) => void;
 }
 
-type TabType = 'overview' | 'disbursals' | 'advances' | 'staff' | 'add-staff';
+type TabType = 'overview' | 'attendance' | 'staff' | 'disbursals' | 'advances' | 'add-staff';
 
 export const SalariesView: React.FC<SalariesViewProps> = ({
   workers,
@@ -68,6 +78,80 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
   const [selectedSlip, setSelectedSlip] = useState<SalaryDisbursal | null>(null);
   const [staffToast, setStaffToast] = useState<string | null>(null);
 
+  // Dedicated Attendance Sheet Date, Shift, and Status filters
+  const [attendanceSheetDate, setAttendanceSheetDate] = useState<string>('2026-11-03');
+  const [attendanceShiftFilter, setAttendanceShiftFilter] = useState<string>('all');
+  const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<string>('all');
+
+  // Admin In/Out Time Tracking Modal State
+  const [isTimeLogModalOpen, setIsTimeLogModalOpen] = useState(false);
+  const [selectedWorkerForLog, setSelectedWorkerForLog] = useState<Worker | null>(null);
+  const [logWorkerId, setLogWorkerId] = useState<string>(workers[0]?.id || 'w-1');
+  const [logDate, setLogDate] = useState<string>('2026-11-03');
+  const [logShift, setLogShift] = useState<string>('Morning Shift (07:00 - 17:00)');
+  const [logCheckIn, setLogCheckIn] = useState<string>('07:00 AM');
+  const [logCheckOut, setLogCheckOut] = useState<string>('05:00 PM');
+  const [logStatus, setLogStatus] = useState<
+    'Present' | 'Late' | 'Half Day' | 'On Leave' | 'Absent'
+  >('Present');
+  const [logOvertime, setLogOvertime] = useState<number | string>(0);
+  const [logNotes, setLogNotes] = useState<string>('Biometric punch verified by Admin');
+
+  // Attendance Records Log List
+  const [attendanceLogs, setAttendanceLogs] = useState<StaffAttendanceLog[]>(() => {
+    try {
+      const saved = localStorage.getItem('greenova_attendance_logs_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+
+    return workers.map((w, idx) => {
+      const isNight =
+        (w.shift || '').includes('Night') ||
+        w.role.toLowerCase().includes('night') ||
+        w.role.toLowerCase().includes('security');
+      const isLeave = w.status === 'On Leave' || w.attendanceStatus === 'On Leave';
+      const isLate = w.attendanceStatus === 'Late' || idx === 3;
+
+      const checkIn = isLeave
+        ? '—'
+        : w.checkInTime || (isNight ? '07:00 PM' : isLate ? '07:25 AM' : '06:50 AM');
+      const checkOut = isLeave ? '—' : w.checkOutTime || (isNight ? '07:00 AM' : '05:00 PM');
+      const shift =
+        w.shift || (isNight ? 'Night Shift (19:00 - 07:00)' : 'Morning Shift (07:00 - 17:00)');
+      const hoursWorked = isLeave ? 0 : isNight ? 12 : 10;
+
+      return {
+        id: `att-${w.id}-2026-11-03`,
+        workerId: w.id,
+        workerName: w.name,
+        role: w.role,
+        flockId: w.flockId || '9',
+        flockName: w.flockName || 'Unit 2',
+        date: '2026-11-03',
+        shift,
+        checkInTime: checkIn,
+        checkOutTime: checkOut,
+        hoursWorked,
+        overtimeHours: idx === 4 ? 0.3 : 0,
+        status: isLeave
+          ? ('On Leave' as const)
+          : isLate
+          ? ('Late' as const)
+          : ('Present' as const),
+        adminNotes: isLeave
+          ? 'Approved medical leave'
+          : isLate
+          ? 'Late gate check-in logged'
+          : 'Verified biometric punch',
+        loggedBy: 'Admin (Operations)',
+        updatedAt: '07:30 AM',
+      };
+    });
+  });
+
   // Add Staff Form state
   const [staffName, setStaffName] = useState('');
   const [staffRole, setStaffRole] = useState('Flock Supervisor');
@@ -78,6 +162,10 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
   const [staffAdvanceBalance, setStaffAdvanceBalance] = useState<number | string>(0);
   const [staffStatus, setStaffStatus] = useState<'Active' | 'On Leave'>('Active');
   const [staffNotes, setStaffNotes] = useState('');
+  const [staffShift, setStaffShift] = useState('Morning Shift (07:00 - 17:00)');
+  const [staffCheckIn, setStaffCheckIn] = useState('07:00 AM');
+  const [staffCheckOut, setStaffCheckOut] = useState('05:00 PM');
+  const [staffAttendance, setStaffAttendance] = useState<'Present' | 'Late' | 'On Leave' | 'Absent'>('Present');
 
   const handleResetStaffForm = () => {
     setStaffName('');
@@ -89,6 +177,10 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
     setStaffAdvanceBalance(0);
     setStaffStatus('Active');
     setStaffNotes('');
+    setStaffShift('Morning Shift (07:00 - 17:00)');
+    setStaffCheckIn('07:00 AM');
+    setStaffCheckOut('05:00 PM');
+    setStaffAttendance('Present');
   };
 
   const handleSaveStaff = (e: React.FormEvent) => {
@@ -121,6 +213,12 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
       phone: staffPhone.trim(),
       status: staffStatus,
       joinedDate: staffJoiningDate,
+      notes: staffNotes.trim(),
+      shift: staffShift,
+      shiftHours: staffShift.includes('Night') ? 12 : staffShift.includes('General') ? 8 : 10,
+      checkInTime: staffStatus === 'On Leave' ? '—' : staffCheckIn,
+      checkOutTime: staffStatus === 'On Leave' ? '—' : staffCheckOut,
+      attendanceStatus: staffStatus === 'On Leave' ? 'On Leave' : staffAttendance,
     };
 
     if (onAddWorker) {
@@ -160,6 +258,13 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
   const [editStaffAdvanceBalance, setEditStaffAdvanceBalance] = useState<number | string>(0);
   const [editStaffStatus, setEditStaffStatus] = useState<'Active' | 'On Leave'>('Active');
   const [editStaffNotes, setEditStaffNotes] = useState('');
+  const [editStaffShift, setEditStaffShift] = useState('Morning Shift (07:00 - 17:00)');
+  const [editStaffCheckIn, setEditStaffCheckIn] = useState('07:00 AM');
+  const [editStaffCheckOut, setEditStaffCheckOut] = useState('05:00 PM');
+  const [editStaffAttendance, setEditStaffAttendance] = useState<'Present' | 'Late' | 'On Leave' | 'Absent'>('Present');
+
+  // Attendance filter in Staff Tab
+  const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'Present' | 'Late' | 'On Leave'>('all');
 
   const handleOpenEditStaff = (worker: Worker) => {
     setEditingWorker(worker);
@@ -172,7 +277,60 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
     setEditStaffAdvanceBalance(worker.advanceBalance || 0);
     setEditStaffStatus(worker.status || 'Active');
     setEditStaffNotes(worker.notes || '');
+    setEditStaffShift(worker.shift || 'Morning Shift (07:00 - 17:00)');
+    setEditStaffCheckIn(worker.checkInTime || '07:00 AM');
+    setEditStaffCheckOut(worker.checkOutTime || '05:00 PM');
+    setEditStaffAttendance(worker.attendanceStatus || (worker.status === 'On Leave' ? 'On Leave' : 'Present'));
     setIsEditStaffModalOpen(true);
+  };
+
+  const handleToggleAttendance = (worker: Worker) => {
+    const nextStatus: 'Present' | 'Late' | 'On Leave' =
+      worker.attendanceStatus === 'Present'
+        ? 'Late'
+        : worker.attendanceStatus === 'Late'
+        ? 'On Leave'
+        : 'Present';
+
+    const updatedWorker: Worker = {
+      ...worker,
+      attendanceStatus: nextStatus,
+      status: nextStatus === 'On Leave' ? 'On Leave' : 'Active',
+      checkInTime:
+        nextStatus === 'On Leave'
+          ? '—'
+          : worker.checkInTime && worker.checkInTime !== '—'
+          ? worker.checkInTime
+          : '07:00 AM',
+      checkOutTime:
+        nextStatus === 'On Leave'
+          ? '—'
+          : worker.checkOutTime && worker.checkOutTime !== '—'
+          ? worker.checkOutTime
+          : '05:00 PM',
+    };
+
+    if (onUpdateWorker) {
+      onUpdateWorker(updatedWorker);
+    }
+
+    try {
+      const stored = localStorage.getItem('greenova_staff_v2');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const updatedList = parsed.map((w: Worker) =>
+            w.id === updatedWorker.id ? updatedWorker : w
+          );
+          localStorage.setItem('greenova_staff_v2', JSON.stringify(updatedList));
+        }
+      }
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    setStaffToast(`${worker.name} marked as "${nextStatus}"`);
+    setTimeout(() => setStaffToast(null), 3500);
   };
 
   const handleSaveEditStaff = (e: React.FormEvent) => {
@@ -206,6 +364,11 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
       status: editStaffStatus,
       joinedDate: editStaffJoiningDate,
       notes: editStaffNotes.trim(),
+      shift: editStaffShift,
+      shiftHours: editStaffShift.includes('Night') ? 12 : editStaffShift.includes('General') ? 8 : 10,
+      checkInTime: editStaffStatus === 'On Leave' ? '—' : editStaffCheckIn,
+      checkOutTime: editStaffStatus === 'On Leave' ? '—' : editStaffCheckOut,
+      attendanceStatus: editStaffStatus === 'On Leave' ? 'On Leave' : editStaffAttendance,
     };
 
     if (onUpdateWorker) {
@@ -232,6 +395,201 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
     setTimeout(() => setStaffToast(null), 4000);
     setIsEditStaffModalOpen(false);
     setEditingWorker(null);
+  };
+
+  // Admin In/Out Time Handlers
+  const handleOpenTimeLogModal = (worker?: Worker) => {
+    const target = worker || (selectedFlock !== 'all' ? filteredWorkers[0] : workers[0]) || workers[0];
+    if (!target) return;
+    setSelectedWorkerForLog(target);
+    setLogWorkerId(target.id);
+    setLogDate(attendanceSheetDate || '2026-11-03');
+    setLogShift(target.shift || 'Morning Shift (07:00 - 17:00)');
+    setLogCheckIn(
+      target.checkInTime && target.checkInTime !== '—' ? target.checkInTime : '07:00 AM'
+    );
+    setLogCheckOut(
+      target.checkOutTime && target.checkOutTime !== '—' ? target.checkOutTime : '05:00 PM'
+    );
+    setLogStatus(
+      (target.attendanceStatus as any) || (target.status === 'On Leave' ? 'On Leave' : 'Present')
+    );
+    setLogOvertime(0);
+    setLogNotes(target.notes || 'In/out timing recorded by Admin');
+    setIsTimeLogModalOpen(true);
+  };
+
+  const handleLogWorkerChange = (workerId: string) => {
+    const w = workers.find((item) => item.id === workerId);
+    if (!w) return;
+    setSelectedWorkerForLog(w);
+    setLogWorkerId(w.id);
+    setLogShift(w.shift || 'Morning Shift (07:00 - 17:00)');
+    setLogCheckIn(w.checkInTime && w.checkInTime !== '—' ? w.checkInTime : '07:00 AM');
+    setLogCheckOut(w.checkOutTime && w.checkOutTime !== '—' ? w.checkOutTime : '05:00 PM');
+    setLogStatus(
+      (w.attendanceStatus as any) || (w.status === 'On Leave' ? 'On Leave' : 'Present')
+    );
+  };
+
+  const handleSaveAttendanceLog = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedWorkerForLog) return;
+
+    const w = selectedWorkerForLog;
+    const isLeave = logStatus === 'On Leave';
+    const isAbsent = logStatus === 'Absent';
+    const finalIn = isLeave || isAbsent ? '—' : logCheckIn.trim();
+    const finalOut = isLeave || isAbsent ? '—' : logCheckOut.trim();
+
+    let hoursWorked = logShift.includes('Night') ? 12 : logShift.includes('General') ? 8 : 10;
+    if (isLeave || isAbsent) hoursWorked = 0;
+    else if (logStatus === 'Half Day') hoursWorked = hoursWorked / 2;
+
+    const newLog: StaffAttendanceLog = {
+      id: `att-${w.id}-${logDate}-${Date.now().toString().slice(-4)}`,
+      workerId: w.id,
+      workerName: w.name,
+      role: w.role,
+      flockId: w.flockId || '9',
+      flockName: w.flockName || 'Unit 2',
+      date: logDate,
+      shift: logShift,
+      checkInTime: finalIn,
+      checkOutTime: finalOut,
+      hoursWorked,
+      overtimeHours: Number(logOvertime) || 0,
+      status: logStatus,
+      adminNotes: logNotes.trim() || 'Admin manual punch recorded',
+      loggedBy: 'Admin (Operations)',
+      updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setAttendanceLogs((prev) => {
+      const filtered = prev.filter(
+        (item) => !(item.workerId === w.id && item.date === logDate)
+      );
+      const nextLogs = [newLog, ...filtered];
+      try {
+        localStorage.setItem('greenova_attendance_logs_v1', JSON.stringify(nextLogs));
+      } catch (err) {}
+      return nextLogs;
+    });
+
+    const updatedWorker: Worker = {
+      ...w,
+      shift: logShift,
+      checkInTime: finalIn,
+      checkOutTime: finalOut,
+      attendanceStatus: logStatus as any,
+      status: isLeave ? 'On Leave' : 'Active',
+    };
+
+    if (onUpdateWorker) {
+      onUpdateWorker(updatedWorker);
+    }
+
+    try {
+      const stored = localStorage.getItem('greenova_staff_v2');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const updatedList = parsed.map((item: Worker) =>
+            item.id === updatedWorker.id ? updatedWorker : item
+          );
+          localStorage.setItem('greenova_staff_v2', JSON.stringify(updatedList));
+        }
+      }
+    } catch (err) {}
+
+    setIsTimeLogModalOpen(false);
+    setStaffToast(`Saved attendance for ${w.name}: IN ${finalIn} | OUT ${finalOut}`);
+    setTimeout(() => setStaffToast(null), 3500);
+  };
+
+  const handleQuickClockStaff = (worker: Worker, action: 'in' | 'out') => {
+    const nowTime = new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    const finalIn =
+      action === 'in'
+        ? nowTime
+        : worker.checkInTime && worker.checkInTime !== '—'
+        ? worker.checkInTime
+        : '07:00 AM';
+    const finalOut = action === 'out' ? nowTime : worker.checkOutTime || 'On Duty';
+
+    const updatedWorker: Worker = {
+      ...worker,
+      checkInTime: finalIn,
+      checkOutTime: finalOut,
+      attendanceStatus: 'Present',
+      status: 'Active',
+    };
+
+    if (onUpdateWorker) {
+      onUpdateWorker(updatedWorker);
+    }
+
+    setAttendanceLogs((prev) => {
+      const updatedLog: StaffAttendanceLog = {
+        id: `att-${worker.id}-${attendanceSheetDate}`,
+        workerId: worker.id,
+        workerName: worker.name,
+        role: worker.role,
+        flockId: worker.flockId || '9',
+        flockName: worker.flockName || 'Unit 2',
+        date: attendanceSheetDate,
+        shift: worker.shift || 'Morning Shift (07:00 - 17:00)',
+        checkInTime: finalIn,
+        checkOutTime: finalOut,
+        hoursWorked: 10,
+        status: 'Present',
+        adminNotes: `Quick Clock-${action.toUpperCase()} recorded by Admin at ${nowTime}`,
+        loggedBy: 'Admin',
+        updatedAt: nowTime,
+      };
+      const filtered = prev.filter(
+        (l) => !(l.workerId === worker.id && l.date === attendanceSheetDate)
+      );
+      const next = [updatedLog, ...filtered];
+      try {
+        localStorage.setItem('greenova_attendance_logs_v1', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+
+    setStaffToast(`${worker.name} successfully clocked ${action.toUpperCase()} at ${nowTime}`);
+    setTimeout(() => setStaffToast(null), 3500);
+  };
+
+  const handleClockAllPresent = () => {
+    const updated = workers.map((w) => {
+      if (w.status === 'On Leave') return w;
+      return {
+        ...w,
+        checkInTime: w.checkInTime && w.checkInTime !== '—' ? w.checkInTime : '07:00 AM',
+        checkOutTime: w.checkOutTime && w.checkOutTime !== '—' ? w.checkOutTime : '05:00 PM',
+        attendanceStatus: 'Present' as const,
+        status: 'Active' as const,
+      };
+    });
+
+    updated.forEach((w) => {
+      if (onUpdateWorker) onUpdateWorker(w);
+    });
+
+    try {
+      localStorage.setItem('greenova_staff_v2', JSON.stringify(updated));
+    } catch (e) {}
+
+    setStaffToast(
+      `All active staff (${updated.filter((w) => w.status === 'Active').length} staff) marked Present on-time!`
+    );
+    setTimeout(() => setStaffToast(null), 3500);
   };
 
   // Salary Disbursal Form state
@@ -467,6 +825,153 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
     });
   }, [workers, selectedFlock, searchTerm]);
 
+  // Attendance & Staff metrics for summary cards
+  const staffAttendanceMetrics = useMemo(() => {
+    const totalStaff = filteredWorkers.length;
+    const activeStaff = filteredWorkers.filter((w) => w.status === 'Active').length;
+    const leaveStaff = filteredWorkers.filter(
+      (w) => w.status === 'On Leave' || w.attendanceStatus === 'On Leave'
+    ).length;
+    const presentStaff = filteredWorkers.filter(
+      (w) => w.attendanceStatus === 'Present' || (!w.attendanceStatus && w.status === 'Active')
+    ).length;
+    const lateStaff = filteredWorkers.filter((w) => w.attendanceStatus === 'Late').length;
+    const attendanceRate =
+      totalStaff > 0 ? (((presentStaff + lateStaff) / totalStaff) * 100).toFixed(1) : '100.0';
+
+    const unit1Staff = filteredWorkers.filter((w) => String(w.flockId) === '8').length;
+    const unit2Staff = filteredWorkers.filter((w) => String(w.flockId) === '9').length;
+    const unit3Staff = filteredWorkers.filter((w) => String(w.flockId) === '10').length;
+
+    return {
+      totalStaff,
+      activeStaff,
+      leaveStaff,
+      presentStaff,
+      lateStaff,
+      attendanceRate,
+      unit1Staff,
+      unit2Staff,
+      unit3Staff,
+    };
+  }, [filteredWorkers]);
+
+  // Displayed workers in Staff tab considering attendance filter
+  const displayedWorkers = useMemo(() => {
+    if (attendanceFilter === 'all') return filteredWorkers;
+    if (attendanceFilter === 'Present') {
+      return filteredWorkers.filter(
+        (w) => w.attendanceStatus === 'Present' || (!w.attendanceStatus && w.status === 'Active')
+      );
+    }
+    if (attendanceFilter === 'Late') {
+      return filteredWorkers.filter((w) => w.attendanceStatus === 'Late');
+    }
+    if (attendanceFilter === 'On Leave') {
+      return filteredWorkers.filter(
+        (w) => w.attendanceStatus === 'On Leave' || w.status === 'On Leave'
+      );
+    }
+    return filteredWorkers;
+  }, [filteredWorkers, attendanceFilter]);
+
+  // Dedicated Attendance Sheet calculated records for selected date & filters
+  const attendanceSheetRecords = useMemo(() => {
+    return filteredWorkers
+      .map((w, idx) => {
+        const existingLog = attendanceLogs.find(
+          (log) => log.workerId === w.id && log.date === attendanceSheetDate
+        );
+
+        const isNight =
+          (w.shift || '').includes('Night') ||
+          w.role.toLowerCase().includes('night') ||
+          w.role.toLowerCase().includes('security');
+        const isLeave = w.status === 'On Leave' || w.attendanceStatus === 'On Leave';
+        const isLate = w.attendanceStatus === 'Late' || (!existingLog && idx === 3);
+
+        const status: 'Present' | 'Late' | 'Half Day' | 'On Leave' | 'Absent' = existingLog
+          ? (existingLog.status as any)
+          : isLeave
+          ? 'On Leave'
+          : isLate
+          ? 'Late'
+          : 'Present';
+
+        const checkInTime = existingLog
+          ? existingLog.checkInTime
+          : isLeave
+          ? '—'
+          : w.checkInTime || (isNight ? '07:00 PM' : isLate ? '07:25 AM' : '06:50 AM');
+
+        const checkOutTime = existingLog
+          ? existingLog.checkOutTime
+          : isLeave
+          ? '—'
+          : w.checkOutTime || (isNight ? '07:00 AM' : '05:00 PM');
+
+        const shift =
+          existingLog?.shift ||
+          w.shift ||
+          (isNight ? 'Night Shift (19:00 - 07:00)' : 'Morning Shift (07:00 - 17:00)');
+
+        const hoursWorked = existingLog
+          ? existingLog.hoursWorked
+          : isLeave
+          ? 0
+          : status === 'Half Day'
+          ? 5
+          : isNight
+          ? 12
+          : 10;
+
+        const overtimeHours = (existingLog?.overtimeHours ?? (idx === 4 ? 0.5 : 0)) || 0;
+
+        const adminNotes =
+          existingLog?.adminNotes ||
+          (isLeave
+            ? 'Approved leave'
+            : isLate
+            ? 'Late check-in logged'
+            : 'Biometric punch verified');
+
+        const loggedBy = existingLog?.loggedBy || 'Admin (Operations)';
+
+        return {
+          worker: w,
+          logId: existingLog?.id || `att-${w.id}-${attendanceSheetDate}`,
+          status,
+          shift,
+          checkInTime,
+          checkOutTime,
+          hoursWorked,
+          overtimeHours,
+          adminNotes,
+          loggedBy,
+        };
+      })
+      .filter((rec) => {
+        if (attendanceStatusFilter !== 'all' && rec.status !== attendanceStatusFilter) {
+          return false;
+        }
+        if (attendanceShiftFilter !== 'all') {
+          if (attendanceShiftFilter === 'Morning' && !rec.shift.toLowerCase().includes('morning'))
+            return false;
+          if (attendanceShiftFilter === 'Night' && !rec.shift.toLowerCase().includes('night'))
+            return false;
+          if (attendanceShiftFilter === 'General' && !rec.shift.toLowerCase().includes('general'))
+            return false;
+        }
+        return true;
+      });
+  }, [
+    filteredWorkers,
+    attendanceLogs,
+    attendanceSheetDate,
+    attendanceStatusFilter,
+    attendanceShiftFilter,
+  ]);
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -503,6 +1008,15 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
           </div>
 
           <button
+            onClick={() => handleOpenTimeLogModal()}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+            title="Admin: Log or adjust staff check-in and check-out timings"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>+ Log In/Out Time</span>
+          </button>
+
+          <button
             onClick={() => setIsStaffModalOpen(true)}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
           >
@@ -528,53 +1042,128 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
         </div>
       </div>
 
-      {/* 3 Top Summary Cards matching sc1366_cfa37225.png */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Card 1: Total Paid */}
-        <div className="p-6 rounded-2xl bg-emerald-50/60 border border-emerald-200 shadow-xs flex flex-col justify-between transition-all hover:shadow-md">
+      {/* 5 Top Summary Cards: Total Employees, Attendance Today, Total Paid, Total Advance, Net Salary Paid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Card 1: Total Employees */}
+        <div className="p-5 rounded-2xl bg-indigo-50/70 border border-indigo-200/90 shadow-xs flex flex-col justify-between transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-800 tracking-wide">Total Paid</span>
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-black text-sm">
-              $
+            <span className="text-xs font-bold text-indigo-900 tracking-wide uppercase">
+              Total Employees
+            </span>
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700">
+              <Users className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-4">
-            <div className="text-2xl sm:text-3xl font-black text-emerald-900 tracking-tight">
-              Rs. {summary.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          <div className="mt-3">
+            <div className="text-2xl sm:text-3xl font-black text-indigo-950 tracking-tight">
+              {staffAttendanceMetrics.totalStaff} <span className="text-base font-bold text-indigo-700">Staff</span>
             </div>
-            <div className="text-xs font-medium text-emerald-700/80 mt-1">Net salary disbursed</div>
+            <div className="text-[11px] font-medium text-indigo-700/80 mt-1">
+              Unit 1: {staffAttendanceMetrics.unit1Staff} • U2: {staffAttendanceMetrics.unit2Staff} • U3: {staffAttendanceMetrics.unit3Staff}
+            </div>
+            <div className="mt-2 pt-2 border-t border-indigo-200/60 flex items-center justify-between text-[10px] font-semibold text-indigo-800">
+              <span>{staffAttendanceMetrics.activeStaff} Active Duty</span>
+              <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-900">
+                {staffAttendanceMetrics.leaveStaff} On Leave
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Card 2: Total Advance */}
-        <div className="p-6 rounded-2xl bg-amber-50/70 border border-amber-200/90 shadow-xs flex flex-col justify-between transition-all hover:shadow-md">
+        {/* Card 2: Staff Attendance Today */}
+        <div
+          onClick={() => setActiveTab('attendance')}
+          className="p-5 rounded-2xl bg-teal-50/70 border border-teal-200/90 shadow-xs flex flex-col justify-between transition-all hover:shadow-md cursor-pointer group"
+          title="Click to view dedicated Daily Staff Attendance Register & Time Tracking Sheet"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-800 tracking-wide">Total Advance</span>
+            <span className="text-xs font-bold text-teal-900 tracking-wide uppercase">
+              Staff Attendance Today
+            </span>
+            <div className="w-8 h-8 rounded-full bg-teal-100 group-hover:bg-teal-200 flex items-center justify-center text-teal-700 transition-colors">
+              <Clock className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="flex items-baseline justify-between">
+              <div className="text-2xl sm:text-3xl font-black text-teal-950 tracking-tight">
+                {staffAttendanceMetrics.presentStaff + staffAttendanceMetrics.lateStaff}{' '}
+                <span className="text-base font-bold text-teal-700">/ {staffAttendanceMetrics.totalStaff}</span>
+              </div>
+              <span className="text-[11px] font-bold text-teal-700 group-hover:underline flex items-center space-x-0.5">
+                <span>View Sheet</span>
+                <ChevronRight className="w-3 h-3" />
+              </span>
+            </div>
+            <div className="text-[11px] font-medium text-teal-700/80 mt-1">
+              {staffAttendanceMetrics.attendanceRate}% Attendance Rate Today
+            </div>
+            <div className="mt-2 pt-2 border-t border-teal-200/60 flex items-center justify-between text-[10px] font-semibold text-teal-800">
+              <span className="text-emerald-700 font-bold">{staffAttendanceMetrics.presentStaff} On Time</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">
+                {staffAttendanceMetrics.lateStaff} Late
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Total Paid */}
+        <div className="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-200 shadow-xs flex flex-col justify-between transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-emerald-800 tracking-wide uppercase">Total Paid</span>
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-black text-sm">
+              <DollarSign className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-xl sm:text-2xl font-black text-emerald-900 tracking-tight">
+              Rs. {summary.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </div>
+            <div className="text-[11px] font-medium text-emerald-700/80 mt-1">Gross salary disbursed</div>
+            <div className="mt-2 pt-2 border-t border-emerald-200/60 flex items-center justify-between text-[10px] font-semibold text-emerald-800">
+              <span>Verified Payroll</span>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900">Audited</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Total Advance */}
+        <div className="p-5 rounded-2xl bg-amber-50/70 border border-amber-200/90 shadow-xs flex flex-col justify-between transition-all hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-amber-800 tracking-wide uppercase">Total Advance</span>
             <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
               <Wallet className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-4">
-            <div className="text-2xl sm:text-3xl font-black text-amber-900 tracking-tight">
+          <div className="mt-3">
+            <div className="text-xl sm:text-2xl font-black text-amber-900 tracking-tight">
               Rs. {summary.totalAdvance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-xs font-medium text-amber-700/80 mt-1">Advance payments</div>
+            <div className="text-[11px] font-medium text-amber-700/80 mt-1">Advance payments</div>
+            <div className="mt-2 pt-2 border-t border-amber-200/60 flex items-center justify-between text-[10px] font-semibold text-amber-800">
+              <span>Active Advance Loans</span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">Pending</span>
+            </div>
           </div>
         </div>
 
-        {/* Card 3: Net Salary Paid */}
-        <div className="p-6 rounded-2xl bg-blue-50/60 border border-blue-200/80 shadow-xs flex flex-col justify-between transition-all hover:shadow-md">
+        {/* Card 5: Net Salary Paid */}
+        <div className="p-5 rounded-2xl bg-blue-50/60 border border-blue-200/80 shadow-xs flex flex-col justify-between transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-indigo-900 tracking-wide">Net Salary Paid</span>
+            <span className="text-xs font-bold text-indigo-900 tracking-wide uppercase">Net Salary Paid</span>
             <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-black text-sm">
-              $
+              <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-4">
-            <div className="text-2xl sm:text-3xl font-black text-indigo-950 tracking-tight">
+          <div className="mt-3">
+            <div className="text-xl sm:text-2xl font-black text-indigo-950 tracking-tight">
               Rs. {summary.netSalaryPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-xs font-medium text-blue-700/80 mt-1">After advance deduction</div>
+            <div className="text-[11px] font-medium text-blue-700/80 mt-1">After advance deduction</div>
+            <div className="mt-2 pt-2 border-t border-blue-200/60 flex items-center justify-between text-[10px] font-semibold text-blue-800">
+              <span>Direct Net Disbursal</span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-900">Settled</span>
+            </div>
           </div>
         </div>
       </div>
@@ -696,7 +1285,7 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
       <div className="flex items-center space-x-2 border-b border-slate-200 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 shrink-0 ${
             activeTab === 'overview'
               ? 'bg-emerald-600 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -707,8 +1296,32 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('attendance')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 shrink-0 ${
+            activeTab === 'attendance'
+              ? 'bg-indigo-600 text-white shadow-xs ring-2 ring-indigo-300'
+              : 'text-indigo-800 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>Attendance Sheet ({staffAttendanceMetrics.presentStaff + staffAttendanceMetrics.lateStaff}/{staffAttendanceMetrics.totalStaff})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('staff')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 shrink-0 ${
+            activeTab === 'staff'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Staff Directory ({filteredWorkers.length})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('disbursals')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 shrink-0 ${
             activeTab === 'disbursals'
               ? 'bg-emerald-600 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -720,7 +1333,7 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
 
         <button
           onClick={() => setActiveTab('advances')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 shrink-0 ${
             activeTab === 'advances'
               ? 'bg-emerald-600 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -731,20 +1344,8 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTab('staff')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 ${
-            activeTab === 'staff'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Staff Member list ({filteredWorkers.length})</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('add-staff')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 ${
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 shrink-0 ${
             activeTab === 'add-staff'
               ? 'bg-teal-600 text-white shadow-xs'
               : 'text-teal-700 bg-teal-50/70 hover:bg-teal-100 border border-teal-200'
@@ -883,6 +1484,419 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                   </div>
                 </div>
               ))}
+            </div>
+          </TableCard>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* TAB: DEDICATED ATTENDANCE SHEET & ADMIN TIME TRACKING */}
+      {/* ========================================================= */}
+      {activeTab === 'attendance' && (
+        <div className="space-y-4">
+          <TableCard
+            title="Daily Staff Attendance Register & Time Tracking Sheet"
+            subtitle="Official farm muster roll with shift punch-in/out timestamps, hours worked, overtime, and Admin time adjustments"
+            badge={
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenTimeLogModal()}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors flex items-center space-x-1.5 cursor-pointer shadow-xs"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>+ Log In/Out Time (Admin)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClockAllPresent}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors flex items-center space-x-1.5 cursor-pointer shadow-xs"
+                  title="Mark all unclocked active workers as Present at 07:00 AM"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  <span>Clock-All Present</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors flex items-center space-x-1 cursor-pointer border border-slate-300"
+                  title="Print daily attendance register"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Print</span>
+                </button>
+              </div>
+            }
+          >
+            {/* Top Toolbar: Date Selector, Shift Filter, Status Filter */}
+            <div className="p-4 bg-slate-50/70 border-b border-slate-200 space-y-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                {/* Date Selection */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-700">
+                    <Calendar className="w-4 h-4 text-indigo-600" />
+                    <span>Muster Date:</span>
+                  </div>
+                  <input
+                    type="date"
+                    value={attendanceSheetDate}
+                    onChange={(e) => setAttendanceSheetDate(e.target.value)}
+                    className="px-2.5 py-1 text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg shadow-2xs focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceSheetDate('2026-11-03')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      attendanceSheetDate === '2026-11-03'
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}
+                  >
+                    Today (Nov 03)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceSheetDate('2026-11-02')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      attendanceSheetDate === '2026-11-02'
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}
+                  >
+                    Yesterday (Nov 02)
+                  </button>
+                </div>
+
+                {/* Shift Filter Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-slate-500 font-semibold mr-1">Shift:</span>
+                  {[
+                    { id: 'all', label: 'All Shifts' },
+                    { id: 'Morning', label: 'Morning' },
+                    { id: 'Night', label: 'Night' },
+                    { id: 'General', label: 'General' },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setAttendanceShiftFilter(s.id)}
+                      className={`px-2 py-0.8 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
+                        attendanceShiftFilter === s.id
+                          ? 'bg-slate-900 text-white shadow-2xs'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status Filter Chips & Shift Schedule Info */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-200/60 text-xs">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-slate-500 font-semibold mr-1">Status:</span>
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceStatusFilter('all')}
+                    className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer ${
+                      attendanceStatusFilter === 'all'
+                        ? 'bg-indigo-900 text-white shadow-2xs'
+                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    }`}
+                  >
+                    All ({filteredWorkers.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceStatusFilter('Present')}
+                    className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer flex items-center space-x-1 ${
+                      attendanceStatusFilter === 'Present'
+                        ? 'bg-emerald-700 text-white shadow-2xs'
+                        : 'bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-200'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>Present ({staffAttendanceMetrics.presentStaff})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceStatusFilter('Late')}
+                    className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer flex items-center space-x-1 ${
+                      attendanceStatusFilter === 'Late'
+                        ? 'bg-amber-600 text-white shadow-2xs'
+                        : 'bg-white text-amber-800 hover:bg-amber-50 border border-amber-200'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    <span>Late ({staffAttendanceMetrics.lateStaff})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceStatusFilter('On Leave')}
+                    className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition-colors cursor-pointer flex items-center space-x-1 ${
+                      attendanceStatusFilter === 'On Leave'
+                        ? 'bg-purple-700 text-white shadow-2xs'
+                        : 'bg-white text-purple-800 hover:bg-purple-50 border border-purple-200'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                    <span>On Leave ({staffAttendanceMetrics.leaveStaff})</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center space-x-2 text-[11px] text-slate-500">
+                  <span className="flex items-center space-x-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="font-semibold text-emerald-800">Biometric Sync Active</span>
+                  </span>
+                  <span>•</span>
+                  <span>Standard Shift: 10 hrs</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Attendance Register Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                  <tr>
+                    <th className="py-3 px-4">Staff Member & ID</th>
+                    <th className="py-3 px-4">Assigned Shed</th>
+                    <th className="py-3 px-4">Shift Schedule</th>
+                    <th className="py-3 px-4">In Time (Punch In)</th>
+                    <th className="py-3 px-4">Out Time (Punch Out)</th>
+                    <th className="py-3 px-4 text-center">Hours & OT</th>
+                    <th className="py-3 px-4 text-center">Attendance Status</th>
+                    <th className="py-3 px-4">Audit Note / Remark</th>
+                    <th className="py-3 px-4 text-center">Admin Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {attendanceSheetRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-8 text-center text-slate-400">
+                        No attendance records match the selected date and filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    attendanceSheetRecords.map((rec) => {
+                      const isPresent = rec.status === 'Present';
+                      const isLate = rec.status === 'Late';
+                      const isHalfDay = rec.status === 'Half Day';
+                      const isLeave = rec.status === 'On Leave';
+                      const isAbsent = rec.status === 'Absent';
+                      const isOnDuty =
+                        !isLeave &&
+                        !isAbsent &&
+                        (rec.checkOutTime === 'On Duty' ||
+                          rec.checkOutTime === '—' ||
+                          rec.checkOutTime === 'Active');
+
+                      return (
+                        <tr key={rec.worker.id} className="hover:bg-slate-50/80 transition-colors">
+                          {/* Staff Member & ID */}
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-900">{rec.worker.name}</div>
+                            <div className="text-[11px] text-slate-500 flex items-center space-x-1.5 font-mono">
+                              <span>{rec.worker.phone}</span>
+                              <span>•</span>
+                              <span className="text-slate-400 font-sans">{rec.worker.role}</span>
+                            </div>
+                          </td>
+
+                          {/* Assigned Shed */}
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-200">
+                              {rec.worker.flockName || 'Unit 2'}
+                            </span>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {rec.worker.flockId === '8'
+                                ? 'Shed 1'
+                                : rec.worker.flockId === '10'
+                                ? 'Shed 3'
+                                : 'Shed 2'}
+                            </div>
+                          </td>
+
+                          {/* Shift Schedule */}
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-slate-800 text-[11px]">
+                              {rec.shift.split('(')[0]?.trim()}
+                            </div>
+                            <div className="font-mono text-[10px] text-slate-500">
+                              {rec.shift.includes('(') ? rec.shift.split('(')[1]?.replace(')', '') : '07:00 - 17:00'}
+                            </div>
+                          </td>
+
+                          {/* Check-In Time */}
+                          <td className="py-3 px-4">
+                            {isLeave || isAbsent ? (
+                              <span className="text-slate-400 font-mono italic">—</span>
+                            ) : (
+                              <div className="flex items-center space-x-1.5">
+                                <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                  {rec.checkInTime}
+                                </span>
+                                {isLate ? (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                    Late
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    On Time
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Check-Out Time */}
+                          <td className="py-3 px-4">
+                            {isLeave || isAbsent ? (
+                              <span className="text-slate-400 font-mono italic">—</span>
+                            ) : isOnDuty ? (
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                <span>Active On Duty</span>
+                              </span>
+                            ) : (
+                              <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                {rec.checkOutTime}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Hours & Overtime */}
+                          <td className="py-3 px-4 text-center">
+                            <div className="font-bold text-slate-900 font-mono">
+                              {rec.hoursWorked} hrs
+                            </div>
+                            {(rec.overtimeHours || 0) > 0 && (
+                              <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">
+                                +{rec.overtimeHours}h OT
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Attendance Status (clickable toggle) */}
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleAttendance(rec.worker)}
+                              title="Click to quickly toggle: Present -> Late -> On Leave"
+                              className="cursor-pointer transition-transform hover:scale-105"
+                            >
+                              {isPresent && (
+                                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                  <span>Present</span>
+                                </span>
+                              )}
+                              {isLate && (
+                                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                  <span>Late</span>
+                                </span>
+                              )}
+                              {isHalfDay && (
+                                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                                  <span>Half Day</span>
+                                </span>
+                              )}
+                              {isLeave && (
+                                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                  <span>On Leave</span>
+                                </span>
+                              )}
+                              {isAbsent && (
+                                <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                  <span>Absent</span>
+                                </span>
+                              )}
+                            </button>
+                          </td>
+
+                          {/* Audit Remarks */}
+                          <td className="py-3 px-4 max-w-xs">
+                            <div className="text-[11px] text-slate-700 truncate font-medium">
+                              {rec.adminNotes}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              By {rec.loggedBy}
+                            </div>
+                          </td>
+
+                          {/* Admin Action */}
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenTimeLogModal(rec.worker)}
+                                className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold transition-colors cursor-pointer flex items-center space-x-1"
+                                title="Admin: Edit exact check-in / check-out times, shift, and overtime"
+                              >
+                                <Clock className="w-3 h-3 text-indigo-600" />
+                                <span>Edit Timings</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleQuickClockStaff(
+                                    rec.worker,
+                                    isOnDuty || rec.checkOutTime === '—' ? 'out' : 'in'
+                                  )
+                                }
+                                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-[11px] font-bold transition-colors cursor-pointer"
+                                title="Stamp current time"
+                              >
+                                {isOnDuty || rec.checkOutTime === '—' ? 'Clock Out' : 'Clock In'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Attendance Sheet Footer Summary Ribbon */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-4 text-slate-600 font-medium">
+                <div>
+                  Total Staff on Register:{' '}
+                  <strong className="text-slate-900 font-bold">{filteredWorkers.length}</strong>
+                </div>
+                <div>
+                  Present:{' '}
+                  <strong className="text-emerald-700 font-bold">{staffAttendanceMetrics.presentStaff}</strong>
+                </div>
+                <div>
+                  Late:{' '}
+                  <strong className="text-amber-700 font-bold">{staffAttendanceMetrics.lateStaff}</strong>
+                </div>
+                <div>
+                  On Leave:{' '}
+                  <strong className="text-purple-700 font-bold">{staffAttendanceMetrics.leaveStaff}</strong>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3 text-slate-500 font-medium text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('staff')}
+                  className="text-indigo-600 hover:underline font-bold flex items-center space-x-1 cursor-pointer"
+                >
+                  <span>Go to Staff Directory</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </TableCard>
         </div>
@@ -1048,13 +2062,21 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
         </TableCard>
       )}
 
-      {/* TAB 4: STAFF MEMBER LIST */}
+      {/* TAB 4: STAFF DIRECTORY */}
       {activeTab === 'staff' && (
         <TableCard
-          title="Staff Member list"
-          subtitle="Monthly salary schedule, designated shed assignment, current advance balance, and instant management actions"
+          title="Staff Directory & Payroll Profiles"
+          subtitle="Employee records, unit allocations, monthly compensation, advance balances, and muster roll assignments"
           badge={
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('attendance')}
+                className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors flex items-center space-x-1 cursor-pointer border border-indigo-200"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Attendance Sheet</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setIsStaffModalOpen(true)}
@@ -1064,67 +2086,208 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                 <span>+ Add Staff Member</span>
               </button>
               <span className="px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 text-[10px] font-bold border border-teal-200">
-                {filteredWorkers.length} Active Personnel
+                {displayedWorkers.length} Personnel
               </span>
             </div>
           }
         >
+          {/* Quick Attendance Filter Chips */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-slate-100 px-4 pt-3 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-slate-500 font-semibold mr-1">Filter Attendance:</span>
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter('all')}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer ${
+                  attendanceFilter === 'all'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                All ({filteredWorkers.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter('Present')}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer flex items-center space-x-1 ${
+                  attendanceFilter === 'Present'
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Present ({staffAttendanceMetrics.presentStaff})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter('Late')}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer flex items-center space-x-1 ${
+                  attendanceFilter === 'Late'
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span>Late ({staffAttendanceMetrics.lateStaff})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter('On Leave')}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors cursor-pointer flex items-center space-x-1 ${
+                  attendanceFilter === 'On Leave'
+                    ? 'bg-purple-700 text-white shadow-2xs'
+                    : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                <span>On Leave ({staffAttendanceMetrics.leaveStaff})</span>
+              </button>
+            </div>
+
+            <div className="text-[11px] text-slate-500 flex items-center space-x-1">
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <span>Standard Shift: 07:00 AM – 05:00 PM (10 hrs)</span>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
                 <tr>
                   <th className="py-3 px-4">Employee Name</th>
-                  <th className="py-3 px-4">Role / Designation</th>
-                  <th className="py-3 px-4">Assigned Farm Unit</th>
-                  <th className="py-3 px-4">Contact Phone</th>
+                  <th className="py-3 px-4">Designation &amp; Shift</th>
+                  <th className="py-3 px-4">Assigned Unit</th>
+                  <th className="py-3 px-4">In / Out Timings</th>
+                  <th className="py-3 px-4 text-center">Today's Attendance</th>
                   <th className="py-3 px-4 text-right">Monthly Basic Salary</th>
-                  <th className="py-3 px-4 text-right">Outstanding Advance</th>
-                  <th className="py-3 px-4 text-center">Direct Actions</th>
+                  <th className="py-3 px-4 text-right">Advance Bal.</th>
+                  <th className="py-3 px-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredWorkers.map((w) => (
-                  <tr key={w.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4 font-bold text-slate-900">{w.name}</td>
-                    <td className="py-3 px-4 text-slate-700 font-medium">{w.role}</td>
-                    <td className="py-3 px-4 text-slate-600">{w.farmAssigned}</td>
-                    <td className="py-3 px-4 font-mono text-slate-600">{w.phone}</td>
-                    <td className="py-3 px-4 text-right font-black text-slate-900">
-                      Rs. {w.monthlySalary.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-right font-bold text-amber-700">
-                      {w.advanceBalance && w.advanceBalance > 0
-                        ? `Rs. ${w.advanceBalance.toLocaleString()}`
-                        : 'Rs. 0'}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center space-x-1.5">
-                        <button
-                          onClick={() => handleOpenEditStaff(w)}
-                          title="Edit Staff Member"
-                          className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-[11px] font-bold transition-colors cursor-pointer flex items-center space-x-1"
-                        >
-                          <Edit2 className="w-3 h-3 text-slate-600" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleQuickGiveAdvance(w)}
-                          title="Give Advance"
-                          className="px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-bold transition-colors cursor-pointer"
-                        >
-                          + Advance
-                        </button>
-                        <button
-                          onClick={() => handleQuickPaySalary(w)}
-                          title="Disburse Salary"
-                          className="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition-colors cursor-pointer"
-                        >
-                          Pay Salary
-                        </button>
-                      </div>
+                {displayedWorkers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                      No staff members match the selected criteria.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  displayedWorkers.map((w) => {
+                    const isPresent =
+                      w.attendanceStatus === 'Present' || (!w.attendanceStatus && w.status === 'Active');
+                    const isLate = w.attendanceStatus === 'Late';
+                    const isLeave = w.attendanceStatus === 'On Leave' || w.status === 'On Leave';
+
+                    return (
+                      <tr key={w.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900">{w.name}</div>
+                          <div className="font-mono text-[11px] text-slate-500">{w.phone}</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="font-medium text-slate-800">{w.role}</div>
+                          <div className="text-[10px] text-slate-500">
+                            {w.shift || 'Morning Shift (07:00 - 17:00)'}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-200">
+                            {w.flockName || w.farmAssigned?.split('(')[0]?.trim() || 'Unit 2'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-mono">
+                          {isLeave ? (
+                            <span className="text-slate-400 italic">Off Shift / On Leave</span>
+                          ) : (
+                            <div className="space-y-0.5">
+                              <div className="flex items-center space-x-1 text-emerald-700 font-semibold text-[11px]">
+                                <span className="text-[10px] text-slate-400">IN:</span>
+                                <span className="bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                  {w.checkInTime || '07:00 AM'}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-1 text-slate-600 text-[11px]">
+                                <span className="text-[10px] text-slate-400">OUT:</span>
+                                <span className="bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                  {w.checkOutTime || '05:00 PM'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAttendance(w)}
+                            title="Click to toggle status: Present -> Late -> On Leave"
+                            className="cursor-pointer transition-transform hover:scale-105"
+                          >
+                            {isPresent && (
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span>Present</span>
+                              </span>
+                            )}
+                            {isLate && (
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                <span>Late Check-in</span>
+                              </span>
+                            )}
+                            {isLeave && (
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                <span>On Leave</span>
+                              </span>
+                            )}
+                          </button>
+                        </td>
+                        <td className="py-3 px-4 text-right font-black text-slate-900">
+                          Rs. {w.monthlySalary.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-amber-700">
+                          {w.advanceBalance && w.advanceBalance > 0
+                            ? `Rs. ${w.advanceBalance.toLocaleString()}`
+                            : 'Rs. 0'}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              onClick={() => handleOpenTimeLogModal(w)}
+                              title="Admin: Log / Edit Staff In-Out Timings"
+                              className="px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold transition-colors cursor-pointer flex items-center space-x-1"
+                            >
+                              <Clock className="w-3 h-3 text-indigo-600" />
+                              <span>Time</span>
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditStaff(w)}
+                              title="Edit Staff Member"
+                              className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-[11px] font-bold transition-colors cursor-pointer flex items-center space-x-1"
+                            >
+                              <Edit2 className="w-3 h-3 text-slate-600" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => handleQuickGiveAdvance(w)}
+                              title="Give Advance"
+                              className="px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-bold transition-colors cursor-pointer"
+                            >
+                              + Adv
+                            </button>
+                            <button
+                              onClick={() => handleQuickPaySalary(w)}
+                              title="Disburse Salary"
+                              className="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition-colors cursor-pointer"
+                            >
+                              Pay
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -1281,6 +2444,67 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                     <option value="On Leave">On Leave</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Row 5: Shift & Timings */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Assigned Shift *
+                  </label>
+                  <select
+                    value={staffShift}
+                    onChange={(e) => setStaffShift(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="Morning Shift (07:00 - 17:00)">Morning Shift (07:00 - 17:00)</option>
+                    <option value="Night Shift (19:00 - 07:00)">Night Shift (19:00 - 07:00)</option>
+                    <option value="General Shift (08:30 - 16:30)">General Shift (08:30 - 16:30)</option>
+                    <option value="Evening Shift (14:00 - 22:00)">Evening Shift (14:00 - 22:00)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Check-in Timing
+                  </label>
+                  <input
+                    type="text"
+                    value={staffCheckIn}
+                    onChange={(e) => setStaffCheckIn(e.target.value)}
+                    placeholder="e.g. 07:00 AM"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Check-out Timing
+                  </label>
+                  <input
+                    type="text"
+                    value={staffCheckOut}
+                    onChange={(e) => setStaffCheckOut(e.target.value)}
+                    placeholder="e.g. 05:00 PM"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Row 6: Today's Attendance Status */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Today's Attendance Status
+                </label>
+                <select
+                  value={staffAttendance}
+                  onChange={(e) => setStaffAttendance(e.target.value as any)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-hidden cursor-pointer"
+                >
+                  <option value="Present">Present (On Time)</option>
+                  <option value="Late">Late Check-in</option>
+                  <option value="On Leave">On Leave</option>
+                </select>
               </div>
 
               {/* Row 5: Quarters / Notes */}
@@ -1938,6 +3162,57 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Shift</label>
+                  <select
+                    value={staffShift}
+                    onChange={(e) => setStaffShift(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  >
+                    <option value="Morning Shift (07:00 - 17:00)">Morning (07:00 - 17:00)</option>
+                    <option value="Night Shift (19:00 - 07:00)">Night (19:00 - 07:00)</option>
+                    <option value="General Shift (08:30 - 16:30)">General (08:30 - 16:30)</option>
+                    <option value="Evening Shift (14:00 - 22:00)">Evening (14:00 - 22:00)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Check-in Time</label>
+                  <input
+                    type="text"
+                    value={staffCheckIn}
+                    onChange={(e) => setStaffCheckIn(e.target.value)}
+                    placeholder="07:00 AM"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Check-out Time</label>
+                  <input
+                    type="text"
+                    value={staffCheckOut}
+                    onChange={(e) => setStaffCheckOut(e.target.value)}
+                    placeholder="05:00 PM"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Today's Attendance Status</label>
+                <select
+                  value={staffAttendance}
+                  onChange={(e) => setStaffAttendance(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                >
+                  <option value="Present">Present (On Time)</option>
+                  <option value="Late">Late Check-in</option>
+                  <option value="On Leave">On Leave</option>
+                </select>
+              </div>
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Notes / Quarters Address (optional)
@@ -2118,6 +3393,57 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Shift</label>
+                  <select
+                    value={editStaffShift}
+                    onChange={(e) => setEditStaffShift(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="Morning Shift (07:00 - 17:00)">Morning (07:00 - 17:00)</option>
+                    <option value="Night Shift (19:00 - 07:00)">Night (19:00 - 07:00)</option>
+                    <option value="General Shift (08:30 - 16:30)">General (08:30 - 16:30)</option>
+                    <option value="Evening Shift (14:00 - 22:00)">Evening (14:00 - 22:00)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Check-in Time</label>
+                  <input
+                    type="text"
+                    value={editStaffCheckIn}
+                    onChange={(e) => setEditStaffCheckIn(e.target.value)}
+                    placeholder="07:00 AM"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Check-out Time</label>
+                  <input
+                    type="text"
+                    value={editStaffCheckOut}
+                    onChange={(e) => setEditStaffCheckOut(e.target.value)}
+                    placeholder="05:00 PM"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Today's Attendance Status</label>
+                <select
+                  value={editStaffAttendance}
+                  onChange={(e) => setEditStaffAttendance(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
+                >
+                  <option value="Present">Present (On Time)</option>
+                  <option value="Late">Late Check-in</option>
+                  <option value="On Leave">On Leave</option>
+                </select>
+              </div>
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Notes / Quarters Address (optional)
@@ -2145,6 +3471,272 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                 >
                   Save Staff Changes
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* ADMIN IN/OUT TIME TRACKING & OVERRIDE MODAL */}
+      {/* ========================================================= */}
+      {isTimeLogModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 overflow-y-auto max-h-[92vh] space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center space-x-2.5 text-indigo-700">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                    Admin Staff In / Out Time Logger
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Record or adjust official muster roll check-in and check-out timestamps
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTimeLogModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAttendanceLog} className="space-y-4 text-xs">
+              {/* Employee Selection */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Select Staff Member *</label>
+                <select
+                  value={logWorkerId}
+                  onChange={(e) => handleLogWorkerChange(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-bold text-slate-900 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer"
+                  required
+                >
+                  {workers.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} — {w.role} ({w.flockName || 'Unit 2'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Attendance Date & Quick Date Buttons */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-bold text-slate-700">Attendance Date *</label>
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setLogDate('2026-11-03')}
+                      className="px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] cursor-pointer"
+                    >
+                      Today (Nov 03)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLogDate('2026-11-02')}
+                      className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
+                    >
+                      Yesterday
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="date"
+                  value={logDate}
+                  onChange={(e) => setLogDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  required
+                />
+              </div>
+
+              {/* Shift Schedule */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Shift Schedule</label>
+                <select
+                  value={logShift}
+                  onChange={(e) => setLogShift(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer"
+                >
+                  <option value="Morning Shift (07:00 - 17:00)">Morning Shift (07:00 AM – 05:00 PM • 10 hrs)</option>
+                  <option value="Night Shift (19:00 - 07:00)">Night Shift (07:00 PM – 07:00 AM • 12 hrs)</option>
+                  <option value="General Shift (08:00 - 16:30)">General Shift (08:00 AM – 04:30 PM • 8.5 hrs)</option>
+                  <option value="Afternoon Shift (13:00 - 21:00)">Afternoon Shift (01:00 PM – 09:00 PM • 8 hrs)</option>
+                </select>
+              </div>
+
+              {/* Check-In Time Input + Preset Buttons */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 flex items-center space-x-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>Check-In Time (Punch In)</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-mono">Format: HH:MM AM/PM</span>
+                </div>
+                <input
+                  type="text"
+                  value={logCheckIn}
+                  onChange={(e) => setLogCheckIn(e.target.value)}
+                  placeholder="07:00 AM"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                />
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-500 font-medium mr-1">Presets:</span>
+                  {[
+                    { label: '06:45 AM (Early)', val: '06:45 AM' },
+                    { label: '07:00 AM (Std)', val: '07:00 AM' },
+                    { label: '07:30 AM (Late)', val: '07:30 AM' },
+                    { label: '07:00 PM (Night)', val: '07:00 PM' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.val}
+                      type="button"
+                      onClick={() => setLogCheckIn(preset.val)}
+                      className="px-2 py-0.5 rounded-md bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 text-[10px] font-semibold cursor-pointer transition-colors"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLogCheckIn(
+                        new Date().toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true,
+                        })
+                      )
+                    }
+                    className="px-2 py-0.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold text-[10px] cursor-pointer"
+                  >
+                    Current Time
+                  </button>
+                </div>
+              </div>
+
+              {/* Check-Out Time Input + Preset Buttons */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 flex items-center space-x-1.5">
+                    <span className="w-2 h-2 rounded-full bg-slate-400" />
+                    <span>Check-Out Time (Punch Out)</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-mono">Format: HH:MM AM/PM</span>
+                </div>
+                <input
+                  type="text"
+                  value={logCheckOut}
+                  onChange={(e) => setLogCheckOut(e.target.value)}
+                  placeholder="05:00 PM"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                />
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-500 font-medium mr-1">Presets:</span>
+                  {[
+                    { label: '05:00 PM (Std)', val: '05:00 PM' },
+                    { label: '07:00 AM (Night)', val: '07:00 AM' },
+                    { label: 'Active / On Duty', val: 'On Duty' },
+                    { label: 'Clear (—)', val: '—' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.val}
+                      type="button"
+                      onClick={() => setLogCheckOut(preset.val)}
+                      className="px-2 py-0.5 rounded-md bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-800 border border-slate-200 text-[10px] font-semibold cursor-pointer transition-colors"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLogCheckOut(
+                        new Date().toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true,
+                        })
+                      )
+                    }
+                    className="px-2 py-0.5 rounded-md bg-indigo-100 hover:bg-indigo-200 text-indigo-900 font-bold text-[10px] cursor-pointer"
+                  >
+                    Current Time
+                  </button>
+                </div>
+              </div>
+
+              {/* Status & Overtime Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Attendance Status *</label>
+                  <select
+                    value={logStatus}
+                    onChange={(e) => setLogStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="Present">Present (On Time)</option>
+                    <option value="Late">Late Check-in</option>
+                    <option value="Half Day">Half Day (4-5 hrs)</option>
+                    <option value="On Leave">On Leave (Approved)</option>
+                    <option value="Absent">Absent (Unexcused)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Overtime (Hours)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="12"
+                    step="0.5"
+                    value={logOvertime}
+                    onChange={(e) => setLogOvertime(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Admin Remarks / Audit Note */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Admin Verification Remarks / Reason
+                </label>
+                <input
+                  type="text"
+                  value={logNotes}
+                  onChange={(e) => setLogNotes(e.target.value)}
+                  placeholder="e.g. Approved gate delay pass, extra hour on feeder motor servicing"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Logged as: <strong className="text-slate-800">Admin (Operations)</strong>
+                </span>
+                <div className="flex items-center space-x-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsTimeLogModalOpen(false)}
+                    className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-colors cursor-pointer shadow-xs flex items-center space-x-1.5"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Save Attendance Punch</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

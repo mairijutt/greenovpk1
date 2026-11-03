@@ -272,7 +272,36 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((w: Worker, idx: number) => ({
+            ...w,
+            shift:
+              w.shift ||
+              (idx === 2 || idx === 10
+                ? 'Night Shift (19:00 - 07:00)'
+                : 'Morning Shift (07:00 - 17:00)'),
+            shiftHours: w.shiftHours || (idx === 2 || idx === 10 ? 12 : 10),
+            checkInTime:
+              w.checkInTime ||
+              (w.status === 'On Leave'
+                ? '—'
+                : idx === 3
+                ? '07:25 AM'
+                : idx === 8
+                ? '07:04 AM'
+                : '06:50 AM'),
+            checkOutTime:
+              w.checkOutTime ||
+              (w.status === 'On Leave'
+                ? '—'
+                : idx === 2 || idx === 10
+                ? '07:00 AM'
+                : '05:00 PM'),
+            attendanceStatus:
+              w.attendanceStatus ||
+              (w.status === 'On Leave' ? 'On Leave' : idx === 3 ? 'Late' : 'Present'),
+          }));
+        }
       } catch (e) {}
     }
     return liveStaffRoster;

@@ -141,6 +141,11 @@ export interface Worker {
   status: 'Active' | 'On Leave';
   joinedDate: string;
   notes?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  shift?: string;
+  shiftHours?: number;
+  attendanceStatus?: 'Present' | 'Late' | 'On Leave' | 'Absent';
 }
 
 export interface SalaryDisbursal {
@@ -177,3 +182,23 @@ export interface AdvanceSalaryRecord {
   remainingBalance: number;
   remarks?: string;
 }
+
+export interface StaffAttendanceLog {
+  id: string;
+  workerId: string;
+  workerName: string;
+  role: string;
+  flockId: string;
+  flockName: string;
+  date: string; // YYYY-MM-DD
+  shift: string;
+  checkInTime: string;
+  checkOutTime: string;
+  hoursWorked: number;
+  overtimeHours?: number;
+  status: 'Present' | 'Late' | 'Half Day' | 'On Leave' | 'Absent';
+  adminNotes?: string;
+  loggedBy?: string;
+  updatedAt?: string;
+}
+
