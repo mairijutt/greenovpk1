@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { UIInput, UIButton } from './ui';
+import loginBg from '../assets/images/poultry_login_bg_1793271065125.jpg';
 
 interface LoginViewProps {
   onLoginSuccess: (user: { email: string; name: string; token?: string; role?: string; isSuperAdmin?: boolean }) => void;
@@ -79,10 +80,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
       {/* Background Graphic & Atmosphere */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <img
-          src="/src/assets/images/poultry_login_bg_1793271065125.jpg"
+          src={loginBg}
           alt="GreenOva Poultry Facility"
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover scale-105 filter brightness-80 contrast-105"
+          onError={(e) => {
+            const target = e.currentTarget;
+            if (!target.src.includes('/assets/poultry_login_bg')) {
+              target.src = '/assets/poultry_login_bg_1793271065125.jpg';
+            } else if (!target.src.includes('/poultry_login_bg')) {
+              target.src = '/poultry_login_bg_1793271065125.jpg';
+            }
+          }}
         />
         {/* Subtle dark gradient overlay to ensure perfect card contrast and readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-slate-950/50 backdrop-blur-[1px]" />
