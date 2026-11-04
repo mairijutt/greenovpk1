@@ -25,6 +25,7 @@ import {
   BarChart2,
   Calendar,
   Info,
+  Wheat,
 } from 'lucide-react';
 import { FinancialRecord } from '../types/farm.ts';
 import {
@@ -266,16 +267,32 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     }, 0);
 
     const otherRevenue = otherRecords.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const avgCartonPrice = totalEggsSold > 0 ? Math.round(eggRevenue / (totalEggsSold / 360)) : 0;
 
     return {
       totalEggsSold,
       eggRevenue,
       eggCartons: Math.round(totalEggsSold / 360),
+      avgCartonPrice,
       otherItemsSold,
       otherRevenue,
       otherCount: otherRecords.length,
     };
   }, [filtered]);
+
+  // Dynamic Per Bird Feed Consumption metrics based on selected unit
+  const perBirdFeedConsumption = useMemo(() => {
+    if (selectedUnit === 'Unit 1') {
+      return { intake: '117 g / day', fcr: '1.48 FCR', subtext: '58 bags/day • 27.8 kg/bird (24,786 birds)' };
+    }
+    if (selectedUnit === 'Unit 2') {
+      return { intake: '118 g / day', fcr: '1.49 FCR', subtext: '75 bags/day • 28.5 kg/bird (31,739 birds)' };
+    }
+    if (selectedUnit === 'Unit 3') {
+      return { intake: '123 g / day', fcr: '1.47 FCR', subtext: '62 bags/day • 29.1 kg/bird (25,189 birds)' };
+    }
+    return { intake: '118 g / day', fcr: '1.48 FCR', subtext: '195 bags/day • 28.3 kg/bird (85,500 birds)' };
+  }, [selectedUnit]);
 
   // Projected Revenue for next 4 weeks on the basis of last 12 weeks
   const projectionRevenue = useMemo(() => {
@@ -884,27 +901,20 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     const su2 = salesOnly.filter((f) => f.flockName === 'Unit 2' || f.flockId === 9 || f.flockId === '9');
     const su3 = salesOnly.filter((f) => f.flockName === 'Unit 3' || f.flockId === 10 || f.flockId === '10');
 
+    const calcStats = (arr: FinancialRecord[]) => {
+      const count = arr.length;
+      const revenue = arr.reduce((s, r) => s + r.amount, 0);
+      const items = arr.reduce((s, r: any) => s + (r.quantity || 0), 0);
+      const cartons = items > 0 ? items / 360 : 0;
+      const avgCartonPrice = cartons > 0 ? Math.round(revenue / cartons) : 0;
+      return { count, revenue, items, cartons, avgCartonPrice };
+    };
+
     return {
-      all: {
-        count: salesOnly.length,
-        revenue: salesOnly.reduce((s, r) => s + r.amount, 0),
-        items: salesOnly.reduce((s, r: any) => s + (r.quantity || 0), 0),
-      },
-      unit1: {
-        count: su1.length,
-        revenue: su1.reduce((s, r) => s + r.amount, 0),
-        items: su1.reduce((s, r: any) => s + (r.quantity || 0), 0),
-      },
-      unit2: {
-        count: su2.length,
-        revenue: su2.reduce((s, r) => s + r.amount, 0),
-        items: su2.reduce((s, r: any) => s + (r.quantity || 0), 0),
-      },
-      unit3: {
-        count: su3.length,
-        revenue: su3.reduce((s, r) => s + r.amount, 0),
-        items: su3.reduce((s, r: any) => s + (r.quantity || 0), 0),
-      },
+      all: calcStats(salesOnly),
+      unit1: calcStats(su1),
+      unit2: calcStats(su2),
+      unit3: calcStats(su3),
     };
   }, [financials]);
 
@@ -1071,7 +1081,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
               {selectedType === 'Income'
-                ? `${Math.round(salesStats.all.items / 360).toLocaleString()} cartons sold (${(salesStats.all.items / 1000000).toFixed(2)}M eggs)`
+                ? `${Math.round(salesStats.all.items / 360).toLocaleString()} cartons sold • Avg: Rs. ${salesStats.all.avgCartonPrice.toLocaleString()} / carton`
                 : 'Farm GVF2025 Combined'}
             </div>
           </button>
@@ -1101,7 +1111,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
               {selectedType === 'Income'
-                ? `${Math.round(salesStats.unit1.items / 360).toLocaleString()} cartons sold (${(salesStats.unit1.items / 1000).toFixed(0)}k eggs)`
+                ? `${Math.round(salesStats.unit1.items / 360).toLocaleString()} cartons sold • Avg: Rs. ${salesStats.unit1.avgCartonPrice.toLocaleString()} / carton`
                 : 'Flock ID 8 (25,000 birds)'}
             </div>
           </button>
@@ -1131,7 +1141,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
               {selectedType === 'Income'
-                ? `${Math.round(salesStats.unit2.items / 360).toLocaleString()} cartons sold (${(salesStats.unit2.items / 1000000).toFixed(2)}M eggs)`
+                ? `${Math.round(salesStats.unit2.items / 360).toLocaleString()} cartons sold • Avg: Rs. ${salesStats.unit2.avgCartonPrice.toLocaleString()} / carton`
                 : 'Flock ID 9 (35,000 birds)'}
             </div>
           </button>
@@ -1161,7 +1171,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
             <div className="text-[10px] text-slate-500 mt-0.5">
               {selectedType === 'Income'
-                ? `${Math.round(salesStats.unit3.items / 360).toLocaleString()} cartons sold (${(salesStats.unit3.items / 1000).toFixed(0)}k eggs)`
+                ? `${Math.round(salesStats.unit3.items / 360).toLocaleString()} cartons sold • Avg: Rs. ${salesStats.unit3.avgCartonPrice.toLocaleString()} / carton`
                 : 'Flock ID 10 (25,500 birds)'}
             </div>
           </button>
@@ -1187,6 +1197,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         className={`grid gap-3.5 sm:gap-4 ${
           selectedType === 'Income'
             ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'
+            : selectedType === 'Expense'
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
             : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
         }`}
       >
@@ -1213,7 +1225,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 text: `${eggSalesData.eggCartons.toLocaleString()} Cartons`,
                 color: 'blue',
               }}
-              subtext={`${eggSalesData.totalEggsSold.toLocaleString()} eggs sold (360 eggs/carton)`}
+              subtext={`Average Carton Price: Rs. ${eggSalesData.avgCartonPrice.toLocaleString()} / carton`}
             />
 
             <StatCard
@@ -1292,6 +1304,15 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               color="teal"
               badge={{ text: '76.45% of Cost', color: 'teal' }}
               subtext="Rs. 276,471,321 (144 vouchers)"
+            />
+            <StatCard
+              title="Per Bird Feed consumption"
+              value={perBirdFeedConsumption.intake}
+              icon={Wheat}
+              color="amber"
+              valueColor="text-amber-800"
+              badge={{ text: perBirdFeedConsumption.fcr, color: 'amber' }}
+              subtext={perBirdFeedConsumption.subtext}
             />
             <StatCard
               title="Average Voucher Amount"
@@ -2074,7 +2095,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
                   <div className="text-[10px] text-slate-500 mt-0.5">
                     {b.head === 'EGG'
-                      ? `${(b.items / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })} cartons (${b.items.toLocaleString()} eggs)`
+                      ? `${(b.items / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })} cartons • Avg Carton Price: Rs. ${Math.round(b.amount / ((b.items || 1) / 360)).toLocaleString()}`
                       : `${b.items.toLocaleString()} ${b.head === 'Feed BAGS' ? 'bags' : 'units'} sold`}
                   </div>
 

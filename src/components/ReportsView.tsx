@@ -992,14 +992,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             />
 
             <StatCard
-              title="Commercial Cartons & Trays"
+              title="Total Cartons"
               value={`${Math.round(eggTotals.cleanTrays / 12).toLocaleString()}`}
               unit="Cartons"
               icon={Package}
               color="emerald"
               valueColor="text-emerald-700"
-              badge={{ text: `${eggTotals.cleanTrays.toLocaleString()} Trays`, color: 'emerald' }}
-              subtext={`${eggTotals.cleanTrays.toLocaleString()} trays (12 trays = 1 carton / 360 eggs)`}
+              badge={{ text: 'Avg: Rs. 6,606/ctn', color: 'emerald' }}
+              subtext="Average Carton Price: Rs. 6,606 / carton"
             />
 
             <StatCard
@@ -1032,7 +1032,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     <th className="py-3 px-3 text-right">Morning Eggs</th>
                     <th className="py-3 px-3 text-right">Evening Eggs</th>
                     <th className="py-3 px-3 text-right">Total Production (Cartons)</th>
-                    <th className="py-3 px-3 text-right">Clean Trays / Cartons</th>
+                    <th className="py-3 px-3 text-right">Total Cartons</th>
                     <th className="py-3 px-3 text-right">Broken Eggs</th>
                     <th className="py-3 px-3 text-right">Avg Weight</th>
                     <th className="py-3 px-3 text-right">Laying Rate</th>
@@ -1080,8 +1080,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                           <div className="text-[10px] text-slate-400 font-normal">({(log.totalEggs || 0).toLocaleString()} eggs)</div>
                         </td>
                         <td className="py-3 px-3 text-right font-semibold font-mono text-slate-800">
-                          <div>{(log.cleanTrays || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">Trays</span></div>
-                          <div className="text-[10px] text-emerald-700 font-bold">{((log.cleanTrays || 0) / 12).toFixed(1)} ctn</div>
+                          <div>{((log.cleanTrays || 0) / 12).toFixed(1)} <span className="text-[10px] text-slate-400 font-normal">ctn</span></div>
+                          <div className="text-[10px] text-slate-500 font-normal">360 eggs/ctn</div>
                         </td>
                         <td className="py-3 px-3 text-right font-mono font-medium">
                           {(log.damagedEggs || log.brokenEggs || 0) > 0 ? (

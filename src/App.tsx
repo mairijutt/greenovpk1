@@ -728,6 +728,34 @@ export default function App() {
     currentUser?.role?.toLowerCase().includes('super admin')
   );
 
+  // Health notifications derived strictly from scheduled vaccines & medications (unconditionally declared at top level)
+  const healthNotifications: HealthNotification[] = useMemo(() => {
+    return vaccines
+      .filter((v) => v.status === 'Scheduled')
+      .map((v) => {
+        const isMed =
+          v.vaccineName.toLowerCase().includes('medicin') ||
+          v.vaccineName.toLowerCase().includes('antibiotic') ||
+          v.vaccineName.toLowerCase().includes('vitamin') ||
+          v.vaccineName.toLowerCase().includes('tonic') ||
+          v.vaccineName.toLowerCase().includes('powder') ||
+          v.vaccineName.toLowerCase().includes('dewormer');
+
+        return {
+          id: v.id,
+          title: v.vaccineName,
+          message: `${v.flockName || 'Layer Shed'} • ${v.method || 'Standard'} • ${v.dosage || ''}`,
+          date: v.scheduledDate || `Week ${v.scheduledWeek}`,
+          flockName: v.flockName,
+          status: v.status as any,
+          method: v.method,
+          dosage: v.dosage,
+          type: isMed ? 'medicine' : 'vaccine',
+          isNew: latestHealthPrompt?.id === v.id,
+        };
+      });
+  }, [vaccines, latestHealthPrompt]);
+
   // If not logged in, render the Login View directly
   if (!currentUser) {
     return (
@@ -753,6 +781,7 @@ export default function App() {
             localStorage.setItem('greenova_user', JSON.stringify(profile));
           } catch (e) {}
           const targetTab = currentTab && currentTab !== 'dashboard' ? currentTab : 'dashboard';
+          setCurrentTab(targetTab);
           const targetPath = targetTab === 'dashboard' ? '/dashboard' : `/${targetTab}`;
           try {
             window.history.pushState({ tab: targetTab }, '', targetPath);
@@ -761,34 +790,6 @@ export default function App() {
       />
     );
   }
-
-  // Health notifications derived strictly from scheduled vaccines & medications
-  const healthNotifications: HealthNotification[] = useMemo(() => {
-    return vaccines
-      .filter((v) => v.status === 'Scheduled')
-      .map((v) => {
-      const isMed =
-        v.vaccineName.toLowerCase().includes('medicin') ||
-        v.vaccineName.toLowerCase().includes('antibiotic') ||
-        v.vaccineName.toLowerCase().includes('vitamin') ||
-        v.vaccineName.toLowerCase().includes('tonic') ||
-        v.vaccineName.toLowerCase().includes('powder') ||
-        v.vaccineName.toLowerCase().includes('dewormer');
-
-      return {
-        id: v.id,
-        title: v.vaccineName,
-        message: `${v.flockName || 'Layer Shed'} • ${v.method || 'Standard'} • ${v.dosage || ''}`,
-        date: v.scheduledDate || `Week ${v.scheduledWeek}`,
-        flockName: v.flockName,
-        status: v.status as any,
-        method: v.method,
-        dosage: v.dosage,
-        type: isMed ? 'medicine' : 'vaccine',
-        isNew: latestHealthPrompt?.id === v.id,
-      };
-    });
-  }, [vaccines, latestHealthPrompt]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans antialiased">

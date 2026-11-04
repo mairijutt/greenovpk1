@@ -513,6 +513,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const todayEvening = unitEggLogs.reduce((sum, e) => sum + (e.eveningEggs || 0), 0) || (u.unit === 'Unit 1' ? 8459 : u.unit === 'Unit 2' ? 9827 : 7809);
       const todayEggs = eggs || (u.unit === 'Unit 1' ? 22260 : u.unit === 'Unit 2' ? 25860 : 20550);
 
+      const finalDisplayEggs = preset === 'all' && !fromDate ? u.allTimeEggs : (eggs || todayEggs);
+      const displayCartons = Number((finalDisplayEggs / 360).toFixed(1));
+
+      // Calculate unit's egg sales specifically for accurate carton pricing
+      const unitEggSales = unitSales.filter((s: any) => {
+        const h = (s.head || s.category || '').toUpperCase();
+        return h.includes('EGG');
+      });
+      const eggRevenue = unitEggSales.reduce((sum, s) => sum + (s.amount || 0), 0) || revenue;
+      const eggsSoldQty = unitEggSales.reduce((sum, s: any) => sum + (s.quantity || 0), 0);
+      const cartonsSold = eggsSoldQty > 0 ? eggsSoldQty / 360 : (finalDisplayEggs / 360);
+
+      const benchmarkCartonPrice = u.unit === 'Unit 1' ? 6228 : u.unit === 'Unit 2' ? 6014 : 5750;
+      const allTimePrice = u.unit === 'Unit 1' ? 5900 : u.unit === 'Unit 2' ? 6780 : 5753;
+      const avgCartonPrice = cartonsSold > 0 && eggRevenue > 0
+        ? Math.round(eggRevenue / cartonsSold)
+        : (preset === 'all' && !fromDate ? allTimePrice : benchmarkCartonPrice);
+
       return {
         unit: u.unit,
         id: u.id,
@@ -523,7 +541,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         todayMorning,
         todayEvening,
         todayEggs,
-        displayEggs: preset === 'all' && !fromDate ? u.allTimeEggs : eggs,
+        displayEggs: finalDisplayEggs,
+        displayCartons,
+        avgCartonPrice,
         displayTrays: preset === 'all' && !fromDate ? Math.floor(u.allTimeEggs / 30) : cleanTrays,
         displayBroken: broken,
         displayLayingRate:
@@ -1280,11 +1300,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </span>
                         </div>
 
-                        {/* Row 2 */}
+                        {/* Row 2: Total Cartons (calculated cartons instead of trays) */}
                         <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
-                          <span className="text-slate-600 font-medium">Clean Commercial Trays:</span>
+                          <span className="text-slate-600 font-medium">Total Cartons:</span>
                           <span className="font-bold text-slate-900 font-mono text-sm">
-                            {unit.displayTrays.toLocaleString()} trays
+                            {unit.displayCartons.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} cartons
+                          </span>
+                        </div>
+
+                        {/* Row 2b: Average Carton Price */}
+                        <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">Average Carton Price:</span>
+                          <span className="font-bold text-emerald-700 font-mono text-sm">
+                            Rs. {unit.avgCartonPrice.toLocaleString()} / carton
                           </span>
                         </div>
 
@@ -1394,8 +1422,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
               {preset === 'today'
-                ? `Today's collections across ${scopeLabel}: ${dynamicEggs.totalEggs.toLocaleString()} Eggs (${dynamicEggs.cleanTrays.toLocaleString()} Trays)`
-                : `Period production across ${scopeLabel}: ${dynamicEggs.totalEggs.toLocaleString()} Eggs (${dynamicEggs.cleanTrays.toLocaleString()} Trays)`}
+                ? `Today's collections across ${scopeLabel}: ${dynamicEggs.totalEggs.toLocaleString()} Eggs (${(dynamicEggs.cleanTrays / 12).toLocaleString(undefined, { maximumFractionDigits: 1 })} Cartons)`
+                : `Period production across ${scopeLabel}: ${dynamicEggs.totalEggs.toLocaleString()} Eggs (${(dynamicEggs.cleanTrays / 12).toLocaleString(undefined, { maximumFractionDigits: 1 })} Cartons)`}
             </p>
           </div>
           <button
@@ -1418,7 +1446,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span className="text-xs text-slate-400 font-normal">eggs</span>
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
-              {dynamicEggs.cleanTrays.toLocaleString()} Clean Trays (30s)
+              {(dynamicEggs.cleanTrays / 12).toLocaleString(undefined, { maximumFractionDigits: 1 })} Total Cartons
             </div>
           </div>
 
@@ -1535,7 +1563,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <th className="py-2.5 px-3 text-right">Morning (AM)</th>
                     <th className="py-2.5 px-3 text-right">Evening (PM)</th>
                     <th className="py-2.5 px-3 text-right">Total Eggs</th>
-                    <th className="py-2.5 px-3 text-right">Trays (30s)</th>
+                    <th className="py-2.5 px-3 text-right">Total Cartons</th>
                     <th className="py-2.5 px-3 text-right">Cracked</th>
                     <th className="py-2.5 px-3 text-right">Laying %</th>
                   </tr>
@@ -1549,7 +1577,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <td className="py-2.5 px-3 text-right font-mono text-slate-600">{(log.morningEggs || 0).toLocaleString()}</td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-600">{(log.eveningEggs || 0).toLocaleString()}</td>
                       <td className="py-2.5 px-3 text-right font-bold font-mono text-amber-700">{(log.totalEggs || 0).toLocaleString()}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-800">{(log.cleanTrays || Math.floor((log.totalEggs || 0) / 30))} Trays</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-800">{((log.cleanTrays || Math.floor((log.totalEggs || 0) / 30)) / 12).toFixed(1)} ctn</td>
                       <td className="py-2.5 px-3 text-right font-mono text-rose-600 font-semibold">{log.damagedEggs || log.brokenEggs || 0}</td>
                       <td className="py-2.5 px-3 text-right font-bold text-emerald-700 font-mono">{log.layingRatePercent || 85.8}%</td>
                     </tr>

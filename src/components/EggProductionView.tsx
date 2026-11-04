@@ -497,19 +497,20 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
           unit="Eggs"
           icon={Egg}
           color="amber"
-          badge={{ text: `${(totalEggs / 360).toFixed(1)} Ctn`, color: 'amber' }}
-          subtext={`${(totalEggs / 360).toFixed(1)} cartons (@ 360/ctn)`}
         />
 
         <StatCard
-          title="Commercial Cartons & Trays"
+          title="Total Cartons"
           value={(totalTrays / 12).toLocaleString(undefined, { maximumFractionDigits: 1 })}
           unit="Cartons"
           icon={Layers}
           color="emerald"
           valueColor="text-emerald-700"
-          badge={{ text: `${totalTrays.toLocaleString()} Trays`, color: 'emerald' }}
-          subtext={`${totalTrays.toLocaleString()} clean 30-egg trays`}
+          badge={{
+            text: `Avg: Rs. ${(avgEggPrice * 360).toLocaleString(undefined, { maximumFractionDigits: 0 })}/ctn`,
+            color: 'emerald',
+          }}
+          subtext={`Average Carton Price: Rs. ${(avgEggPrice * 360).toLocaleString(undefined, { maximumFractionDigits: 0 })} / carton`}
         />
 
         <StatCard
@@ -1033,9 +1034,9 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                   </div>
 
                   <div className="flex justify-between items-center text-[11px] text-slate-300">
-                    <span>Clean Trays &amp; Cartons:</span>
+                    <span>Total Cartons:</span>
                     <span className="font-mono font-bold text-emerald-400">
-                      {(activeTooltipData.cleanTrays / 12).toFixed(1)} ctn ({activeTooltipData.cleanTrays.toLocaleString()} trays)
+                      {(activeTooltipData.cleanTrays / 12).toFixed(1)} cartons
                     </span>
                   </div>
 
@@ -1108,7 +1109,7 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
 
             <div className="text-[11px] text-slate-500 flex items-center space-x-1">
               <Info className="w-3.5 h-3.5 text-slate-400" />
-              <span>Hover any day to inspect exact shift yields &amp; trays</span>
+              <span>Hover any day to inspect exact shift yields &amp; cartons</span>
             </div>
           </div>
         </div>
@@ -1166,7 +1167,7 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                 <th className="py-3 px-4 text-right">Morning (A.M.)</th>
                 <th className="py-3 px-4 text-right">Evening (P.M.)</th>
                 <th className="py-3 px-4 text-right">Total Production</th>
-                <th className="py-3 px-4 text-right">Clean Trays / Cartons</th>
+                <th className="py-3 px-4 text-right">Total Cartons</th>
                 <th className="py-3 px-4 text-right">Broken</th>
                 <th className="py-3 px-4 text-center">Laying %</th>
                 <th className="py-3 px-4">Notes</th>
@@ -1209,10 +1210,10 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-right font-mono">
                       <div className="font-semibold text-slate-700">
-                        {entry.cleanTrays.toLocaleString()} trays
+                        {(entry.cleanTrays / 12).toFixed(1)} cartons
                       </div>
                       <div className="text-[10px] text-slate-500 font-medium">
-                        {(entry.cleanTrays / 12).toFixed(1)} ctn
+                        360 eggs/ctn
                       </div>
                     </td>
                     <td className="py-3 px-4 text-right font-medium text-rose-600 font-mono">

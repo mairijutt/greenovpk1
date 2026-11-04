@@ -149,9 +149,6 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="font-bold text-base sm:text-lg tracking-tight text-white whitespace-nowrap group-hover:text-emerald-300 transition-colors">
                     GreenOva Poultry
                   </span>
-                  <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    Smart OS
-                  </span>
                 </div>
                 <p className="text-[11px] sm:text-xs text-emerald-300/80 hidden sm:block">
                   Smarter Poultry. Stronger Profits.
