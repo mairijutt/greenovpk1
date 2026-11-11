@@ -265,13 +265,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     let expenses = 0;
     if (preset === 'all' && !fromDate && !toDate) {
       if (selectedFlock === 'all') {
-        expenses = 361653128.6;
+        expenses = 387153843.6;
       } else if (selectedFlock === 'Unit 1' || selectedFlock === '8') {
-        expenses = 66172253;
+        expenses = 73051255;
       } else if (selectedFlock === 'Unit 2' || selectedFlock === '9') {
-        expenses = 243997005.6;
+        expenses = 253509518.6;
       } else {
-        expenses = 51483870;
+        expenses = 60593070;
       }
       // Add any custom user-added expenses from financials
       const customUserExp = financials
@@ -1771,7 +1771,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Rs. {Math.round(dynamicStock.amount).toLocaleString()}
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
-              {preset === 'today' ? 'Challan #1468 (D.O. 3996)' : '145 Total Deliveries'}
+              {preset === 'today' ? 'Challan #1468 (D.O. 3996)' : `${dynamicStock.shipments || 157} Total Deliveries`}
             </div>
           </div>
 

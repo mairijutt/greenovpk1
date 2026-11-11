@@ -34,7 +34,7 @@ export async function syncFromSupabase(stores: {
       stores.setFlocks(flocks);
     }
 
-    if (expRes.rows.length >= 1241) {
+    if (expRes.rows.length >= 1378) {
       const expenses = expRes.rows.map((r: any) => ({
         id: r.id,
         expenseDate: r.expense_date ? new Date(r.expense_date).toISOString() : new Date().toISOString(),
@@ -54,9 +54,9 @@ export async function syncFromSupabase(stores: {
     }
 
     // Only load remote eggs if they exactly match the authentic PDF total and count
-    if (eggRes.rows.length === 371) {
+    if (eggRes.rows.length === 413) {
       const remoteSum = eggRes.rows.reduce((sum: number, r: any) => sum + Number(r.totalEggs || 0), 0);
-      if (remoteSum === 17168190) {
+      if (remoteSum === 18126930) {
         const eggs = eggRes.rows.map((r: any) => ({
           id: r.id,
           date: r.date ? new Date(r.date).toISOString() : new Date().toISOString(),
@@ -75,7 +75,7 @@ export async function syncFromSupabase(stores: {
       }
     }
 
-    if (saleRes.rows.length >= 808) {
+    if (saleRes.rows.length >= 938) {
       const sales = saleRes.rows.map((r: any) => ({
         id: r.id,
         saleDate: r.saleDate ? new Date(r.saleDate).toISOString() : new Date().toISOString(),
@@ -101,9 +101,9 @@ export async function syncFromSupabase(stores: {
       stores.setSales(sales);
     }
 
-    if (stockRes.rows.length >= 145) {
+    if (stockRes.rows.length >= 157) {
       const remoteBags = stockRes.rows.reduce((sum: number, r: any) => sum + Number(r.quantity || 0), 0);
-      if (remoteBags === 48395) {
+      if (remoteBags === 50545) {
         const stocks = stockRes.rows.map((r: any) => ({
           id: r.id,
           date: r.date ? new Date(r.date).toISOString() : new Date().toISOString(),

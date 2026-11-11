@@ -375,10 +375,10 @@ function loadStore() {
       const parsed = JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8'));
       if (Array.isArray(parsed.flockItems) && parsed.flockItems.length > 0) flockItems = parsed.flockItems;
       if (Array.isArray(parsed.farmList) && parsed.farmList.length > 0) farmList = parsed.farmList;
-      if (Array.isArray(parsed.rawExpenses) && parsed.rawExpenses.length >= 1241) {
+      if (Array.isArray(parsed.rawExpenses) && parsed.rawExpenses.length >= 1378) {
         rawExpenses = parsed.rawExpenses;
       } else {
-        // Automatically upgrade store with all 1,241 official PDF expense records
+        // Automatically upgrade store with all 1,378 official PDF expense records
         rawExpenses = liveExpenseRecords.map((r: any) => ({
           id: Number(r.trackingId) || 0,
           expenseDate: `${r.date}T00:00:00.000Z`,
@@ -397,7 +397,7 @@ function loadStore() {
         }));
         saveStore();
       }
-      if (Array.isArray(parsed.rawStocks) && parsed.rawStocks.length === 145) {
+      if (Array.isArray(parsed.rawStocks) && parsed.rawStocks.length === 157) {
         rawStocks = parsed.rawStocks;
       } else {
         rawStocks = liveStockRecords.map((r: any) => ({
@@ -419,10 +419,10 @@ function loadStore() {
         }));
         saveStore();
       }
-      if (Array.isArray(parsed.rawSales) && parsed.rawSales.length >= 808) {
+      if (Array.isArray(parsed.rawSales) && parsed.rawSales.length >= 938) {
         rawSales = parsed.rawSales;
       } else {
-        // Automatically upgrade store with all 808 official PDF sales records
+        // Automatically upgrade store with all 938 official PDF sales records
         rawSales = liveSalesRecords.map((s: any) => ({
           id: s.trackingId,
           saleDate: `${s.date}T00:00:00.000Z`,
@@ -448,10 +448,10 @@ function loadStore() {
         }));
         saveStore();
       }
-      if (Array.isArray(parsed.rawEggProductions) && parsed.rawEggProductions.length === 371) {
+      if (Array.isArray(parsed.rawEggProductions) && parsed.rawEggProductions.length === 413) {
         rawEggProductions = parsed.rawEggProductions;
       } else {
-        // Automatically upgrade store with all 371 official PDF egg production records
+        // Automatically upgrade store with all 413 official PDF egg production records
         rawEggProductions = liveEggProductions.map((e: any) => ({
           id: Number(e.trackingId || e.id) || 0,
           date: `${e.date}T00:00:00.000Z`,
@@ -683,7 +683,7 @@ function computeMetrics(flockId?: number | null, startDate?: string, endDate?: s
     expenseMap[head] = (expenseMap[head] || 0) + cost;
   }
 
-  // 4. Sales / Revenue (Computed directly from all 808 live authentic PDF sales)
+  // 4. Sales / Revenue (Computed directly from all 938 live authentic PDF sales)
   let totalRevenue = 0;
   let totalItemsSold = 0;
   const salesMap: Record<string, number> = {};

@@ -17,6 +17,7 @@ import { StatCard, UIButton, UIInput, UITextarea } from './ui';
 interface FarmsViewProps {
   farms: Farm[];
   flocks: Flock[];
+  onUpdateFarms?: (farms: Farm[]) => void;
 }
 
 const defaultInitialFarms: Farm[] = [
@@ -48,8 +49,9 @@ const defaultInitialFarms: Farm[] = [
   },
 ];
 
-export const FarmsView: React.FC<FarmsViewProps> = ({ farms: initialPropsFarms, flocks }) => {
+export const FarmsView: React.FC<FarmsViewProps> = ({ farms: initialPropsFarms, flocks, onUpdateFarms }) => {
   const [farmList, setFarmList] = useState<Farm[]>(() => {
+    if (initialPropsFarms && initialPropsFarms.length > 0) return initialPropsFarms;
     const saved = localStorage.getItem('greenova_farm_records');
     if (saved) {
       try {
@@ -63,6 +65,7 @@ export const FarmsView: React.FC<FarmsViewProps> = ({ farms: initialPropsFarms, 
 
   useEffect(() => {
     localStorage.setItem('greenova_farm_records', JSON.stringify(farmList));
+    onUpdateFarms?.(farmList);
   }, [farmList]);
 
   const [showModal, setShowModal] = useState(false);

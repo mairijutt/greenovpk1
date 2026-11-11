@@ -11,8 +11,10 @@ import {
   Calendar,
   Building2,
   ChevronRight,
+  ChevronDown,
   Sparkles,
 } from 'lucide-react';
+import { Farm } from '../types/farm';
 
 export interface HealthNotification {
   id: string;
@@ -48,6 +50,9 @@ interface HeaderProps {
   onClearPrompt?: () => void;
   onNavigateTab?: (tab: string) => void;
   onToggleVaccineStatus?: (id: string) => void;
+  farms?: Farm[];
+  selectedFarmId?: string;
+  onSelectFarm?: (farmId: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -64,6 +69,9 @@ export const Header: React.FC<HeaderProps> = ({
   onClearPrompt,
   onNavigateTab,
   onToggleVaccineStatus,
+  farms = [],
+  selectedFarmId = 'all',
+  onSelectFarm,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showPromptToast, setShowPromptToast] = useState(false);
@@ -157,8 +165,31 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right Section: Bell Notification Prompt & User Profile */}
+          {/* Right Section: Farm Selector, Bell Notification Prompt & User Profile */}
           <div className="flex items-center space-x-2 sm:space-x-3">
+            {/* Global Farm Dropdown */}
+            {farms && farms.length > 0 && (
+              <div className="relative flex items-center">
+                <div className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-900/90 hover:bg-emerald-800 border border-emerald-700/80 transition-colors shadow-2xs text-xs">
+                  <Building2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider hidden lg:inline">Farm:</span>
+                  <select
+                    value={selectedFarmId && selectedFarmId !== 'all' ? selectedFarmId : (farms[0]?.id || 'farm-1')}
+                    onChange={(e) => onSelectFarm?.(e.target.value)}
+                    aria-label="Global Farm Selector"
+                    className="appearance-none bg-transparent pr-5 text-xs font-bold text-white focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[160px] lg:max-w-[210px] truncate"
+                  >
+                    {farms.map((f) => (
+                      <option key={f.id} value={f.id} className="bg-slate-900 text-white font-semibold">
+                        {f.name} {f.code ? `(${f.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-emerald-300 absolute right-2 pointer-events-none" />
+                </div>
+              </div>
+            )}
+
             {/* Bell Icon Notification Button & Popover */}
             <div className="relative" ref={dropdownRef}>
               <button

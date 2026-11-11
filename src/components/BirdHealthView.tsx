@@ -17,8 +17,9 @@ import {
   BarChart2,
   Info,
   Users,
+  ChevronDown,
 } from 'lucide-react';
-import { MortalityLog, VaccineLog, Flock } from '../types/farm';
+import { MortalityLog, VaccineLog, Flock, Farm } from '../types/farm';
 import {
   StatCard,
   PageHeader,
@@ -40,6 +41,9 @@ interface BirdHealthViewProps {
   onOpenRecordModal: (type: 'mortality') => void;
   onToggleVaccine: (id: string) => void;
   onAddVaccine?: (vaccine: VaccineLog) => void;
+  farms?: Farm[];
+  selectedFarmId?: string;
+  onSelectFarm?: (farmId: string) => void;
 }
 
 type HealthChartMode = 'mortality' | 'rate';
@@ -52,17 +56,39 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
   onOpenRecordModal,
   onToggleVaccine,
   onAddVaccine,
+  farms = [],
+  selectedFarmId = 'all',
+  onSelectFarm,
 }) => {
   const latestDate = useMemo(() => {
     return mortalityLogs[0]?.date || '2026-10-24';
   }, [mortalityLogs]);
 
+  const defaultFarmId = farms[0]?.id || 'farm-1';
   const [activeTab, setActiveTab] = useState<'mortality' | 'vaccines'>('mortality');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFarm, setSelectedFarm] = useState(
+    selectedFarmId && selectedFarmId !== 'all' ? selectedFarmId : defaultFarmId
+  );
   const [selectedFlock, setSelectedFlock] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [preset, setPreset] = useState<DatePreset>('all');
+
+  const isFirstFarm = selectedFarm === defaultFarmId || selectedFarm === 'farm-1';
+
+  // Sync external farm selection if changed
+  useEffect(() => {
+    if (selectedFarmId !== undefined) {
+      setSelectedFarm(selectedFarmId && selectedFarmId !== 'all' ? selectedFarmId : defaultFarmId);
+    }
+  }, [selectedFarmId, defaultFarmId]);
+
+  const handleFarmChange = (fId: string) => {
+    setSelectedFarm(fId);
+    setSelectedFlock('all');
+    onSelectFarm?.(fId);
+  };
 
   // Vaccine sub-filter status
   const [vaccineStatusFilter, setVaccineStatusFilter] = useState<VaccineFilterStatus>('all');
@@ -104,14 +130,69 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
 
   const handleReset = () => {
     setSelectedFlock('all');
+    setSelectedFarm(defaultFarmId);
+    onSelectFarm?.(defaultFarmId);
     setFromDate('');
     setToDate('');
     setPreset('all');
     setSearchTerm('');
   };
 
+  // Flocks available under the selected farm
+  const availableFlocks = useMemo(() => {
+    if (isFirstFarm) {
+      return flocks.filter(
+        (f) => f.farmId === 'farm-1' || f.id === '8' || f.id === '9' || f.id === '10'
+      );
+    }
+    return flocks.filter((f) => {
+      if (f.farmId === selectedFarm) return true;
+      const farmObj = farms.find((farm) => farm.id === selectedFarm);
+      return farmObj && f.farmName && f.farmName.toLowerCase().includes(farmObj.name.toLowerCase());
+    });
+  }, [flocks, selectedFarm, farms, isFirstFarm]);
+
   // Flock census data matching official farm records
   const flockCensus = useMemo(() => {
+    if (!isFirstFarm) {
+      if (availableFlocks.length === 0) {
+        return {
+          all: {
+            activeBirds: 0,
+            capacity: 0,
+            mortality: 0,
+            mortalityRate: 0,
+            status: 'No Flocks Registered',
+          },
+          unit1: { id: '0', name: 'N/A', currentCount: 0, initialCount: 0, activeBirds: 0, capacity: 0, mortality: 0, mortalityRate: 0, status: 'No Data', ageWeeks: 0, breed: '-' },
+          unit2: { id: '0', name: 'N/A', currentCount: 0, initialCount: 0, activeBirds: 0, capacity: 0, mortality: 0, mortalityRate: 0, status: 'No Data', ageWeeks: 0, breed: '-' },
+          unit3: { id: '0', name: 'N/A', currentCount: 0, initialCount: 0, activeBirds: 0, capacity: 0, mortality: 0, mortalityRate: 0, status: 'No Data', ageWeeks: 0, breed: '-' },
+        };
+      }
+
+      const totalActiveBirds = availableFlocks.reduce((sum, f) => sum + (f.currentCount || 0), 0);
+      const totalCapacity = availableFlocks.reduce((sum, f) => sum + (f.initialCount || f.currentCount || 0), 0);
+      const availIds = new Set(availableFlocks.map((f) => String(f.id)));
+      const availNames = new Set(availableFlocks.map((f) => f.name.toLowerCase()));
+      const totalMort = mortalityLogs
+        .filter((m) => (m.flockId && availIds.has(String(m.flockId))) || (m.flockName && availNames.has(m.flockName.toLowerCase())))
+        .reduce((sum, m) => sum + (m.count || 0), 0);
+      const mortRate = totalActiveBirds > 0 ? Number(((totalMort / totalActiveBirds) * 100).toFixed(3)) : 0;
+
+      return {
+        all: {
+          activeBirds: totalActiveBirds,
+          capacity: totalCapacity,
+          mortality: totalMort,
+          mortalityRate: mortRate,
+          status: 'Active Bio-Security Monitoring',
+        },
+        unit1: { id: '0', name: 'N/A', currentCount: 0, initialCount: 0, activeBirds: 0, capacity: 0, mortality: 0, mortalityRate: 0, status: 'No Data', ageWeeks: 0, breed: '-' },
+        unit2: { id: '0', name: 'N/A', currentCount: 0, initialCount: 0, activeBirds: 0, capacity: 0, mortality: 0, mortalityRate: 0, status: 'No Data', ageWeeks: 0, breed: '-' },
+        unit3: { id: '0', name: 'N/A', currentCount: 0, initialCount: 0, activeBirds: 0, capacity: 0, mortality: 0, mortalityRate: 0, status: 'No Data', ageWeeks: 0, breed: '-' },
+      };
+    }
+
     const u1 = flocks.find((f) => f.id === '8' || f.name === 'Unit 1') || {
       id: '8',
       name: 'Unit 1',
@@ -186,10 +267,52 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
         status: 'Optimal Mineral Balance',
       },
     };
-  }, [flocks, mortalityLogs]);
+  }, [flocks, mortalityLogs, isFirstFarm, availableFlocks]);
 
   // Current scope population & mortality metrics
   const scopedMetrics = useMemo(() => {
+    if (!isFirstFarm) {
+      if (availableFlocks.length === 0) {
+        return {
+          label: 'No Units Registered',
+          activeBirds: 0,
+          capacity: 0,
+          mortality: 0,
+          mortalityRate: 0,
+          ageWeeks: 0,
+          breed: 'None',
+        };
+      }
+      if (selectedFlock !== 'all') {
+        const fl = availableFlocks.find((f) => String(f.id) === selectedFlock || f.name === selectedFlock);
+        if (fl) {
+          const flMort = mortalityLogs
+            .filter((m) => String(m.flockId) === String(fl.id) || m.flockName === fl.name)
+            .reduce((s, m) => s + (m.count || 0), 0);
+          const act = fl.currentCount || 0;
+          const cap = fl.initialCount || fl.currentCount || 0;
+          return {
+            label: fl.name,
+            activeBirds: act,
+            capacity: cap,
+            mortality: flMort,
+            mortalityRate: act > 0 ? Number(((flMort / act) * 100).toFixed(3)) : 0,
+            ageWeeks: fl.ageWeeks || 0,
+            breed: fl.breed || 'Commercial Layer',
+          };
+        }
+      }
+      return {
+        label: 'All Units Combined',
+        activeBirds: flockCensus.all.activeBirds,
+        capacity: flockCensus.all.capacity,
+        mortality: flockCensus.all.mortality,
+        mortalityRate: flockCensus.all.mortalityRate,
+        ageWeeks: Math.round(availableFlocks.reduce((s, f) => s + (f.ageWeeks || 0), 0) / (availableFlocks.length || 1)),
+        breed: 'Commercial Layers',
+      };
+    }
+
     if (selectedFlock === '8' || selectedFlock === 'Unit 1') {
       return {
         label: 'Unit 1 (Shed 1)',
@@ -232,11 +355,47 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
       ageWeeks: 32,
       breed: 'Lohmann Brown & Hy-Line Layers',
     };
-  }, [selectedFlock, flockCensus]);
+  }, [selectedFlock, flockCensus, isFirstFarm, availableFlocks, mortalityLogs]);
 
   // Filtered mortality logs
   const filteredMortality = useMemo(() => {
+    if (!isFirstFarm) {
+      if (availableFlocks.length === 0) return [];
+      const availIds = new Set(availableFlocks.map((f) => String(f.id)));
+      const availNames = new Set(availableFlocks.map((f) => f.name.toLowerCase()));
+
+      return mortalityLogs.filter((log) => {
+        const matchesFarmFlock =
+          (log.flockId && availIds.has(String(log.flockId))) ||
+          (log.flockName && availNames.has(log.flockName.toLowerCase())) ||
+          (log.flockName && availableFlocks.some((f) => log.flockName.toLowerCase().includes(f.name.toLowerCase())));
+        if (!matchesFarmFlock) return false;
+
+        const q = searchTerm.toLowerCase();
+        const matchesSearch =
+          !searchTerm ||
+          log.flockName.toLowerCase().includes(q) ||
+          log.cause.toLowerCase().includes(q) ||
+          (log.symptoms && log.symptoms.toLowerCase().includes(q)) ||
+          log.recordedBy.toLowerCase().includes(q) ||
+          log.date.includes(q);
+        const matchesFlock =
+          selectedFlock === 'all' ||
+          String(log.flockId) === selectedFlock ||
+          log.flockName === selectedFlock;
+        const matchesFrom = !fromDate || log.date >= fromDate;
+        const matchesTo = !toDate || log.date <= toDate;
+        return matchesSearch && matchesFlock && matchesFrom && matchesTo;
+      });
+    }
+
+    const greenOvaFlockIds = new Set(['8', '9', '10']);
     return mortalityLogs.filter((log) => {
+      const isGreenOvaMatch =
+        (log.flockId && greenOvaFlockIds.has(String(log.flockId))) ||
+        (log.flockName && (log.flockName.includes('1') || log.flockName.includes('2') || log.flockName.includes('3')));
+      if (!isGreenOvaMatch) return false;
+
       const q = searchTerm.toLowerCase();
       const matchesSearch =
         !searchTerm ||
@@ -247,17 +406,59 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
         log.date.includes(q);
       const matchesFlock =
         selectedFlock === 'all' ||
-        log.flockId === selectedFlock ||
+        String(log.flockId) === selectedFlock ||
         log.flockName === selectedFlock;
       const matchesFrom = !fromDate || log.date >= fromDate;
       const matchesTo = !toDate || log.date <= toDate;
       return matchesSearch && matchesFlock && matchesFrom && matchesTo;
     });
-  }, [mortalityLogs, searchTerm, selectedFlock, fromDate, toDate]);
+  }, [mortalityLogs, isFirstFarm, availableFlocks, searchTerm, selectedFlock, fromDate, toDate]);
 
   // Filtered vaccine schedules
   const filteredVaccines = useMemo(() => {
+    if (!isFirstFarm) {
+      if (availableFlocks.length === 0) return [];
+      const availIds = new Set(availableFlocks.map((f) => String(f.id)));
+      const availNames = new Set(availableFlocks.map((f) => f.name.toLowerCase()));
+
+      return vaccines.filter((v) => {
+        const vFlockName = v.flockName?.toLowerCase();
+        const matchesFarmFlock =
+          (v.flockId && availIds.has(String(v.flockId))) ||
+          (vFlockName && availNames.has(vFlockName)) ||
+          (vFlockName && availableFlocks.some((f) => vFlockName.includes(f.name.toLowerCase())));
+        if (!matchesFarmFlock) return false;
+
+        const q = searchTerm.toLowerCase();
+        const matchesSearch =
+          !searchTerm ||
+          v.vaccineName.toLowerCase().includes(q) ||
+          v.method.toLowerCase().includes(q) ||
+          (v.flockName && v.flockName.toLowerCase().includes(q)) ||
+          (v.vetNotes && v.vetNotes.toLowerCase().includes(q));
+
+        const matchesFlock =
+          selectedFlock === 'all' ||
+          String(v.flockId) === selectedFlock ||
+          (v.flockName && v.flockName === selectedFlock);
+
+        const matchesStatus =
+          vaccineStatusFilter === 'all' ||
+          (vaccineStatusFilter === 'scheduled' && v.status !== 'Completed') ||
+          (vaccineStatusFilter === 'completed' && v.status === 'Completed');
+
+        return matchesSearch && matchesFlock && matchesStatus;
+      });
+    }
+
+    const greenOvaFlockIds = new Set(['8', '9', '10']);
     return vaccines.filter((v) => {
+      const vFlockName = v.flockName?.toLowerCase();
+      const isGreenOvaMatch =
+        (v.flockId && greenOvaFlockIds.has(String(v.flockId))) ||
+        (vFlockName && (vFlockName.includes('1') || vFlockName.includes('2') || vFlockName.includes('3')));
+      if (!isGreenOvaMatch) return false;
+
       const q = searchTerm.toLowerCase();
       const matchesSearch =
         !searchTerm ||
@@ -268,7 +469,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
 
       const matchesFlock =
         selectedFlock === 'all' ||
-        v.flockId === selectedFlock ||
+        String(v.flockId) === selectedFlock ||
         (v.flockName && v.flockName === selectedFlock);
 
       const matchesStatus =
@@ -278,11 +479,11 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
 
       return matchesSearch && matchesFlock && matchesStatus;
     });
-  }, [vaccines, searchTerm, selectedFlock, vaccineStatusFilter]);
+  }, [vaccines, isFirstFarm, availableFlocks, searchTerm, selectedFlock, vaccineStatusFilter]);
 
   const totalPeriodDeaths = filteredMortality.reduce((acc, curr) => acc + (curr.count || 0), 0);
-  const pendingVaccines = vaccines.filter((v) => v.status !== 'Completed').length;
-  const completedVaccines = vaccines.filter((v) => v.status === 'Completed').length;
+  const pendingVaccines = filteredVaccines.filter((v) => v.status !== 'Completed').length;
+  const completedVaccines = filteredVaccines.filter((v) => v.status === 'Completed').length;
 
   // Group mortality logs by calendar date for interactive chart
   const dailyHealthChartData = useMemo(() => {
@@ -434,7 +635,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
                 <span>All Flocks Combined</span>
               </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-200/70 font-semibold text-slate-700">
-                3 of 3 Active
+                {isFirstFarm ? '3 of 3 Active' : `${availableFlocks.length} Active`}
               </span>
             </div>
             <div className="mt-2 text-xl font-black text-slate-900 font-mono">
@@ -451,112 +652,176 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
             </div>
           </button>
 
-          {/* Unit 1 Card */}
-          <button
-            type="button"
-            onClick={() => setSelectedFlock('8')}
-            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-              selectedFlock === '8' || selectedFlock === 'Unit 1'
-                ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20'
-                : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Unit 1 (Shed 1)</span>
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">
-                Week {flockCensus.unit1.ageWeeks}
-              </span>
-            </div>
-            <div className="mt-2 text-xl font-black text-emerald-800 font-mono">
-              {flockCensus.unit1.activeBirds.toLocaleString()}{' '}
-              <span className="text-xs font-normal text-slate-500">
-                / {flockCensus.unit1.capacity.toLocaleString()} Birds
-              </span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] border-t border-slate-200/60 pt-2">
-              <span className="text-slate-600 font-medium">Unit 1 Mortality:</span>
-              <span className="font-bold text-rose-600 font-mono">
-                {flockCensus.unit1.mortality} Deaths ({flockCensus.unit1.mortalityRate}%)
-              </span>
-            </div>
-          </button>
+          {isFirstFarm ? (
+            <>
+              {/* Unit 1 Card */}
+              <button
+                type="button"
+                onClick={() => setSelectedFlock('8')}
+                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedFlock === '8' || selectedFlock === 'Unit 1'
+                    ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20'
+                    : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>Unit 1 (Shed 1)</span>
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">
+                    Week {flockCensus.unit1.ageWeeks}
+                  </span>
+                </div>
+                <div className="mt-2 text-xl font-black text-emerald-800 font-mono">
+                  {flockCensus.unit1.activeBirds.toLocaleString()}{' '}
+                  <span className="text-xs font-normal text-slate-500">
+                    / {flockCensus.unit1.capacity.toLocaleString()} Birds
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[11px] border-t border-slate-200/60 pt-2">
+                  <span className="text-slate-600 font-medium">Unit 1 Mortality:</span>
+                  <span className="font-bold text-rose-600 font-mono">
+                    {flockCensus.unit1.mortality} Deaths ({flockCensus.unit1.mortalityRate}%)
+                  </span>
+                </div>
+              </button>
 
-          {/* Unit 2 Card */}
-          <button
-            type="button"
-            onClick={() => setSelectedFlock('9')}
-            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-              selectedFlock === '9' || selectedFlock === 'Unit 2'
-                ? 'bg-blue-500/10 border-blue-500 ring-2 ring-blue-500/20'
-                : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>Unit 2 (Shed 2)</span>
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800 font-semibold">
-                Week {flockCensus.unit2.ageWeeks}
-              </span>
-            </div>
-            <div className="mt-2 text-xl font-black text-blue-800 font-mono">
-              {flockCensus.unit2.activeBirds.toLocaleString()}{' '}
-              <span className="text-xs font-normal text-slate-500">
-                / {flockCensus.unit2.capacity.toLocaleString()} Birds
-              </span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] border-t border-slate-200/60 pt-2">
-              <span className="text-slate-600 font-medium">Unit 2 Mortality:</span>
-              <span className="font-bold text-rose-600 font-mono">
-                {flockCensus.unit2.mortality} Deaths ({flockCensus.unit2.mortalityRate}%)
-              </span>
-            </div>
-          </button>
+              {/* Unit 2 Card */}
+              <button
+                type="button"
+                onClick={() => setSelectedFlock('9')}
+                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedFlock === '9' || selectedFlock === 'Unit 2'
+                    ? 'bg-blue-500/10 border-blue-500 ring-2 ring-blue-500/20'
+                    : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span>Unit 2 (Shed 2)</span>
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800 font-semibold">
+                    Week {flockCensus.unit2.ageWeeks}
+                  </span>
+                </div>
+                <div className="mt-2 text-xl font-black text-blue-800 font-mono">
+                  {flockCensus.unit2.activeBirds.toLocaleString()}{' '}
+                  <span className="text-xs font-normal text-slate-500">
+                    / {flockCensus.unit2.capacity.toLocaleString()} Birds
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[11px] border-t border-slate-200/60 pt-2">
+                  <span className="text-slate-600 font-medium">Unit 2 Mortality:</span>
+                  <span className="font-bold text-rose-600 font-mono">
+                    {flockCensus.unit2.mortality} Deaths ({flockCensus.unit2.mortalityRate}%)
+                  </span>
+                </div>
+              </button>
 
-          {/* Unit 3 Card */}
-          <button
-            type="button"
-            onClick={() => setSelectedFlock('10')}
-            className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-              selectedFlock === '10' || selectedFlock === 'Unit 3'
-                ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20'
-                : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                <span>Unit 3 (Shed 3)</span>
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-semibold">
-                Week {flockCensus.unit3.ageWeeks}
-              </span>
+              {/* Unit 3 Card */}
+              <button
+                type="button"
+                onClick={() => setSelectedFlock('10')}
+                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedFlock === '10' || selectedFlock === 'Unit 3'
+                    ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20'
+                    : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span>Unit 3 (Shed 3)</span>
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-semibold">
+                    Week {flockCensus.unit3.ageWeeks}
+                  </span>
+                </div>
+                <div className="mt-2 text-xl font-black text-amber-800 font-mono">
+                  {flockCensus.unit3.activeBirds.toLocaleString()}{' '}
+                  <span className="text-xs font-normal text-slate-500">
+                    / {flockCensus.unit3.capacity.toLocaleString()} Birds
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[11px] border-t border-slate-200/60 pt-2">
+                  <span className="text-slate-600 font-medium">Unit 3 Mortality:</span>
+                  <span className="font-bold text-rose-600 font-mono">
+                    {flockCensus.unit3.mortality} Deaths ({flockCensus.unit3.mortalityRate}%)
+                  </span>
+                </div>
+              </button>
+            </>
+          ) : availableFlocks.length === 0 ? (
+            <div className="sm:col-span-3 p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 flex flex-col items-center justify-center text-center">
+              <p className="text-xs font-semibold text-slate-600">No units registered for this farm yet</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Please add units and flocks in the Flocks tab to record bird health data.</p>
             </div>
-            <div className="mt-2 text-xl font-black text-amber-800 font-mono">
-              {flockCensus.unit3.activeBirds.toLocaleString()}{' '}
-              <span className="text-xs font-normal text-slate-500">
-                / {flockCensus.unit3.capacity.toLocaleString()} Birds
-              </span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-[11px] border-t border-slate-200/60 pt-2">
-              <span className="text-slate-600 font-medium">Unit 3 Mortality:</span>
-              <span className="font-bold text-rose-600 font-mono">
-                {flockCensus.unit3.mortality} Deaths ({flockCensus.unit3.mortalityRate}%)
-              </span>
-            </div>
-          </button>
+          ) : (
+            availableFlocks.map((flock, idx) => {
+              const flMort = mortalityLogs
+                .filter((m) => String(m.flockId) === String(flock.id) || m.flockName === flock.name)
+                .reduce((s, m) => s + (m.count || 0), 0);
+              const act = flock.currentCount || 0;
+              const cap = flock.initialCount || flock.currentCount || 0;
+              const rate = act > 0 ? Number(((flMort / act) * 100).toFixed(3)) : 0;
+              const colors = [
+                { bg: 'bg-emerald-500/10', border: 'border-emerald-500', dot: 'bg-emerald-500', text: 'text-emerald-800' },
+                { bg: 'bg-blue-500/10', border: 'border-blue-500', dot: 'bg-blue-500', text: 'text-blue-800' },
+                { bg: 'bg-amber-500/10', border: 'border-amber-500', dot: 'bg-amber-500', text: 'text-amber-800' },
+                { bg: 'bg-purple-500/10', border: 'border-purple-500', dot: 'bg-purple-500', text: 'text-purple-800' },
+              ];
+              const c = colors[idx % colors.length];
+              const isSelected = selectedFlock === String(flock.id) || selectedFlock === flock.name;
+
+              return (
+                <button
+                  key={flock.id}
+                  type="button"
+                  onClick={() => setSelectedFlock(String(flock.id))}
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    isSelected
+                      ? `${c.bg} ${c.border} ring-2 ring-emerald-500/20`
+                      : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                    <span className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+                      <span>{flock.name}</span>
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-200/70 text-slate-700 font-semibold">
+                      Week {flock.ageWeeks || 1}
+                    </span>
+                  </div>
+                  <div className={`mt-2 text-xl font-black ${c.text} font-mono`}>
+                    {act.toLocaleString()}{' '}
+                    <span className="text-xs font-normal text-slate-500">
+                      / {cap.toLocaleString()} Birds
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[11px] border-t border-slate-200/60 pt-2">
+                    <span className="text-slate-600 font-medium">{flock.name} Mortality:</span>
+                    <span className="font-bold text-rose-600 font-mono">
+                      {flMort} Deaths ({rate}%)
+                    </span>
+                  </div>
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
 
-      {/* Date Range Picker Bar (🐔 All Flocks Combined | 📅 FROM ... TO ... | Today | 30D | All | ⟳) */}
+      {/* Date Range Picker Bar */}
       <DateRangePickerBar
+        selectedFarm={selectedFarm}
+        onSelectFarm={handleFarmChange}
+        farms={farms}
         selectedFlock={selectedFlock}
         onSelectFlock={setSelectedFlock}
-        flocks={flocks.map((f) => ({ id: f.id, name: f.name }))}
+        flocks={availableFlocks}
         fromDate={fromDate}
         toDate={toDate}
         onDateChange={(from, to) => {
@@ -799,17 +1064,38 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
           )}
         </div>
 
-        <UISearchInput
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onClear={() => setSearchTerm('')}
-          placeholder={
-            activeTab === 'mortality'
-              ? 'Filter cause, vet, or symptoms...'
-              : 'Search vaccine name or method...'
-          }
-          containerClassName="w-full sm:w-72"
-        />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <UISearchInput
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onClear={() => setSearchTerm('')}
+            placeholder={
+              activeTab === 'mortality'
+                ? 'Filter cause, vet, or symptoms...'
+                : 'Search vaccine name or method...'
+            }
+            containerClassName="w-full sm:w-72"
+          />
+
+          {farms && farms.length > 0 && (
+            <div className="relative inline-flex items-center">
+              <Building2 className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+              <select
+                aria-label="Filter bird health records by farm"
+                value={selectedFarm}
+                onChange={(e) => handleFarmChange(e.target.value)}
+                className="pl-8 pr-7 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors appearance-none cursor-pointer shadow-xs"
+              >
+                {farms.map((farm) => (
+                  <option key={farm.id} value={farm.id}>
+                    {farm.name} ({farm.location || 'Active'})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none" />
+            </div>
+          )}
+        </div>
       </UIFilterBar>
 
       {/* Main Content Area */}

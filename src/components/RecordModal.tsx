@@ -252,7 +252,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                       </option>
                       {flocks.map((f) => (
                         <option key={f.id} value={f.id}>
-                          {f.name} ({f.shedNumber || `Shed ${f.id}`}) — {(f.currentCount || f.initialCount || 25000).toLocaleString()} Birds
+                          {f.farmName ? `${f.farmName} — ` : ''}{f.name} ({f.shedNumber || `Shed ${f.id}`}) — {(f.currentCount || f.initialCount || 25000).toLocaleString()} Birds
                         </option>
                       ))}
                     </select>
@@ -493,7 +493,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                   >
                     {flocks.map((f) => (
                       <option key={f.id} value={f.id}>
-                        {f.name} ({f.shedNumber || `Shed ${f.id}`}) — {(f.currentCount || f.initialCount || 25000).toLocaleString()} Birds
+                        {f.farmName ? `${f.farmName} — ` : ''}{f.name} ({f.shedNumber || `Shed ${f.id}`}) — {(f.currentCount || f.initialCount || 25000).toLocaleString()} Birds
                       </option>
                     ))}
                   </UISelect>
@@ -556,7 +556,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                   >
                     {flocks.map((f) => (
                       <option key={f.id} value={f.id}>
-                        {f.name} ({f.shedNumber || `Shed ${f.id}`}) — {(f.currentCount || f.initialCount || 25000).toLocaleString()} Birds
+                        {f.farmName ? `${f.farmName} — ` : ''}{f.name} ({f.shedNumber || `Shed ${f.id}`}) — {(f.currentCount || f.initialCount || 25000).toLocaleString()} Birds
                       </option>
                     ))}
                   </UISelect>

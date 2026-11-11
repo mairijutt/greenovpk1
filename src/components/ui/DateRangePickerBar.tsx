@@ -1,9 +1,15 @@
 import React from 'react';
-import { Calendar, ChevronDown, RefreshCw } from 'lucide-react';
+import { Calendar, ChevronDown, RefreshCw, Building2 } from 'lucide-react';
 
 export type DatePreset = 'today' | '30d' | 'all' | 'custom';
 
 export interface DateRangePickerBarProps {
+  // Farm filtering
+  selectedFarm?: string;
+  onSelectFarm?: (farmId: string) => void;
+  farms?: { id: string; name: string; code?: string }[];
+  showFarmSelector?: boolean;
+
   // Flock filtering
   selectedFlock?: string;
   onSelectFlock?: (flockId: string) => void;
@@ -26,6 +32,10 @@ export interface DateRangePickerBarProps {
 }
 
 export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
+  selectedFarm = 'all',
+  onSelectFarm,
+  farms = [],
+  showFarmSelector = true,
   selectedFlock = 'all',
   onSelectFlock,
   flocks = [],
@@ -48,6 +58,7 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
     if (onReset) {
       onReset();
     } else {
+      if (onSelectFarm && farms && farms.length > 0) onSelectFarm(farms[0].id);
       if (onSelectFlock) onSelectFlock('all');
       handlePresetClick('all');
     }
@@ -57,6 +68,31 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
     <div
       className={`rounded-2xl border border-emerald-500/25 bg-white p-2 sm:p-2.5 shadow-xs flex flex-wrap items-center gap-2 sm:gap-2.5 ${className}`}
     >
+      {/* 0. Farm Selector */}
+      {showFarmSelector && farms && farms.length > 0 && (
+        <div className="relative flex items-center">
+          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 transition-colors shadow-2xs">
+            <Building2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <select
+              value={selectedFarm && selectedFarm !== 'all' ? selectedFarm : (farms[0]?.id || 'farm-1')}
+              onChange={(e) => {
+                onSelectFarm?.(e.target.value);
+                if (onSelectFlock) onSelectFlock('all');
+              }}
+              aria-label="Filter by Farm"
+              className="appearance-none bg-transparent pr-5 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[150px] sm:max-w-[200px] truncate"
+            >
+              {farms.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name} {f.code ? `(${f.code})` : ''}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
+          </div>
+        </div>
+      )}
+
       {/* 1. Flock Selector matching screenshot: 🐔 All Flocks Combined ▼ */}
       {showFlockSelector && (
         <div className="relative flex items-center">
@@ -66,7 +102,7 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
               value={selectedFlock}
               onChange={(e) => onSelectFlock?.(e.target.value)}
               aria-label="Filter by Flock"
-              className="appearance-none bg-transparent pr-5 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+              className="appearance-none bg-transparent pr-5 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[150px] sm:max-w-[180px] truncate"
             >
               <option value="all">All Flocks Combined</option>
               {flocks.map((f) => (

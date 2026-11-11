@@ -1093,7 +1093,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                           Rs. {record.amount.toLocaleString()}
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-slate-600">
-                          Rs. {record.costPerBag.toLocaleString()}
+                          Rs. {record.costPerBag ? record.costPerBag.toLocaleString() : '0'}
                         </td>
                         <td className="py-3 px-3">
                           <span

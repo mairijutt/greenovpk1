@@ -106,24 +106,24 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     setCurrentPage(1);
   };
 
-  // Egg Production dataset: prefer full liveEggProductions (371 records)
+  // Egg Production dataset: prefer full liveEggProductions (413 records)
   const eggDataset: DetailedEggProduction[] = useMemo(() => {
-    if (eggProductions.length >= 371) {
+    if (eggProductions.length >= 413) {
       return eggProductions as DetailedEggProduction[];
     }
     return liveEggProductions;
   }, [eggProductions]);
 
-  // Sales dataset: prefer full liveSalesRecords (808 records)
+  // Sales dataset: prefer full liveSalesRecords (938 records)
   const salesDataset: SaleRecord[] = useMemo(() => {
     const incomeFromFinancials = financials.filter((f) => f.type === 'Income') as SaleRecord[];
-    if (incomeFromFinancials.length >= 808) {
+    if (incomeFromFinancials.length >= 938) {
       return incomeFromFinancials;
     }
     return liveSalesRecords;
   }, [financials]);
 
-  // Stock dataset: 145 authentic records
+  // Stock dataset: 157 authentic records
   const stockDataset: StockRecord[] = useMemo(() => {
     return liveStockRecords;
   }, []);
@@ -437,7 +437,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 : 'bg-slate-100 text-slate-600'
             }`}
           >
-            371 Logs
+            413 Logs
           </span>
         </button>
 
@@ -461,7 +461,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 : 'bg-slate-100 text-slate-600'
             }`}
           >
-            808 Sales
+            938 Sales
           </span>
         </button>
 
@@ -485,7 +485,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 : 'bg-slate-100 text-slate-600'
             }`}
           >
-            145 Logs
+            157 Logs
           </span>
         </button>
 
@@ -535,11 +535,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>All Units Combined</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'all' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    371 Logs
+                    413 Logs
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  47,689 Cartons <span className="text-[10px] font-normal">(17.17M Eggs)</span>
+                  50,353 Cartons <span className="text-[10px] font-normal">(18.13M Eggs)</span>
                 </div>
               </button>
 
@@ -558,11 +558,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>Unit 1</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 1' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    87 Logs
+                    130 Logs
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  5,365 Cartons <span className="text-[10px] font-normal">(1.93M Eggs • 11.3%)</span>
+                  6,230 Cartons <span className="text-[10px] font-normal">(2.24M Eggs • 12.4%)</span>
                 </div>
               </button>
 
@@ -581,11 +581,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>Unit 2</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 2' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    229 Logs
+                    192 Logs
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  39,175 Cartons <span className="text-[10px] font-normal">(14.10M Eggs • 82.2%)</span>
+                  40,177 Cartons <span className="text-[10px] font-normal">(14.46M Eggs • 79.8%)</span>
                 </div>
               </button>
 
@@ -604,11 +604,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>Unit 3</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 3' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    55 Logs
+                    91 Logs
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  3,149 Cartons <span className="text-[10px] font-normal">(1.13M Eggs • 6.6%)</span>
+                  3,945 Cartons <span className="text-[10px] font-normal">(1.42M Eggs • 7.8%)</span>
                 </div>
               </button>
             </>
@@ -629,11 +629,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>All Units Combined</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'all' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    808 Sales
+                    938 Sales
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  Rs. 312.78M <span className="text-[10px] font-normal">(47,226 Cartons / 17.00M Eggs)</span>
+                  Rs. 329.69M <span className="text-[10px] font-normal">(49,893 Cartons / 17.96M Items)</span>
                 </div>
               </button>
 
@@ -652,11 +652,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>Unit 1</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 1' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    182 Sales
+                    231 Sales
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  Rs. 29.80M <span className="text-[10px] font-normal">(4,514 Cartons / 9.5%)</span>
+                  Rs. 34.95M <span className="text-[10px] font-normal">(6,071 Cartons / 10.6%)</span>
                 </div>
               </button>
 
@@ -675,11 +675,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>Unit 2</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 2' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    489 Sales
+                    584 Sales
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  Rs. 266.38M <span className="text-[10px] font-normal">(40,238 Cartons / 85.2%)</span>
+                  Rs. 273.82M <span className="text-[10px] font-normal">(40,068 Cartons / 83.1%)</span>
                 </div>
               </button>
 
@@ -698,11 +698,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>Unit 3</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 3' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    137 Sales
+                    123 Sales
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  Rs. 16.60M <span className="text-[10px] font-normal">(2,474 Cartons / 5.3%)</span>
+                  Rs. 20.92M <span className="text-[10px] font-normal">(3,754 Cartons / 6.3%)</span>
                 </div>
               </button>
             </>
@@ -723,14 +723,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>All Units Combined</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'all' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    145 Logs
+                    157 Logs
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  48,395 <span className="text-[10px] font-normal">Bags</span>
+                  50,545 <span className="text-[10px] font-normal">Bags</span>
                 </div>
                 <div className={`text-[11px] font-semibold mt-0.5 ${selectedUnit === 'all' ? 'text-indigo-100' : 'text-slate-500'}`}>
-                  Rs. 282.57M
+                  Rs. 294.62M
                 </div>
               </button>
 
@@ -749,14 +749,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>Unit 1</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 1' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    49 Logs
+                    54 Logs
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  7,840 <span className="text-[10px] font-normal">Bags (16.2%)</span>
+                  8,640 <span className="text-[10px] font-normal">Bags (17.1%)</span>
                 </div>
                 <div className={`text-[11px] font-semibold mt-0.5 ${selectedUnit === 'Unit 1' ? 'text-indigo-100' : 'text-slate-500'}`}>
-                  Rs. 46.37M
+                  Rs. 50.91M
                 </div>
               </button>
 
@@ -775,14 +775,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>Unit 2</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 2' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    67 Logs
+                    71 Logs
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  34,245 <span className="text-[10px] font-normal">Bags (70.8%)</span>
+                  34,845 <span className="text-[10px] font-normal">Bags (68.9%)</span>
                 </div>
                 <div className={`text-[11px] font-semibold mt-0.5 ${selectedUnit === 'Unit 2' ? 'text-indigo-100' : 'text-slate-500'}`}>
-                  Rs. 199.65M
+                  Rs. 202.97M
                 </div>
               </button>
 
@@ -801,14 +801,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <div className="flex justify-between items-center text-[11px] font-bold">
                   <span>Unit 3</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 3' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    29 Logs
+                    32 Logs
                   </span>
                 </div>
                 <div className="text-xs font-black mt-1">
-                  6,310 <span className="text-[10px] font-normal">Bags (13.0%)</span>
+                  7,060 <span className="text-[10px] font-normal">Bags (14.0%)</span>
                 </div>
                 <div className={`text-[11px] font-semibold mt-0.5 ${selectedUnit === 'Unit 3' ? 'text-indigo-100' : 'text-slate-500'}`}>
-                  Rs. 36.55M
+                  Rs. 40.74M
                 </div>
               </button>
             </>
@@ -1530,7 +1530,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                           Rs. {record.amount.toLocaleString()}
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-slate-600">
-                          Rs. {record.costPerBag.toLocaleString()}
+                          Rs. {record.costPerBag ? record.costPerBag.toLocaleString() : '0'}
                         </td>
                         <td className="py-3 px-3">
                           <span

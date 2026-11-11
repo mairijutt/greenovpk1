@@ -1,5 +1,5 @@
-// 100% Authentic GreenOva Stock & Inventory Ledger - Parsed from Stock_Report_2026-10-27_93e8aa14.pdf
-// Total Bags Received: 48,395 | Total Amount Paid: Rs. 282,566,219 | Shipments: 145
+// 100% Authentic GreenOva Stock & Inventory Ledger - Parsed from Stock_Report_2026-24OCT-09NOV_31b51050.pdf
+// Total Bags Received: 50,545 | Total Amount Paid: Rs. 294,624,464 | Shipments: 157
 
 export interface StockRecord {
   id: string;
@@ -15,51 +15,309 @@ export interface StockRecord {
   quantity: number;
   bags: number;
   amount: number;
-  costPerBag: number;
+  costPerBag: number | null;
   paymentType: string;
   challanNo: string;
   notes: string;
 }
 
 export const STOCK_SUMMARY = {
-  totalBagsReceived: 48395,
-  totalAmountPaid: 282566219,
-  shipmentCount: 145,
-  averageCostPerBag: Math.round(282566219 / 48395),
+  totalBagsReceived: 50545,
+  totalAmountPaid: 294624464,
+  shipmentCount: 157,
+  averageCostPerBag: Math.round(294624464 / 50545),
   byUnit: {
-    'Unit 1': {
-      bags: 7840,
-      amount: 46373074,
-      shipments: 49,
-      percentage: Number(((7840 / 48395) * 100).toFixed(2)),
+    "Unit 1": {
+        "unitName": "Unit 1",
+        "bags": 8640,
+        "amount": 50908834,
+        "percent": 17.09,
+        "shipments": 54
     },
-    'Unit 2': {
-      bags: 34245,
-      amount: 199645042,
-      shipments: 67,
-      percentage: Number(((34245 / 48395) * 100).toFixed(2)),
+    "Unit 2": {
+        "unitName": "Unit 2",
+        "bags": 34845,
+        "amount": 202973266,
+        "percent": 68.94,
+        "shipments": 71
     },
-    'Unit 3': {
-      bags: 6310,
-      amount: 36548103,
-      shipments: 29,
-      percentage: Number(((6310 / 48395) * 100).toFixed(2)),
+    "Unit 3": {
+        "unitName": "Unit 3",
+        "bags": 7060,
+        "amount": 40742364,
+        "percent": 13.97,
+        "shipments": 32
+    }
+},
+  byType: {
+    "11": {
+        "bags": 5570,
+        "shipments": 28
     },
-  },
-  byFeedType: {
-    '13': { bags: 42425, shipments: 115 },
-    '11': { bags: 5570, shipments: 28 },
-    '12': { bags: 400, shipments: 2 },
-  },
+    "12": {
+        "bags": 400,
+        "shipments": 2
+    },
+    "13": {
+        "bags": 44575,
+        "shipments": 127
+    }
+},
 };
 
 export const unitWiseStockSummary = {
-  'Unit 1': { unitName: 'Unit 1', bags: 7840, amount: 46373074, percent: Number(((7840 / 48395) * 100).toFixed(2)), shipments: 49 },
-  'Unit 2': { unitName: 'Unit 2', bags: 34245, amount: 199645042, percent: Number(((34245 / 48395) * 100).toFixed(2)), shipments: 67 },
-  'Unit 3': { unitName: 'Unit 3', bags: 6310, amount: 36548103, percent: Number(((6310 / 48395) * 100).toFixed(2)), shipments: 29 },
+  "Unit 1": {
+    "unitName": "Unit 1",
+    "bags": 8640,
+    "amount": 50908834,
+    "percent": 17.09,
+    "shipments": 54
+  },
+  "Unit 2": {
+    "unitName": "Unit 2",
+    "bags": 34845,
+    "amount": 202973266,
+    "percent": 68.94,
+    "shipments": 71
+  },
+  "Unit 3": {
+    "unitName": "Unit 3",
+    "bags": 7060,
+    "amount": 40742364,
+    "percent": 13.97,
+    "shipments": 32
+  }
 };
 
 export const liveStockRecords: StockRecord[] = [
+  {
+    "id": "stock-172",
+    "trackingId": 172,
+    "date": "2026-11-05",
+    "rawDate": "05 Nov 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 2",
+    "flockId": "9",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 200,
+    "bags": 200,
+    "amount": 1109408,
+    "costPerBag": 5547,
+    "paymentType": "CASH",
+    "challanNo": "1496",
+    "notes": "200 bags 13c3 unit 2 D.O:4290"
+  },
+  {
+    "id": "stock-169",
+    "trackingId": 169,
+    "date": "2026-11-05",
+    "rawDate": "05 Nov 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 3",
+    "flockId": "10",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 250,
+    "bags": 250,
+    "amount": 1398087,
+    "costPerBag": 5592,
+    "paymentType": "CASH",
+    "challanNo": "310",
+    "notes": "250 bags MF-13C unit 3 D.O:7473"
+  },
+  {
+    "id": "stock-167",
+    "trackingId": 167,
+    "date": "2026-11-05",
+    "rawDate": "05 Nov 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 1",
+    "flockId": "8",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 200,
+    "bags": 200,
+    "amount": 1133940,
+    "costPerBag": 5670,
+    "paymentType": "CASH",
+    "challanNo": "219",
+    "notes": "200 bags 13c1 unit 1 D.O:4289"
+  },
+  {
+    "id": "stock-171",
+    "trackingId": 171,
+    "date": "2026-11-03",
+    "rawDate": "03 Nov 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 2",
+    "flockId": "9",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 100,
+    "bags": 100,
+    "amount": 554704,
+    "costPerBag": 5547,
+    "paymentType": "CASH",
+    "challanNo": "1493",
+    "notes": "100 bags 13c3 unit 2 D.O: 4220"
+  },
+  {
+    "id": "stock-166",
+    "trackingId": 166,
+    "date": "2026-11-03",
+    "rawDate": "03 Nov 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 1",
+    "flockId": "8",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 100,
+    "bags": 100,
+    "amount": 566970,
+    "costPerBag": 5670,
+    "paymentType": "CASH",
+    "challanNo": "217",
+    "notes": "100 bags 13c1 unit 1 D.O:4220"
+  },
+  {
+    "id": "stock-170",
+    "trackingId": 170,
+    "date": "2026-11-02",
+    "rawDate": "02 Nov 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 2",
+    "flockId": "9",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 100,
+    "bags": 100,
+    "amount": 554704,
+    "costPerBag": 5547,
+    "paymentType": "CASH",
+    "challanNo": "1489",
+    "notes": "100 bags 13c3 unit 2 D.O:4180"
+  },
+  {
+    "id": "stock-165",
+    "trackingId": 165,
+    "date": "2026-11-02",
+    "rawDate": "02 Nov 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 1",
+    "flockId": "8",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 100,
+    "bags": 100,
+    "amount": 566970,
+    "costPerBag": 5670,
+    "paymentType": "CASH",
+    "challanNo": "215",
+    "notes": "100 bags 13c1 unit 1 D.O:4180"
+  },
+  {
+    "id": "stock-164",
+    "trackingId": 164,
+    "date": "2026-10-31",
+    "rawDate": "31 Oct 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 3",
+    "flockId": "10",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 250,
+    "bags": 250,
+    "amount": 1398087,
+    "costPerBag": 5592,
+    "paymentType": "CASH",
+    "challanNo": "301",
+    "notes": "250 bags MF-13C unit 3 D.O:7157"
+  },
+  {
+    "id": "stock-162",
+    "trackingId": 162,
+    "date": "2026-10-31",
+    "rawDate": "31 Oct 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 1",
+    "flockId": "8",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 200,
+    "bags": 200,
+    "amount": 1133940,
+    "costPerBag": 5670,
+    "paymentType": "CASH",
+    "challanNo": "214",
+    "notes": "200 bags 13c1 unit 1 D.O:4105"
+  },
+  {
+    "id": "stock-168",
+    "trackingId": 168,
+    "date": "2026-10-30",
+    "rawDate": "30 Oct 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 2",
+    "flockId": "9",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 200,
+    "bags": 200,
+    "amount": 1109408,
+    "costPerBag": 5547,
+    "paymentType": "CASH",
+    "challanNo": "1483",
+    "notes": "200 bags 13c3 unit 2 D.O;4106"
+  },
+  {
+    "id": "stock-163",
+    "trackingId": 163,
+    "date": "2026-10-25",
+    "rawDate": "25 Oct 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 3",
+    "flockId": "10",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 250,
+    "bags": 250,
+    "amount": 1398087,
+    "costPerBag": 5592,
+    "paymentType": "CASH",
+    "challanNo": "295",
+    "notes": "250 bags MF-13C unit 3 D.O :6849"
+  },
+  {
+    "id": "stock-161",
+    "trackingId": 161,
+    "date": "2026-10-25",
+    "rawDate": "25 Oct 2026",
+    "type": "13",
+    "feedType": "Layer Feed 13",
+    "flockName": "Unit 1",
+    "flockId": "8",
+    "head": "FEED",
+    "category": "Feed",
+    "quantity": 200,
+    "bags": 200,
+    "amount": 1133940,
+    "costPerBag": 5670,
+    "paymentType": "CASH",
+    "challanNo": "209",
+    "notes": "200 bags 13c1 unit 1 D.O:3997"
+  },
   {
     "id": "stock-158",
     "trackingId": 158,
@@ -1958,7 +2216,7 @@ export const liveStockRecords: StockRecord[] = [
     "costPerBag": 5767,
     "paymentType": "CASH",
     "challanNo": "1226",
-    "notes": "220bags 13C3 UNIT 2 D.O. NO.:12921"
+    "notes": "220bags 13C3 UNIT 2 D.O."
   },
   {
     "id": "stock-55",
@@ -2088,7 +2346,7 @@ export const liveStockRecords: StockRecord[] = [
     "quantity": 0,
     "bags": 0,
     "amount": 1,
-    "costPerBag": 0,
+    "costPerBag": null,
     "paymentType": "CASH",
     "challanNo": "1207",
     "notes": "CANCELLED"
@@ -2547,7 +2805,7 @@ export const liveStockRecords: StockRecord[] = [
     "costPerBag": 6372,
     "paymentType": "CASH",
     "challanNo": "155",
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "stock-27",
@@ -2793,8 +3051,8 @@ export const liveStockRecords: StockRecord[] = [
     "amount": 138463914,
     "costPerBag": 5888,
     "paymentType": "BANK_TRANSFER",
-    "challanNo": "1",
-    "notes": "23515 bags received till 30 april 2026 224 remaining in stock"
+    "challanNo": "R",
+    "notes": "1 23515 bags received till 30 april 2026 224 remaining in stock"
   },
   {
     "id": "stock-6",

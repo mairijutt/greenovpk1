@@ -19,8 +19,9 @@ import {
   Calendar,
   Scale,
   DollarSign,
+  ChevronDown,
 } from 'lucide-react';
-import { EggProduction, Flock } from '../types/farm';
+import { EggProduction, Flock, Farm } from '../types/farm';
 import {
   StatCard,
   PageHeader,
@@ -36,6 +37,9 @@ interface EggProductionViewProps {
   eggProductions: EggProduction[];
   flocks: Flock[];
   onOpenRecordModal: (type: 'egg') => void;
+  farms?: Farm[];
+  selectedFarmId?: string;
+  onSelectFarm?: (farmId: string) => void;
 }
 
 type ChartViewMode = 'shifts' | 'laying-rate' | 'flocks';
@@ -45,16 +49,44 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
   eggProductions,
   flocks,
   onOpenRecordModal,
+  farms = [],
+  selectedFarmId = 'farm-1',
+  onSelectFarm,
 }) => {
   const latestDate = useMemo(() => {
     return eggProductions[0]?.date || '2026-10-24';
   }, [eggProductions]);
 
+  const defaultFarmId = farms[0]?.id || 'farm-1';
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFarm, setSelectedFarm] = useState(
+    selectedFarmId && selectedFarmId !== 'all' ? selectedFarmId : defaultFarmId
+  );
   const [selectedFlock, setSelectedFlock] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [preset, setPreset] = useState<DatePreset>('all');
+
+  // Sync external farm selection if changed
+  useEffect(() => {
+    if (selectedFarmId && selectedFarmId !== 'all') {
+      setSelectedFarm(selectedFarmId);
+    } else if (farms.length > 0) {
+      setSelectedFarm(farms[0].id);
+    }
+  }, [selectedFarmId, farms]);
+
+  const handleFarmChange = (fId: string) => {
+    setSelectedFarm(fId);
+    setSelectedFlock('all');
+    onSelectFarm?.(fId);
+  };
+
+  // Identify whether selected farm is the first registered farm (GreenOva)
+  const isFirstFarm = useMemo(() => {
+    const firstId = farms[0]?.id || 'farm-1';
+    return selectedFarm === firstId || selectedFarm === 'farm-1';
+  }, [selectedFarm, farms]);
 
   // Chart Interactive Controls
   const [chartMode, setChartMode] = useState<ChartViewMode>('shifts');
@@ -89,6 +121,9 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
 
   const handleReset = () => {
     setSelectedFlock('all');
+    const defFarm = farms[0]?.id || 'farm-1';
+    setSelectedFarm(defFarm);
+    onSelectFarm?.(defFarm);
     setFromDate('');
     setToDate('');
     setPreset('all');
@@ -96,9 +131,72 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
     setCurrentPage(1);
   };
 
+  // Flocks available under the selected farm
+  const availableFlocks = useMemo(() => {
+    if (isFirstFarm) {
+      return flocks
+        .filter(
+          (f) =>
+            f.purpose === 'Layers' &&
+            (f.farmId === 'farm-1' ||
+              f.id === '8' ||
+              f.id === '9' ||
+              f.id === '10' ||
+              f.name.toLowerCase().includes('unit'))
+        )
+        .map((f) => ({ id: f.id, name: f.name }));
+    }
+    const curFarm = farms.find((farm) => farm.id === selectedFarm);
+    const farmName = curFarm?.name?.toLowerCase() || '';
+    const filteredFlocks = flocks.filter(
+      (f) =>
+        f.purpose === 'Layers' &&
+        (f.farmId === selectedFarm || (f.farmName && farmName && f.farmName.toLowerCase().includes(farmName)))
+    );
+    return filteredFlocks.map((f) => ({ id: f.id, name: f.name }));
+  }, [flocks, selectedFarm, farms, isFirstFarm]);
+
   // Filtered productions based on page-level filters
   const filtered = useMemo(() => {
+    if (isFirstFarm) {
+      // GreenOva owns ledger Unit 1, Unit 2, Unit 3 records
+      return eggProductions.filter((item) => {
+        const matchesSearch =
+          !searchTerm ||
+          item.flockName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.date.includes(searchTerm) ||
+          String(item.id).includes(searchTerm) ||
+          (item.notes && item.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesFlock =
+          selectedFlock === 'all' ||
+          item.flockId === selectedFlock ||
+          item.flockName === selectedFlock;
+        const matchesFrom = !fromDate || item.date >= fromDate;
+        const matchesTo = !toDate || item.date <= toDate;
+        return matchesSearch && matchesFlock && matchesFrom && matchesTo;
+      });
+    }
+
+    // For any newly added farm:
+    const curFarm = farms.find((farm) => farm.id === selectedFarm);
+    const farmName = curFarm?.name?.toLowerCase() || '';
+    const farmFlocks = flocks.filter(
+      (f) =>
+        f.purpose === 'Layers' &&
+        (f.farmId === selectedFarm || (f.farmName && farmName && f.farmName.toLowerCase().includes(farmName)))
+    );
+
+    if (farmFlocks.length === 0) return [];
+
+    const farmFlockIds = new Set(farmFlocks.map((f) => String(f.id).toLowerCase()));
+    const farmFlockNames = new Set(farmFlocks.map((f) => f.name.toLowerCase()));
+
     return eggProductions.filter((item) => {
+      const fId = String(item.flockId || '').toLowerCase();
+      const fName = (item.flockName || '').toLowerCase();
+      const matchesFarmFlock = farmFlockIds.has(fId) || Array.from(farmFlockNames).some((n) => fName.includes(n));
+      if (!matchesFarmFlock) return false;
+
       const matchesSearch =
         !searchTerm ||
         item.flockName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -113,7 +211,7 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
       const matchesTo = !toDate || item.date <= toDate;
       return matchesSearch && matchesFlock && matchesFrom && matchesTo;
     });
-  }, [eggProductions, searchTerm, selectedFlock, fromDate, toDate]);
+  }, [eggProductions, searchTerm, selectedFarm, selectedFlock, fromDate, toDate, flocks, farms, isFirstFarm]);
 
   // Aggregate stats across the full filtered set
   const totalEggs = filtered.reduce((acc, curr) => acc + curr.totalEggs, 0);
@@ -129,13 +227,14 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
     if (withWeight.length > 0) {
       return (withWeight.reduce((s, r) => s + (r.avgWeightGrams || 0), 0) / withWeight.length).toFixed(1);
     }
-    return '61.4';
+    return filtered.length === 0 ? '0.0' : '61.4';
   }, [filtered]);
 
   const avgEggPrice = useMemo(() => {
+    if (filtered.length === 0) return 0;
     if (preset === 'today') return 16.30;
     return 18.35;
-  }, [preset]);
+  }, [filtered.length, preset]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
@@ -165,33 +264,46 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
 
   // Unit-wise egg production stats across authentic loaded records
   const unitEggStats = useMemo(() => {
-    const u1 = eggProductions.filter((e) => e.flockId === '8' || e.flockName === 'Unit 1');
-    const u2 = eggProductions.filter((e) => e.flockId === '9' || e.flockName === 'Unit 2');
-    const u3 = eggProductions.filter((e) => e.flockId === '10' || e.flockName === 'Unit 3');
+    if (isFirstFarm) {
+      const u1 = eggProductions.filter((e) => e.flockId === '8' || e.flockName === 'Unit 1');
+      const u2 = eggProductions.filter((e) => e.flockId === '9' || e.flockName === 'Unit 2');
+      const u3 = eggProductions.filter((e) => e.flockId === '10' || e.flockName === 'Unit 3');
+
+      return {
+        all: {
+          eggs: eggProductions.reduce((s, r) => s + r.totalEggs, 0),
+          broken: eggProductions.reduce((s, r) => s + r.damagedEggs, 0),
+          count: eggProductions.length,
+        },
+        unit1: {
+          eggs: u1.reduce((s, r) => s + r.totalEggs, 0),
+          broken: u1.reduce((s, r) => s + r.damagedEggs, 0),
+          count: u1.length,
+        },
+        unit2: {
+          eggs: u2.reduce((s, r) => s + r.totalEggs, 0),
+          broken: u2.reduce((s, r) => s + r.damagedEggs, 0),
+          count: u2.length,
+        },
+        unit3: {
+          eggs: u3.reduce((s, r) => s + r.totalEggs, 0),
+          broken: u3.reduce((s, r) => s + r.damagedEggs, 0),
+          count: u3.length,
+        },
+      };
+    }
 
     return {
       all: {
-        eggs: eggProductions.reduce((s, r) => s + r.totalEggs, 0),
-        broken: eggProductions.reduce((s, r) => s + r.damagedEggs, 0),
-        count: eggProductions.length,
+        eggs: filtered.reduce((s, r) => s + r.totalEggs, 0),
+        broken: filtered.reduce((s, r) => s + r.damagedEggs, 0),
+        count: filtered.length,
       },
-      unit1: {
-        eggs: u1.reduce((s, r) => s + r.totalEggs, 0),
-        broken: u1.reduce((s, r) => s + r.damagedEggs, 0),
-        count: u1.length,
-      },
-      unit2: {
-        eggs: u2.reduce((s, r) => s + r.totalEggs, 0),
-        broken: u2.reduce((s, r) => s + r.damagedEggs, 0),
-        count: u2.length,
-      },
-      unit3: {
-        eggs: u3.reduce((s, r) => s + r.totalEggs, 0),
-        broken: u3.reduce((s, r) => s + r.damagedEggs, 0),
-        count: u3.length,
-      },
+      unit1: { eggs: 0, broken: 0, count: 0 },
+      unit2: { eggs: 0, broken: 0, count: 0 },
+      unit3: { eggs: 0, broken: 0, count: 0 },
     };
-  }, [eggProductions]);
+  }, [eggProductions, filtered, isFirstFarm]);
 
   // --- INTERACTIVE CHART DATA PROCESSING ---
   // Group records by calendar date for continuous day-by-day telemetry
@@ -388,94 +500,140 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
             </div>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setSelectedFlock('8')}
-            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              selectedFlock === '8' || selectedFlock === 'Unit 1'
-                ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20'
-                : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Unit 1
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">
-                {unitEggStats.unit1.count} logs
-              </span>
-            </div>
-            <div className="mt-1 text-base font-black text-emerald-700 font-mono">
-              {(unitEggStats.unit1.eggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
-              <span className="text-xs font-semibold text-slate-500">Cartons</span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
-              {unitEggStats.unit1.eggs.toLocaleString()} eggs (11.25%) • {unitEggStats.unit1.broken.toLocaleString()} broken
-            </div>
-          </button>
+          {isFirstFarm ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setSelectedFlock('8')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedFlock === '8' || selectedFlock === 'Unit 1'
+                    ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20'
+                    : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    Unit 1
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">
+                    {unitEggStats.unit1.count} logs
+                  </span>
+                </div>
+                <div className="mt-1 text-base font-black text-emerald-700 font-mono">
+                  {(unitEggStats.unit1.eggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
+                  <span className="text-xs font-semibold text-slate-500">Cartons</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                  {unitEggStats.unit1.eggs.toLocaleString()} eggs (11.25%) • {unitEggStats.unit1.broken.toLocaleString()} broken
+                </div>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setSelectedFlock('9')}
-            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              selectedFlock === '9' || selectedFlock === 'Unit 2'
-                ? 'bg-blue-500/10 border-blue-500 ring-2 ring-blue-500/20'
-                : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                Unit 2
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800 font-semibold">
-                {unitEggStats.unit2.count} logs
-              </span>
-            </div>
-            <div className="mt-1 text-base font-black text-blue-700 font-mono">
-              {(unitEggStats.unit2.eggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
-              <span className="text-xs font-semibold text-slate-500">Cartons</span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
-              {unitEggStats.unit2.eggs.toLocaleString()} eggs (82.15%) • {unitEggStats.unit2.broken.toLocaleString()} broken
-            </div>
-          </button>
+              <button
+                type="button"
+                onClick={() => setSelectedFlock('9')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedFlock === '9' || selectedFlock === 'Unit 2'
+                    ? 'bg-blue-500/10 border-blue-500 ring-2 ring-blue-500/20'
+                    : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    Unit 2
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800 font-semibold">
+                    {unitEggStats.unit2.count} logs
+                  </span>
+                </div>
+                <div className="mt-1 text-base font-black text-blue-700 font-mono">
+                  {(unitEggStats.unit2.eggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
+                  <span className="text-xs font-semibold text-slate-500">Cartons</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                  {unitEggStats.unit2.eggs.toLocaleString()} eggs (82.15%) • {unitEggStats.unit2.broken.toLocaleString()} broken
+                </div>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setSelectedFlock('10')}
-            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              selectedFlock === '10' || selectedFlock === 'Unit 3'
-                ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20'
-                : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                Unit 3
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-semibold">
-                {unitEggStats.unit3.count} logs
-              </span>
-            </div>
-            <div className="mt-1 text-base font-black text-amber-700 font-mono">
-              {(unitEggStats.unit3.eggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
-              <span className="text-xs font-semibold text-slate-500">Cartons</span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
-              {unitEggStats.unit3.eggs.toLocaleString()} eggs (6.60%) • {unitEggStats.unit3.broken.toLocaleString()} broken
-            </div>
-          </button>
+              <button
+                type="button"
+                onClick={() => setSelectedFlock('10')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedFlock === '10' || selectedFlock === 'Unit 3'
+                    ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20'
+                    : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    Unit 3
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-semibold">
+                    {unitEggStats.unit3.count} logs
+                  </span>
+                </div>
+                <div className="mt-1 text-base font-black text-amber-700 font-mono">
+                  {(unitEggStats.unit3.eggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
+                  <span className="text-xs font-semibold text-slate-500">Cartons</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                  {unitEggStats.unit3.eggs.toLocaleString()} eggs (6.60%) • {unitEggStats.unit3.broken.toLocaleString()} broken
+                </div>
+              </button>
+            </>
+          ) : (
+            availableFlocks.map((flock) => {
+              const flockLogs = filtered.filter(
+                (e) => String(e.flockId) === String(flock.id) || e.flockName.toLowerCase() === flock.name.toLowerCase()
+              );
+              const fEggs = flockLogs.reduce((s, r) => s + r.totalEggs, 0);
+              const fBroken = flockLogs.reduce((s, r) => s + r.damagedEggs, 0);
+              const isSelected = selectedFlock === flock.id || selectedFlock === flock.name;
+
+              return (
+                <button
+                  key={flock.id}
+                  type="button"
+                  onClick={() => setSelectedFlock(isSelected ? 'all' : flock.id)}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20'
+                      : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      {flock.name}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">
+                      {flockLogs.length} logs
+                    </span>
+                  </div>
+                  <div className="mt-1 text-base font-black text-emerald-700 font-mono">
+                    {(fEggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })}{' '}
+                    <span className="text-xs font-semibold text-slate-500">Cartons</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5 font-medium">
+                    {fEggs.toLocaleString()} eggs • {fBroken.toLocaleString()} broken
+                  </div>
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
 
-      {/* Date Range Picker Bar (🐔 All Flocks Combined | 📅 FROM ... TO ... | Today | 30D | All | ⟳) */}
+      {/* Date Range Picker Bar */}
       <DateRangePickerBar
+        selectedFarm={selectedFarm}
+        onSelectFarm={handleFarmChange}
+        farms={farms}
         selectedFlock={selectedFlock}
         onSelectFlock={setSelectedFlock}
-        flocks={flocks.filter((f) => f.purpose === 'Layers').map((f) => ({ id: f.id, name: f.name }))}
+        flocks={availableFlocks}
         fromDate={fromDate}
         toDate={toDate}
         onDateChange={(from, to) => {
@@ -1117,13 +1275,34 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
 
       {/* Secondary Search & Count Filter Bar */}
       <UIFilterBar>
-        <UISearchInput
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onClear={() => setSearchTerm('')}
-          placeholder="Search by ID (#376), flock, date, or notes..."
-          containerClassName="w-full sm:w-80"
-        />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <UISearchInput
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onClear={() => setSearchTerm('')}
+            placeholder="Search by ID (#376), flock, date, or notes..."
+            containerClassName="w-full sm:w-80"
+          />
+
+          {farms && farms.length > 0 && (
+            <div className="relative inline-flex items-center">
+              <Building2 className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+              <select
+                aria-label="Filter records by farm"
+                value={selectedFarm}
+                onChange={(e) => handleFarmChange(e.target.value)}
+                className="pl-8 pr-7 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors appearance-none cursor-pointer shadow-xs"
+              >
+                {farms.map((farm) => (
+                  <option key={farm.id} value={farm.id}>
+                    {farm.name} ({farm.location || 'Active'})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none" />
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center space-x-3 text-xs text-slate-500 font-medium">
           <span>

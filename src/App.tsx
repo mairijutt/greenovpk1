@@ -192,11 +192,11 @@ export default function App() {
     return liveFlocks;
   });
   const [eggProductions, setEggProductions] = useState<EggProduction[]>(() => {
-    const saved = localStorage.getItem('greenova_eggs_v2');
+    const saved = localStorage.getItem('greenova_eggs_v3') || localStorage.getItem('greenova_eggs_v2');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 371) {
+        if (Array.isArray(parsed) && parsed.length >= 413) {
           return parsed;
         }
       } catch (e) {}
@@ -229,11 +229,11 @@ export default function App() {
   });
   const [latestHealthPrompt, setLatestHealthPrompt] = useState<HealthNotification | null>(null);
   const [consumptionLogs, setConsumptionLogs] = useState<FeedConsumption[]>(() => {
-    const saved = localStorage.getItem('greenova_feed_v2');
+    const saved = localStorage.getItem('greenova_feed_v3') || localStorage.getItem('greenova_feed_v2');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 145) {
+        if (Array.isArray(parsed) && parsed.length >= 157) {
           return parsed;
         }
       } catch (e) {}
@@ -245,23 +245,12 @@ export default function App() {
     return saved ? JSON.parse(saved) : initialInventory;
   });
   const [financials, setFinancials] = useState<FinancialRecord[]>(() => {
-    const saved = localStorage.getItem('greenova_financials_v2');
+    const saved = localStorage.getItem('greenova_financials_v3') || localStorage.getItem('greenova_financials_v2');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 2049) {
-          return parsed.map((item: any) => {
-            if (item.id === 'sale-766') {
-              return { ...item, onlinePayment: 345000, cashPayment: 0, paymentMethod: 'Online' };
-            }
-            if (item.id === 'sale-815') {
-              return { ...item, paymentMethod: 'Online' };
-            }
-            if (item.id === 'sale-797') {
-              return { ...item, paymentMethod: 'Split (Online/Cash)' };
-            }
-            return item;
-          });
+        if (Array.isArray(parsed) && parsed.length >= 2316) {
+          return parsed;
         }
       } catch (e) {}
     }
@@ -308,22 +297,22 @@ export default function App() {
   });
 
   const [salaryDisbursals, setSalaryDisbursals] = useState<SalaryDisbursal[]>(() => {
-    const saved = localStorage.getItem('greenova_salaries_v2');
+    const saved = localStorage.getItem('greenova_salaries_v3') || localStorage.getItem('greenova_salaries_v2');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 46) return parsed;
       } catch (e) {}
     }
     return liveSalaryDisbursals;
   });
 
   const [advanceRecords, setAdvanceRecords] = useState<AdvanceSalaryRecord[]>(() => {
-    const saved = localStorage.getItem('greenova_advances_v2');
+    const saved = localStorage.getItem('greenova_advances_v3') || localStorage.getItem('greenova_advances_v2');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 22) return parsed;
       } catch (e) {}
     }
     return liveAdvanceRecords;
@@ -334,7 +323,7 @@ export default function App() {
     localStorage.setItem('greenova_flocks', JSON.stringify(flocks));
   }, [flocks]);
   useEffect(() => {
-    localStorage.setItem('greenova_eggs_v2', JSON.stringify(eggProductions));
+    localStorage.setItem('greenova_eggs_v3', JSON.stringify(eggProductions));
   }, [eggProductions]);
   useEffect(() => {
     localStorage.setItem('greenova_mortality_v2', JSON.stringify(mortalityLogs));
@@ -343,22 +332,22 @@ export default function App() {
     localStorage.setItem('greenova_vaccines_v2', JSON.stringify(vaccines));
   }, [vaccines]);
   useEffect(() => {
-    localStorage.setItem('greenova_feed_v2', JSON.stringify(consumptionLogs));
+    localStorage.setItem('greenova_feed_v3', JSON.stringify(consumptionLogs));
   }, [consumptionLogs]);
   useEffect(() => {
     localStorage.setItem('greenova_inventory', JSON.stringify(inventory));
   }, [inventory]);
   useEffect(() => {
-    localStorage.setItem('greenova_financials_v2', JSON.stringify(financials));
+    localStorage.setItem('greenova_financials_v3', JSON.stringify(financials));
   }, [financials]);
   useEffect(() => {
     localStorage.setItem('greenova_staff_v2', JSON.stringify(workers));
   }, [workers]);
   useEffect(() => {
-    localStorage.setItem('greenova_salaries_v2', JSON.stringify(salaryDisbursals));
+    localStorage.setItem('greenova_salaries_v3', JSON.stringify(salaryDisbursals));
   }, [salaryDisbursals]);
   useEffect(() => {
-    localStorage.setItem('greenova_advances_v2', JSON.stringify(advanceRecords));
+    localStorage.setItem('greenova_advances_v3', JSON.stringify(advanceRecords));
   }, [advanceRecords]);
 
   // Initial flock sync from backend if reachable
@@ -390,11 +379,11 @@ export default function App() {
 
   // Action handlers
   const handleAddEgg = (newEgg: EggProduction) => {
-    // Generate next sequential numeric ID matching PDF series (e.g. #377, #378)
+    // Generate next sequential numeric ID matching PDF series (e.g. #414, #415)
     const numericIds = eggProductions
       .map((e) => Number(e.id))
       .filter((n) => !isNaN(n) && n > 0);
-    const nextNumericId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 377;
+    const nextNumericId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 414;
     const finalEgg: EggProduction = {
       ...newEgg,
       id: String(nextNumericId),
@@ -404,9 +393,9 @@ export default function App() {
 
     // Immediate localStorage sync
     try {
-      const stored = localStorage.getItem('greenova_eggs_v2');
+      const stored = localStorage.getItem('greenova_eggs_v3') || localStorage.getItem('greenova_eggs_v2');
       const parsed = stored ? JSON.parse(stored) : [];
-      localStorage.setItem('greenova_eggs_v2', JSON.stringify([finalEgg, ...(Array.isArray(parsed) ? parsed : [])]));
+      localStorage.setItem('greenova_eggs_v3', JSON.stringify([finalEgg, ...(Array.isArray(parsed) ? parsed : [])]));
     } catch (e) {
       console.warn('LocalStorage error:', e);
     }

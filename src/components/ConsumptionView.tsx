@@ -16,8 +16,9 @@ import {
   Calendar,
   Users,
   AlertTriangle,
+  ChevronDown,
 } from 'lucide-react';
-import { FeedConsumption, Flock, MortalityLog } from '../types/farm';
+import { FeedConsumption, Flock, MortalityLog, Farm } from '../types/farm';
 import {
   StatCard,
   PageHeader,
@@ -34,6 +35,9 @@ interface ConsumptionViewProps {
   flocks: Flock[];
   mortalityLogs?: MortalityLog[];
   onOpenRecordModal: (type: 'feed') => void;
+  farms?: Farm[];
+  selectedFarmId?: string;
+  onSelectFarm?: (farmId: string) => void;
 }
 
 type ChartViewMode = 'volume' | 'grams' | 'flocks';
@@ -44,16 +48,44 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
   flocks,
   mortalityLogs = [],
   onOpenRecordModal,
+  farms = [],
+  selectedFarmId = 'farm-1',
+  onSelectFarm,
 }) => {
   const latestDate = useMemo(() => {
     return consumptionLogs[0]?.date || '2026-10-24';
   }, [consumptionLogs]);
 
+  const defaultFarmId = farms[0]?.id || 'farm-1';
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFarm, setSelectedFarm] = useState(
+    selectedFarmId && selectedFarmId !== 'all' ? selectedFarmId : defaultFarmId
+  );
   const [selectedFlock, setSelectedFlock] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [preset, setPreset] = useState<DatePreset>('all');
+
+  // Sync external farm selection if changed
+  useEffect(() => {
+    if (selectedFarmId && selectedFarmId !== 'all') {
+      setSelectedFarm(selectedFarmId);
+    } else if (farms.length > 0) {
+      setSelectedFarm(farms[0].id);
+    }
+  }, [selectedFarmId, farms]);
+
+  const handleFarmChange = (fId: string) => {
+    setSelectedFarm(fId);
+    setSelectedFlock('all');
+    onSelectFarm?.(fId);
+  };
+
+  // Identify whether selected farm is the first registered farm (GreenOva)
+  const isFirstFarm = useMemo(() => {
+    const firstId = farms[0]?.id || 'farm-1';
+    return selectedFarm === firstId || selectedFarm === 'farm-1';
+  }, [selectedFarm, farms]);
 
   // Chart Interactive Controls
   const [chartMode, setChartMode] = useState<ChartViewMode>('volume');
@@ -88,6 +120,9 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
 
   const handleReset = () => {
     setSelectedFlock('all');
+    const defFarm = farms[0]?.id || 'farm-1';
+    setSelectedFarm(defFarm);
+    onSelectFarm?.(defFarm);
     setFromDate('');
     setToDate('');
     setPreset('all');
@@ -95,9 +130,71 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
     setCurrentPage(1);
   };
 
+  // Flocks available under the selected farm
+  const availableFlocks = useMemo(() => {
+    if (isFirstFarm) {
+      return flocks
+        .filter(
+          (f) =>
+            f.farmId === 'farm-1' ||
+            f.id === '8' ||
+            f.id === '9' ||
+            f.id === '10' ||
+            f.name.toLowerCase().includes('unit')
+        )
+        .map((f) => ({ id: f.id, name: f.name }));
+    }
+    const curFarm = farms.find((farm) => farm.id === selectedFarm);
+    const farmName = curFarm?.name?.toLowerCase() || '';
+    const filteredFlocks = flocks.filter(
+      (f) => f.farmId === selectedFarm || (f.farmName && farmName && f.farmName.toLowerCase().includes(farmName))
+    );
+    return filteredFlocks.map((f) => ({ id: f.id, name: f.name }));
+  }, [flocks, selectedFarm, farms, isFirstFarm]);
+
   // Filtered consumption logs based on page-level filters
   const filtered = useMemo(() => {
+    if (isFirstFarm) {
+      return consumptionLogs.filter((log) => {
+        const q = searchTerm.toLowerCase();
+        const matchesSearch =
+          !searchTerm ||
+          log.flockName.toLowerCase().includes(q) ||
+          log.feedType.toLowerCase().includes(q) ||
+          log.date.includes(q) ||
+          (log.challanNo && log.challanNo.toLowerCase().includes(q)) ||
+          (log.notes && log.notes.toLowerCase().includes(q)) ||
+          String(log.trackingId || log.id).includes(q);
+
+        const matchesFlock =
+          selectedFlock === 'all' ||
+          log.flockId === selectedFlock ||
+          log.flockName === selectedFlock;
+
+        const matchesFrom = !fromDate || log.date >= fromDate;
+        const matchesTo = !toDate || log.date <= toDate;
+        return matchesSearch && matchesFlock && matchesFrom && matchesTo;
+      });
+    }
+
+    // For any newly added farm:
+    const curFarm = farms.find((farm) => farm.id === selectedFarm);
+    const farmName = curFarm?.name?.toLowerCase() || '';
+    const farmFlocks = flocks.filter(
+      (f) => f.farmId === selectedFarm || (f.farmName && farmName && f.farmName.toLowerCase().includes(farmName))
+    );
+
+    if (farmFlocks.length === 0) return [];
+
+    const farmFlockIds = new Set(farmFlocks.map((f) => String(f.id).toLowerCase()));
+    const farmFlockNames = new Set(farmFlocks.map((f) => f.name.toLowerCase()));
+
     return consumptionLogs.filter((log) => {
+      const fId = String(log.flockId || '').toLowerCase();
+      const fName = (log.flockName || '').toLowerCase();
+      const matchesFarmFlock = farmFlockIds.has(fId) || Array.from(farmFlockNames).some((n) => fName.includes(n));
+      if (!matchesFarmFlock) return false;
+
       const q = searchTerm.toLowerCase();
       const matchesSearch =
         !searchTerm ||
@@ -117,7 +214,7 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
       const matchesTo = !toDate || log.date <= toDate;
       return matchesSearch && matchesFlock && matchesFrom && matchesTo;
     });
-  }, [consumptionLogs, searchTerm, selectedFlock, fromDate, toDate]);
+  }, [consumptionLogs, flocks, farms, selectedFarm, searchTerm, selectedFlock, fromDate, toDate, isFirstFarm]);
 
   // Aggregate stats across the full filtered set
   const totalFeedKg = filtered.reduce((acc, curr) => acc + (curr.feedQuantityKg || 0), 0);
@@ -125,18 +222,33 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
     (acc, curr) => acc + (curr.bags || Math.round((curr.feedQuantityKg || 0) / 50)),
     0
   );
-  // Water intake defaults to 0 as instructed if not found in feed records
   const totalWaterL = filtered.reduce((acc, curr) => acc + (curr.waterIntakeLiters || 0), 0);
   const avgGrams =
     filtered.length > 0
       ? (filtered.reduce((acc, curr) => acc + (curr.gramsPerBird || 118), 0) / filtered.length).toFixed(1)
-      : '118.0';
+      : '0.0';
 
   // Unit-wise feed overview statistics across all authentic loaded records
   const unitFeedStats = useMemo(() => {
-    const u1 = consumptionLogs.filter((c) => c.flockId === '8' || c.flockName?.includes('1'));
-    const u2 = consumptionLogs.filter((c) => c.flockId === '9' || c.flockName?.includes('2'));
-    const u3 = consumptionLogs.filter((c) => c.flockId === '10' || c.flockName?.includes('3'));
+    if (isFirstFarm) {
+      const u1 = consumptionLogs.filter((c) => c.flockId === '8' || c.flockName?.includes('1'));
+      const u2 = consumptionLogs.filter((c) => c.flockId === '9' || c.flockName?.includes('2'));
+      const u3 = consumptionLogs.filter((c) => c.flockId === '10' || c.flockName?.includes('3'));
+
+      const getStats = (list: FeedConsumption[]) => ({
+        bags: list.reduce((s, r) => s + (r.bags || Math.round((r.feedQuantityKg || 0) / 50)), 0),
+        feedKg: list.reduce((s, r) => s + (r.feedQuantityKg || 0), 0),
+        waterL: list.reduce((s, r) => s + (r.waterIntakeLiters || 0), 0),
+        count: list.length,
+      });
+
+      return {
+        all: getStats(consumptionLogs),
+        unit1: getStats(u1),
+        unit2: getStats(u2),
+        unit3: getStats(u3),
+      };
+    }
 
     const getStats = (list: FeedConsumption[]) => ({
       bags: list.reduce((s, r) => s + (r.bags || Math.round((r.feedQuantityKg || 0) / 50)), 0),
@@ -146,33 +258,34 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
     });
 
     return {
-      all: getStats(consumptionLogs),
-      unit1: getStats(u1),
-      unit2: getStats(u2),
-      unit3: getStats(u3),
+      all: getStats(filtered),
+      unit1: { bags: 0, feedKg: 0, waterL: 0, count: 0 },
+      unit2: { bags: 0, feedKg: 0, waterL: 0, count: 0 },
+      unit3: { bags: 0, feedKg: 0, waterL: 0, count: 0 },
     };
-  }, [consumptionLogs]);
+  }, [consumptionLogs, filtered, isFirstFarm]);
 
   // Active Birds Count based on selected unit or farm census
   const activeBirdsCount = useMemo(() => {
-    if (selectedFlock === 'all') {
-      const total = flocks.reduce((acc, f) => acc + (f.currentCount || 0), 0);
-      return total || 81714;
+    if (isFirstFarm) {
+      if (selectedFlock === 'all') return 81714;
+      if (selectedFlock === '8' || selectedFlock === 'Unit 1') return 24786;
+      if (selectedFlock === '9' || selectedFlock === 'Unit 2') return 31739;
+      if (selectedFlock === '10' || selectedFlock === 'Unit 3') return 25189;
+      return 81714;
     }
-    const matched = flocks.find(
-      (f) =>
-        f.id === selectedFlock ||
-        f.name === selectedFlock ||
-        (selectedFlock === '8' && (f.id === '8' || f.name.includes('1'))) ||
-        (selectedFlock === '9' && (f.id === '9' || f.name.includes('2'))) ||
-        (selectedFlock === '10' && (f.id === '10' || f.name.includes('3')))
+    const curFarm = farms.find((f) => f.id === selectedFarm);
+    const farmName = curFarm?.name?.toLowerCase() || '';
+    const farmFlocks = flocks.filter(
+      (f) => f.farmId === selectedFarm || (f.farmName && farmName && f.farmName.toLowerCase().includes(farmName))
     );
-    if (matched) return matched.currentCount;
-    if (selectedFlock === '8') return 24786;
-    if (selectedFlock === '9') return 31739;
-    if (selectedFlock === '10') return 25189;
-    return 81714;
-  }, [flocks, selectedFlock]);
+    if (farmFlocks.length === 0) return 0;
+    if (selectedFlock === 'all') {
+      return farmFlocks.reduce((acc, f) => acc + (f.currentCount || f.initialCount || 0), 0);
+    }
+    const matched = farmFlocks.find((f) => String(f.id) === selectedFlock || f.name.toLowerCase() === selectedFlock.toLowerCase());
+    return matched?.currentCount || matched?.initialCount || 0;
+  }, [flocks, selectedFlock, isFirstFarm, selectedFarm, farms]);
 
   // Cull Count based on mortality and cull logs in selected date range and flock
   const totalCullCount = useMemo(() => {
@@ -364,7 +477,7 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
             </h3>
           </div>
           <div className="text-[11px] text-slate-500 font-medium">
-            145 Authentic Records from Stock Delivery &amp; Issuance Ledger • Water intake defaults to 0 L
+            {consumptionLogs.length} Authentic Records from Stock Delivery &amp; Issuance Ledger • Water intake defaults to 0 L
           </div>
         </div>
 
@@ -394,97 +507,144 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
             </div>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setSelectedFlock('8')}
-            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              selectedFlock === '8' || selectedFlock === 'Unit 1'
-                ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20'
-                : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Unit 1
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">
-                {unitFeedStats.unit1.count} logs
-              </span>
-            </div>
-            <div className="mt-1 text-base font-black text-emerald-700 font-mono">
-              {unitFeedStats.unit1.bags.toLocaleString()}{' '}
-              <span className="text-xs font-semibold text-slate-500">bags</span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5 flex justify-between">
-              <span>{unitFeedStats.unit1.feedKg.toLocaleString()} kg</span>
-              <span className="text-sky-600 font-medium">Water: {unitFeedStats.unit1.waterL} L</span>
-            </div>
-          </button>
+          {isFirstFarm ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setSelectedFlock('8')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedFlock === '8' || selectedFlock === 'Unit 1'
+                    ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20'
+                    : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    Unit 1
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">
+                    {unitFeedStats.unit1.count} logs
+                  </span>
+                </div>
+                <div className="mt-1 text-base font-black text-emerald-700 font-mono">
+                  {unitFeedStats.unit1.bags.toLocaleString()}{' '}
+                  <span className="text-xs font-semibold text-slate-500">bags</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5 flex justify-between">
+                  <span>{unitFeedStats.unit1.feedKg.toLocaleString()} kg</span>
+                  <span className="text-sky-600 font-medium">Water: {unitFeedStats.unit1.waterL} L</span>
+                </div>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setSelectedFlock('9')}
-            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              selectedFlock === '9' || selectedFlock === 'Unit 2'
-                ? 'bg-blue-500/10 border-blue-500 ring-2 ring-blue-500/20'
-                : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                Unit 2
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800 font-semibold">
-                {unitFeedStats.unit2.count} logs
-              </span>
-            </div>
-            <div className="mt-1 text-base font-black text-blue-700 font-mono">
-              {unitFeedStats.unit2.bags.toLocaleString()}{' '}
-              <span className="text-xs font-semibold text-slate-500">bags</span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5 flex justify-between">
-              <span>{unitFeedStats.unit2.feedKg.toLocaleString()} kg</span>
-              <span className="text-sky-600 font-medium">Water: {unitFeedStats.unit2.waterL} L</span>
-            </div>
-          </button>
+              <button
+                type="button"
+                onClick={() => setSelectedFlock('9')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedFlock === '9' || selectedFlock === 'Unit 2'
+                    ? 'bg-blue-500/10 border-blue-500 ring-2 ring-blue-500/20'
+                    : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    Unit 2
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-100 text-blue-800 font-semibold">
+                    {unitFeedStats.unit2.count} logs
+                  </span>
+                </div>
+                <div className="mt-1 text-base font-black text-blue-700 font-mono">
+                  {unitFeedStats.unit2.bags.toLocaleString()}{' '}
+                  <span className="text-xs font-semibold text-slate-500">bags</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5 flex justify-between">
+                  <span>{unitFeedStats.unit2.feedKg.toLocaleString()} kg</span>
+                  <span className="text-sky-600 font-medium">Water: {unitFeedStats.unit2.waterL} L</span>
+                </div>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setSelectedFlock('10')}
-            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              selectedFlock === '10' || selectedFlock === 'Unit 3'
-                ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20'
-                : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                Unit 3
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-semibold">
-                {unitFeedStats.unit3.count} logs
-              </span>
-            </div>
-            <div className="mt-1 text-base font-black text-amber-700 font-mono">
-              {unitFeedStats.unit3.bags.toLocaleString()}{' '}
-              <span className="text-xs font-semibold text-slate-500">bags</span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5 flex justify-between">
-              <span>{unitFeedStats.unit3.feedKg.toLocaleString()} kg</span>
-              <span className="text-sky-600 font-medium">Water: {unitFeedStats.unit3.waterL} L</span>
-            </div>
-          </button>
+              <button
+                type="button"
+                onClick={() => setSelectedFlock('10')}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  selectedFlock === '10' || selectedFlock === 'Unit 3'
+                    ? 'bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20'
+                    : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    Unit 3
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-semibold">
+                    {unitFeedStats.unit3.count} logs
+                  </span>
+                </div>
+                <div className="mt-1 text-base font-black text-amber-700 font-mono">
+                  {unitFeedStats.unit3.bags.toLocaleString()}{' '}
+                  <span className="text-xs font-semibold text-slate-500">bags</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5 flex justify-between">
+                  <span>{unitFeedStats.unit3.feedKg.toLocaleString()} kg</span>
+                  <span className="text-sky-600 font-medium">Water: {unitFeedStats.unit3.waterL} L</span>
+                </div>
+              </button>
+            </>
+          ) : (
+            availableFlocks.map((flock) => {
+              const flockLogs = filtered.filter(
+                (c) => String(c.flockId) === String(flock.id) || c.flockName?.toLowerCase() === flock.name.toLowerCase()
+              );
+              const fBags = flockLogs.reduce((s, r) => s + (r.bags || Math.round((r.feedQuantityKg || 0) / 50)), 0);
+              const fKg = flockLogs.reduce((s, r) => s + (r.feedQuantityKg || 0), 0);
+              const fWater = flockLogs.reduce((s, r) => s + (r.waterIntakeLiters || 0), 0);
+              const isSelected = selectedFlock === flock.id || selectedFlock === flock.name;
+
+              return (
+                <button
+                  key={flock.id}
+                  type="button"
+                  onClick={() => setSelectedFlock(isSelected ? 'all' : flock.id)}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20'
+                      : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-100/70'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      {flock.name}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-semibold">
+                      {flockLogs.length} logs
+                    </span>
+                  </div>
+                  <div className="mt-1 text-base font-black text-emerald-700 font-mono">
+                    {fBags.toLocaleString()} <span className="text-xs font-semibold text-slate-500">bags</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5 flex justify-between">
+                    <span>{fKg.toLocaleString()} kg</span>
+                    <span className="text-sky-600 font-medium">Water: {fWater} L</span>
+                  </div>
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
 
-      {/* Date Range Picker Bar (🐔 All Flocks Combined | 📅 FROM ... TO ... | Today | 30D | All | ⟳) */}
+      {/* Date Range Picker Bar */}
       <DateRangePickerBar
+        selectedFarm={selectedFarm}
+        onSelectFarm={handleFarmChange}
+        farms={farms}
         selectedFlock={selectedFlock}
         onSelectFlock={setSelectedFlock}
-        flocks={flocks.map((f) => ({ id: f.id, name: f.name }))}
+        flocks={availableFlocks}
         fromDate={fromDate}
         toDate={toDate}
         onDateChange={(from, to) => {
@@ -1045,13 +1205,34 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
 
       {/* Standardized Search & Filter Bar */}
       <UIFilterBar>
-        <UISearchInput
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onClear={() => setSearchTerm('')}
-          placeholder="Search by Challan #, formulation, flock, date, or notes..."
-          containerClassName="w-full sm:w-80"
-        />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <UISearchInput
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onClear={() => setSearchTerm('')}
+            placeholder="Search by Challan #, formulation, flock, date, or notes..."
+            containerClassName="w-full sm:w-80"
+          />
+
+          {farms && farms.length > 0 && (
+            <div className="relative inline-flex items-center">
+              <Building2 className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+              <select
+                aria-label="Filter feeding records by farm"
+                value={selectedFarm}
+                onChange={(e) => handleFarmChange(e.target.value)}
+                className="pl-8 pr-7 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors appearance-none cursor-pointer shadow-xs"
+              >
+                {farms.map((farm) => (
+                  <option key={farm.id} value={farm.id}>
+                    {farm.name} ({farm.location || 'Active'})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none" />
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center space-x-3 text-xs text-slate-500 font-medium">
           <span>

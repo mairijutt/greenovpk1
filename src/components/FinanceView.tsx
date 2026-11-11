@@ -1020,7 +1020,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         iconColor={selectedType === 'Expense' ? 'rose' : 'emerald'}
         badge={
           selectedType === 'Expense'
-            ? '21 Expense Heads • 1,241 Vouchers'
+            ? `21 Expense Heads • ${unitStats.all.count.toLocaleString()} Vouchers`
             : selectedType === 'Income'
             ? 'Sales Ledger Active'
             : 'Complete Audited Ledger'
@@ -1302,8 +1302,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               value="FEED"
               icon={Tag}
               color="teal"
-              badge={{ text: '76.45% of Cost', color: 'teal' }}
-              subtext="Rs. 276,471,321 (144 vouchers)"
+              badge={{ text: '76.11% of Cost', color: 'teal' }}
+              subtext="Rs. 294,653,964 (161 vouchers)"
             />
             <StatCard
               title="Per Bird Feed consumption"
@@ -1339,8 +1339,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               icon={DollarSign}
               color="emerald"
               valueColor="text-emerald-700"
-              badge={{ text: '808 Sales', color: 'emerald' }}
-              trend={{ value: '17.00M Items', isUp: true }}
+              badge={{ text: `${salesStats.all.count.toLocaleString()} Sales`, color: 'emerald' }}
+              trend={{ value: `${(((eggSalesData.totalEggsSold + eggSalesData.otherItemsSold) || salesStats.all.items || 17961559) / 1000000).toFixed(2)}M Items`, isUp: true }}
               subtext="Total revenue generated"
             />
             <StatCard

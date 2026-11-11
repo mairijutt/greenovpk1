@@ -1,5 +1,5 @@
-// 100% Authentic GreenOva Egg Production Logs - Parsed from Egg_Production_Report_2026-10-26_1ecfa4c4.pdf
-// Total Production: 17,168,190 Eggs | Broken Eggs: 55,470 | Logs: 371
+// 100% Authentic GreenOva Egg Production Logs - Parsed from Egg_Production_Report_2026-24oct-09Nov_2d1a3bd8.pdf
+// Total Production: 18,126,930 Eggs | Broken Eggs: 57,570 | Logs: 413
 
 import { EggProduction } from '../types/farm.ts';
 
@@ -11,26 +11,773 @@ export interface DetailedEggProduction extends EggProduction {
 }
 
 export const EGG_PRODUCTION_SUMMARY = {
-  totalProduction: 17168190,
-  totalBroken: 55470,
-  cleanEggs: 17112720,
-  totalTrays: 570424,
-  logCount: 371,
+  totalProduction: 18126930,
+  totalBroken: 57570,
+  cleanEggs: 18069360,
+  totalTrays: 602312,
+  logCount: 413,
   averageLayingRate: 85.8,
   byUnit: {
-    'Unit 1': { totalEggs: 1931280, brokenEggs: 4170, cleanTrays: 64237, logs: 87 },
-    'Unit 2': { totalEggs: 14103090, brokenEggs: 47970, cleanTrays: 468504, logs: 229 },
-    'Unit 3': { totalEggs: 1133820, brokenEggs: 3330, cleanTrays: 37683, logs: 55 },
-  },
+    "Unit 1": {
+        "totalEggs": 2242800,
+        "brokenEggs": 0,
+        "cleanTrays": 74760,
+        "logs": 130
+    },
+    "Unit 2": {
+        "totalEggs": 14463810,
+        "brokenEggs": 57570,
+        "cleanTrays": 480208,
+        "logs": 192
+    },
+    "Unit 3": {
+        "totalEggs": 1420320,
+        "brokenEggs": 0,
+        "cleanTrays": 47344,
+        "logs": 91
+    }
+},
 };
 
 export const unitWiseEggSummary = {
-  'Unit 1': { unitName: 'Unit 1', totalEggs: 1931280, percent: 11.25, brokenEggs: 4170, logs: 87 },
-  'Unit 2': { unitName: 'Unit 2', totalEggs: 14103090, percent: 82.15, brokenEggs: 47970, logs: 229 },
-  'Unit 3': { unitName: 'Unit 3', totalEggs: 1133820, percent: 6.60, brokenEggs: 3330, logs: 55 },
+  "Unit 1": {
+    "unitName": "Unit 1",
+    "totalEggs": 2242800,
+    "percent": 12.37,
+    "brokenEggs": 0,
+    "logs": 130
+  },
+  "Unit 2": {
+    "unitName": "Unit 2",
+    "totalEggs": 14463810,
+    "percent": 79.79,
+    "brokenEggs": 57570,
+    "logs": 192
+  },
+  "Unit 3": {
+    "unitName": "Unit 3",
+    "totalEggs": 1420320,
+    "percent": 7.84,
+    "brokenEggs": 0,
+    "logs": 91
+  }
 };
 
 export const liveEggProductions: DetailedEggProduction[] = [
+  {
+    "id": "418",
+    "trackingId": 418,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-11-07",
+    "rawDate": "07 Nov 2026",
+    "morningEggs": 15903,
+    "eveningEggs": 9747,
+    "totalEggs": 25650,
+    "damagedEggs": 210,
+    "brokenEggs": 210,
+    "cleanTrays": 848,
+    "layingRatePercent": 79.58,
+    "averageWeight": 60,
+    "notes": "79.58% production"
+  },
+  {
+    "id": "417",
+    "trackingId": 417,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-11-07",
+    "rawDate": "07 Nov 2026",
+    "morningEggs": 12797,
+    "eveningEggs": 7843,
+    "totalEggs": 20640,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 688,
+    "layingRatePercent": 89.41,
+    "averageWeight": 60,
+    "notes": "89.41% production"
+  },
+  {
+    "id": "415",
+    "trackingId": 415,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-11-07",
+    "rawDate": "07 Nov 2026",
+    "morningEggs": 13764,
+    "eveningEggs": 8436,
+    "totalEggs": 22200,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 740,
+    "layingRatePercent": 91.86,
+    "averageWeight": 60,
+    "notes": "91.86% production"
+  },
+  {
+    "id": "416",
+    "trackingId": 416,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-11-06",
+    "rawDate": "06 Nov 2026",
+    "morningEggs": 12648,
+    "eveningEggs": 7752,
+    "totalEggs": 20400,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 680,
+    "layingRatePercent": 88.36,
+    "averageWeight": 60,
+    "notes": "88.36% production"
+  },
+  {
+    "id": "414",
+    "trackingId": 414,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-11-06",
+    "rawDate": "06 Nov 2026",
+    "morningEggs": 15940,
+    "eveningEggs": 9770,
+    "totalEggs": 25710,
+    "damagedEggs": 150,
+    "brokenEggs": 150,
+    "cleanTrays": 852,
+    "layingRatePercent": 79.65,
+    "averageWeight": 60,
+    "notes": "79.65% production"
+  },
+  {
+    "id": "413",
+    "trackingId": 413,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-11-06",
+    "rawDate": "06 Nov 2026",
+    "morningEggs": 13801,
+    "eveningEggs": 8459,
+    "totalEggs": 22260,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 742,
+    "layingRatePercent": 85,
+    "averageWeight": 60,
+    "notes": ""
+  },
+  {
+    "id": "412",
+    "trackingId": 412,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-11-05",
+    "rawDate": "05 Nov 2026",
+    "morningEggs": 12722,
+    "eveningEggs": 7798,
+    "totalEggs": 20520,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 684,
+    "layingRatePercent": 88.85,
+    "averageWeight": 60,
+    "notes": "88.85% production"
+  },
+  {
+    "id": "407",
+    "trackingId": 407,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-11-05",
+    "rawDate": "05 Nov 2026",
+    "morningEggs": 15884,
+    "eveningEggs": 9736,
+    "totalEggs": 25620,
+    "damagedEggs": 180,
+    "brokenEggs": 180,
+    "cleanTrays": 848,
+    "layingRatePercent": 79.45,
+    "averageWeight": 60,
+    "notes": "79.45% production"
+  },
+  {
+    "id": "406",
+    "trackingId": 406,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-11-05",
+    "rawDate": "05 Nov 2026",
+    "morningEggs": 13783,
+    "eveningEggs": 8447,
+    "totalEggs": 22230,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 741,
+    "layingRatePercent": 91.96,
+    "averageWeight": 60,
+    "notes": "91.96% production"
+  },
+  {
+    "id": "411",
+    "trackingId": 411,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-11-04",
+    "rawDate": "04 Nov 2026",
+    "morningEggs": 12648,
+    "eveningEggs": 7752,
+    "totalEggs": 20400,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 680,
+    "layingRatePercent": 88.33,
+    "averageWeight": 60,
+    "notes": "88.33% production"
+  },
+  {
+    "id": "405",
+    "trackingId": 405,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-11-04",
+    "rawDate": "04 Nov 2026",
+    "morningEggs": 15903,
+    "eveningEggs": 9747,
+    "totalEggs": 25650,
+    "damagedEggs": 150,
+    "brokenEggs": 150,
+    "cleanTrays": 850,
+    "layingRatePercent": 79.43,
+    "averageWeight": 60,
+    "notes": "79.43% production"
+  },
+  {
+    "id": "404",
+    "trackingId": 404,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-11-04",
+    "rawDate": "04 Nov 2026",
+    "morningEggs": 13783,
+    "eveningEggs": 8447,
+    "totalEggs": 22230,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 741,
+    "layingRatePercent": 91.95,
+    "averageWeight": 60,
+    "notes": "91.95% production"
+  },
+  {
+    "id": "410",
+    "trackingId": 410,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-11-03",
+    "rawDate": "03 Nov 2026",
+    "morningEggs": 12629,
+    "eveningEggs": 7741,
+    "totalEggs": 20370,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 679,
+    "layingRatePercent": 88.18,
+    "averageWeight": 60,
+    "notes": "88.18% production"
+  },
+  {
+    "id": "403",
+    "trackingId": 403,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-11-03",
+    "rawDate": "03 Nov 2026",
+    "morningEggs": 15866,
+    "eveningEggs": 9724,
+    "totalEggs": 25590,
+    "damagedEggs": 120,
+    "brokenEggs": 120,
+    "cleanTrays": 849,
+    "layingRatePercent": 79.5,
+    "averageWeight": 60,
+    "notes": "79.50% production"
+  },
+  {
+    "id": "402",
+    "trackingId": 402,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-11-03",
+    "rawDate": "03 Nov 2026",
+    "morningEggs": 13745,
+    "eveningEggs": 8425,
+    "totalEggs": 22170,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 739,
+    "layingRatePercent": 91.69,
+    "averageWeight": 60,
+    "notes": "91.69% production"
+  },
+  {
+    "id": "409",
+    "trackingId": 409,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-11-02",
+    "rawDate": "02 Nov 2026",
+    "morningEggs": 12685,
+    "eveningEggs": 7775,
+    "totalEggs": 20460,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 682,
+    "layingRatePercent": 88.57,
+    "averageWeight": 60,
+    "notes": "88.57% production"
+  },
+  {
+    "id": "401",
+    "trackingId": 401,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-11-02",
+    "rawDate": "02 Nov 2026",
+    "morningEggs": 16201,
+    "eveningEggs": 9929,
+    "totalEggs": 26130,
+    "damagedEggs": 150,
+    "brokenEggs": 150,
+    "cleanTrays": 866,
+    "layingRatePercent": 80.86,
+    "averageWeight": 60,
+    "notes": "80.86% production"
+  },
+  {
+    "id": "400",
+    "trackingId": 400,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-11-02",
+    "rawDate": "02 Nov 2026",
+    "morningEggs": 13838,
+    "eveningEggs": 8482,
+    "totalEggs": 22320,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 744,
+    "layingRatePercent": 92.3,
+    "averageWeight": 60,
+    "notes": "92.30% production"
+  },
+  {
+    "id": "408",
+    "trackingId": 408,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-11-01",
+    "rawDate": "01 Nov 2026",
+    "morningEggs": 12685,
+    "eveningEggs": 7775,
+    "totalEggs": 20460,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 682,
+    "layingRatePercent": 88.55,
+    "averageWeight": 60,
+    "notes": "88.55% production"
+  },
+  {
+    "id": "399",
+    "trackingId": 399,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-11-01",
+    "rawDate": "01 Nov 2026",
+    "morningEggs": 15977,
+    "eveningEggs": 9793,
+    "totalEggs": 25770,
+    "damagedEggs": 210,
+    "brokenEggs": 210,
+    "cleanTrays": 852,
+    "layingRatePercent": 79.9,
+    "averageWeight": 60,
+    "notes": "79.90% production"
+  },
+  {
+    "id": "398",
+    "trackingId": 398,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-11-01",
+    "rawDate": "01 Nov 2026",
+    "morningEggs": 13783,
+    "eveningEggs": 8447,
+    "totalEggs": 22230,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 741,
+    "layingRatePercent": 91.91,
+    "averageWeight": 60,
+    "notes": "91.91% production"
+  },
+  {
+    "id": "397",
+    "trackingId": 397,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-10-31",
+    "rawDate": "31 Oct 2026",
+    "morningEggs": 15810,
+    "eveningEggs": 9690,
+    "totalEggs": 25500,
+    "damagedEggs": 150,
+    "brokenEggs": 150,
+    "cleanTrays": 845,
+    "layingRatePercent": 79.06,
+    "averageWeight": 60,
+    "notes": "79.06% production"
+  },
+  {
+    "id": "396",
+    "trackingId": 396,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-10-31",
+    "rawDate": "31 Oct 2026",
+    "morningEggs": 13764,
+    "eveningEggs": 8436,
+    "totalEggs": 22200,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 740,
+    "layingRatePercent": 91.76,
+    "averageWeight": 60,
+    "notes": "91.76% production"
+  },
+  {
+    "id": "393",
+    "trackingId": 393,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-10-31",
+    "rawDate": "31 Oct 2026",
+    "morningEggs": 12685,
+    "eveningEggs": 7775,
+    "totalEggs": 20460,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 682,
+    "layingRatePercent": 88.55,
+    "averageWeight": 60,
+    "notes": "88.55% production"
+  },
+  {
+    "id": "395",
+    "trackingId": 395,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-10-30",
+    "rawDate": "30 Oct 2026",
+    "morningEggs": 15959,
+    "eveningEggs": 9781,
+    "totalEggs": 25740,
+    "damagedEggs": 90,
+    "brokenEggs": 90,
+    "cleanTrays": 855,
+    "layingRatePercent": 79.4,
+    "averageWeight": 60,
+    "notes": "79.40% production"
+  },
+  {
+    "id": "394",
+    "trackingId": 394,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-10-30",
+    "rawDate": "30 Oct 2026",
+    "morningEggs": 13783,
+    "eveningEggs": 8447,
+    "totalEggs": 22230,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 741,
+    "layingRatePercent": 91.88,
+    "averageWeight": 60,
+    "notes": "91.88% production"
+  },
+  {
+    "id": "392",
+    "trackingId": 392,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-10-30",
+    "rawDate": "30 Oct 2026",
+    "morningEggs": 12704,
+    "eveningEggs": 7786,
+    "totalEggs": 20490,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 683,
+    "layingRatePercent": 88.67,
+    "averageWeight": 60,
+    "notes": "88.67% production"
+  },
+  {
+    "id": "391",
+    "trackingId": 391,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-10-29",
+    "rawDate": "29 Oct 2026",
+    "morningEggs": 12760,
+    "eveningEggs": 7820,
+    "totalEggs": 20580,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 686,
+    "layingRatePercent": 89.04,
+    "averageWeight": 60,
+    "notes": "89.04% production"
+  },
+  {
+    "id": "386",
+    "trackingId": 386,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-10-29",
+    "rawDate": "29 Oct 2026",
+    "morningEggs": 16052,
+    "eveningEggs": 9838,
+    "totalEggs": 25890,
+    "damagedEggs": 150,
+    "brokenEggs": 150,
+    "cleanTrays": 858,
+    "layingRatePercent": 80.01,
+    "averageWeight": 60,
+    "notes": "80.01% production"
+  },
+  {
+    "id": "385",
+    "trackingId": 385,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-10-29",
+    "rawDate": "29 Oct 2026",
+    "morningEggs": 13820,
+    "eveningEggs": 8470,
+    "totalEggs": 22290,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 743,
+    "layingRatePercent": 92.11,
+    "averageWeight": 60,
+    "notes": "92.11% production"
+  },
+  {
+    "id": "390",
+    "trackingId": 390,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-10-28",
+    "rawDate": "28 Oct 2026",
+    "morningEggs": 12574,
+    "eveningEggs": 7706,
+    "totalEggs": 20280,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 676,
+    "layingRatePercent": 87.74,
+    "averageWeight": 60,
+    "notes": "87.74% production"
+  },
+  {
+    "id": "384",
+    "trackingId": 384,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-10-28",
+    "rawDate": "28 Oct 2026",
+    "morningEggs": 16015,
+    "eveningEggs": 9815,
+    "totalEggs": 25830,
+    "damagedEggs": 210,
+    "brokenEggs": 210,
+    "cleanTrays": 854,
+    "layingRatePercent": 79.97,
+    "averageWeight": 60,
+    "notes": "79.97% production"
+  },
+  {
+    "id": "383",
+    "trackingId": 383,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-10-28",
+    "rawDate": "28 Oct 2026",
+    "morningEggs": 13838,
+    "eveningEggs": 8482,
+    "totalEggs": 22320,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 744,
+    "layingRatePercent": 92.22,
+    "averageWeight": 60,
+    "notes": "92.22% production"
+  },
+  {
+    "id": "389",
+    "trackingId": 389,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-10-27",
+    "rawDate": "27 Oct 2026",
+    "morningEggs": 12778,
+    "eveningEggs": 7832,
+    "totalEggs": 20610,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 687,
+    "layingRatePercent": 89.15,
+    "averageWeight": 60,
+    "notes": "89.15% production"
+  },
+  {
+    "id": "382",
+    "trackingId": 382,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-10-27",
+    "rawDate": "27 Oct 2026",
+    "morningEggs": 16033,
+    "eveningEggs": 9827,
+    "totalEggs": 25860,
+    "damagedEggs": 120,
+    "brokenEggs": 120,
+    "cleanTrays": 858,
+    "layingRatePercent": 79.75,
+    "averageWeight": 60,
+    "notes": "79.75% production"
+  },
+  {
+    "id": "381",
+    "trackingId": 381,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-10-27",
+    "rawDate": "27 Oct 2026",
+    "morningEggs": 13801,
+    "eveningEggs": 8459,
+    "totalEggs": 22260,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 742,
+    "layingRatePercent": 91.96,
+    "averageWeight": 60,
+    "notes": "91.96% production"
+  },
+  {
+    "id": "388",
+    "trackingId": 388,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-10-26",
+    "rawDate": "26 Oct 2026",
+    "morningEggs": 12592,
+    "eveningEggs": 7718,
+    "totalEggs": 20310,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 677,
+    "layingRatePercent": 87.84,
+    "averageWeight": 60,
+    "notes": "87.84% production"
+  },
+  {
+    "id": "380",
+    "trackingId": 380,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-10-26",
+    "rawDate": "26 Oct 2026",
+    "morningEggs": 16108,
+    "eveningEggs": 9872,
+    "totalEggs": 25980,
+    "damagedEggs": 150,
+    "brokenEggs": 150,
+    "cleanTrays": 861,
+    "layingRatePercent": 80.19,
+    "averageWeight": 60,
+    "notes": "80.19% production"
+  },
+  {
+    "id": "379",
+    "trackingId": 379,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-10-26",
+    "rawDate": "26 Oct 2026",
+    "morningEggs": 13801,
+    "eveningEggs": 8459,
+    "totalEggs": 22260,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 742,
+    "layingRatePercent": 91.95,
+    "averageWeight": 60,
+    "notes": "91.95% production"
+  },
+  {
+    "id": "387",
+    "trackingId": 387,
+    "flockId": "10",
+    "flockName": "Unit 3",
+    "date": "2026-10-25",
+    "rawDate": "25 Oct 2026",
+    "morningEggs": 12722,
+    "eveningEggs": 7798,
+    "totalEggs": 20520,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 684,
+    "layingRatePercent": 85,
+    "averageWeight": 60,
+    "notes": "88.74 % production"
+  },
+  {
+    "id": "378",
+    "trackingId": 378,
+    "flockId": "9",
+    "flockName": "Unit 2",
+    "date": "2026-10-25",
+    "rawDate": "25 Oct 2026",
+    "morningEggs": 15996,
+    "eveningEggs": 9804,
+    "totalEggs": 25800,
+    "damagedEggs": 60,
+    "brokenEggs": 60,
+    "cleanTrays": 858,
+    "layingRatePercent": 79.33,
+    "averageWeight": 60,
+    "notes": "79.33% production"
+  },
+  {
+    "id": "377",
+    "trackingId": 377,
+    "flockId": "8",
+    "flockName": "Unit 1",
+    "date": "2026-10-25",
+    "rawDate": "25 Oct 2026",
+    "morningEggs": 13838,
+    "eveningEggs": 8482,
+    "totalEggs": 22320,
+    "damagedEggs": 0,
+    "brokenEggs": 0,
+    "cleanTrays": 744,
+    "layingRatePercent": 92.19,
+    "averageWeight": 60,
+    "notes": "92.19% production"
+  },
   {
     "id": "376",
     "trackingId": 376,
@@ -250,7 +997,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 684,
     "layingRatePercent": 88.7,
     "averageWeight": 60,
-    "notes": "88.70% production Eggs Average Weight Notes"
+    "notes": "88.70% production"
   },
   {
     "id": "361",
@@ -505,7 +1252,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 667,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "347",
@@ -573,7 +1320,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 875,
     "layingRatePercent": 80.52,
     "averageWeight": 60,
-    "notes": "80.52% production Eggs Average Weight Notes"
+    "notes": "80.52% production"
   },
   {
     "id": "344",
@@ -896,7 +1643,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 745,
     "layingRatePercent": 92.11,
     "averageWeight": 60,
-    "notes": "92.11% production Eggs Average Weight Notes"
+    "notes": "92.11% production"
   },
   {
     "id": "331",
@@ -1219,7 +1966,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 672,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "86.99 % production Eggs Average Weight Notes"
+    "notes": "86.99 % production"
   },
   {
     "id": "306",
@@ -1542,7 +2289,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 883,
     "layingRatePercent": 81.78,
     "averageWeight": 60,
-    "notes": "81.78% production Eggs Average Weight Notes"
+    "notes": "81.78% production"
   },
   {
     "id": "286",
@@ -1865,7 +2612,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 725,
     "layingRatePercent": 89.35,
     "averageWeight": 60,
-    "notes": "89.35% production Eggs Average Weight Notes"
+    "notes": "89.35% production"
   },
   {
     "id": "270",
@@ -2188,7 +2935,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 598,
     "layingRatePercent": 77.31,
     "averageWeight": 60,
-    "notes": "77.31% production Eggs Average Weight Notes"
+    "notes": "77.31% production"
   },
   {
     "id": "246",
@@ -2511,7 +3258,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 853,
     "layingRatePercent": 80.79,
     "averageWeight": 60,
-    "notes": "80.79% production Eggs Average Weight Notes"
+    "notes": "80.79% production"
   },
   {
     "id": "229",
@@ -2834,7 +3581,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 660,
     "layingRatePercent": 79.4,
     "averageWeight": 60,
-    "notes": "79.40% production Eggs Average Weight Notes"
+    "notes": "79.40% production"
   },
   {
     "id": "213",
@@ -3038,7 +3785,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 645,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "205",
@@ -3157,7 +3904,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 229,
     "layingRatePercent": 27.46,
     "averageWeight": 60,
-    "notes": "27.46% production Eggs Average Weight Notes"
+    "notes": "27.46% production"
   },
   {
     "id": "188",
@@ -3480,7 +4227,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 822,
     "layingRatePercent": 77.81,
     "averageWeight": 60,
-    "notes": "77.81% production Eggs Average Weight Notes"
+    "notes": "77.81% production"
   },
   {
     "id": "172",
@@ -3633,7 +4380,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 54,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "162",
@@ -3684,7 +4431,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 40,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "159",
@@ -3735,7 +4482,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 37,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "158",
@@ -3769,7 +4516,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 36,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "156",
@@ -3820,7 +4567,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 851,
     "layingRatePercent": 80.46,
     "averageWeight": 60,
-    "notes": "80.46% production Eggs Average Weight Notes"
+    "notes": "80.46% production"
   },
   {
     "id": "153",
@@ -3854,7 +4601,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 21,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "152",
@@ -3905,7 +4652,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 15,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "148",
@@ -3922,7 +4669,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 13,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "147",
@@ -4041,7 +4788,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 848,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "140",
@@ -4107,9 +4854,9 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "damagedEggs": 60,
     "brokenEggs": 60,
     "cleanTrays": 869,
-    "layingRatePercent": 81.87,
+    "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "81.87% production"
+    "notes": "81.87%"
   },
   {
     "id": "136",
@@ -4160,7 +4907,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 518,
     "layingRatePercent": 63.18,
     "averageWeight": 60,
-    "notes": "63.18% production Eggs Average Weight Notes"
+    "notes": "63.18% production"
   },
   {
     "id": "133",
@@ -4296,7 +5043,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 473,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "125",
@@ -4500,7 +5247,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 379,
     "layingRatePercent": 46.17,
     "averageWeight": 60,
-    "notes": "46.17% Eggs Average Weight Notes production"
+    "notes": "46.17% production"
   },
   {
     "id": "113",
@@ -4585,7 +5332,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 290,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "108",
@@ -4602,7 +5349,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 894,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "107",
@@ -4619,7 +5366,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 893,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "106",
@@ -4636,7 +5383,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 278,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "105",
@@ -4653,7 +5400,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 265,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "104",
@@ -4670,7 +5417,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 878,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "103",
@@ -4687,7 +5434,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 899,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "102",
@@ -4704,7 +5451,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 225,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "101",
@@ -4721,7 +5468,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 194,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "100",
@@ -4738,7 +5485,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 897,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "99",
@@ -4755,7 +5502,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 183,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "98",
@@ -4772,7 +5519,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 910,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "97",
@@ -4789,7 +5536,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 909,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "96",
@@ -4806,7 +5553,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 165,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "95",
@@ -4840,7 +5587,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 140,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "93",
@@ -4891,7 +5638,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 886,
     "layingRatePercent": 83.01,
     "averageWeight": 60,
-    "notes": "83.01% Eggs Average Weight Notes production"
+    "notes": "83.01% production"
   },
   {
     "id": "90",
@@ -5112,7 +5859,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 30,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "76",
@@ -5146,7 +5893,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 22,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "72",
@@ -5180,7 +5927,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 17,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "70",
@@ -5214,7 +5961,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 10,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "- Eggs Average Weight Notes"
+    "notes": ""
   },
   {
     "id": "68",
@@ -5248,7 +5995,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 8,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "66",
@@ -5282,7 +6029,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 6,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "64",
@@ -5554,7 +6301,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 929,
     "layingRatePercent": 87.27,
     "averageWeight": 60,
-    "notes": "87.27% Eggs Average Weight Notes production"
+    "notes": "87.27% production"
   },
   {
     "id": "48",
@@ -5724,7 +6471,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 942,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "38",
@@ -5741,7 +6488,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 946,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "37",
@@ -5775,7 +6522,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 931,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "35",
@@ -5792,7 +6539,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 922,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "34",
@@ -5809,7 +6556,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 935,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "33",
@@ -5826,7 +6573,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 945,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "32",
@@ -5843,7 +6590,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 954,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "31",
@@ -5860,7 +6607,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 943,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "30",
@@ -5877,7 +6624,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 946,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "29",
@@ -5894,7 +6641,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 940,
     "layingRatePercent": 85,
     "averageWeight": 58,
-    "notes": "-"
+    "notes": ""
   },
   {
     "id": "28",
@@ -5962,7 +6709,7 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 955,
     "layingRatePercent": 88.9,
     "averageWeight": 60,
-    "notes": "88.9% production Eggs Average Weight Notes"
+    "notes": "88.9% production"
   },
   {
     "id": "24",
@@ -6336,6 +7083,6 @@ export const liveEggProductions: DetailedEggProduction[] = [
     "cleanTrays": 309396,
     "layingRatePercent": 85,
     "averageWeight": 60,
-    "notes": "-"
+    "notes": ""
   }
 ];

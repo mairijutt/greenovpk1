@@ -112,6 +112,7 @@ export interface FinancialRecord {
   category: string;
   amount: number;
   date: string;
+  rawDate?: string;
   referenceNo: string;
   description: string;
   status: 'Paid' | 'Pending';
@@ -126,6 +127,13 @@ export interface FinancialRecord {
   receiptNumber?: string;
   attachment?: string | null;
   attachmentName?: string | null;
+  expenseCost?: number;
+  totalAmount?: number;
+  quantity?: number;
+  unitPrice?: number;
+  onlinePayment?: number;
+  cashPayment?: number;
+  vehicleNumber?: string;
 }
 
 export interface Worker {
