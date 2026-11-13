@@ -5,8 +5,8 @@
       "farmId": 9,
       "flockName": "Unit 1",
       "breed": "LSL",
-      "totalBirds": 25000,
-      "originalTotalBirds": 24786,
+      "totalBirds": 24786,
+      "originalTotalBirds": 25000,
       "cost": 8125000,
       "isActive": true,
       "acquiredDate": "2026-02-25T00:00:00.000Z",
@@ -16,15 +16,16 @@
         "name": "GreenOva",
         "code": "GVF2025",
         "location": "Multan, Punjab"
-      }
+      },
+      "mortality": 5
     },
     {
       "id": 9,
       "farmId": 9,
       "flockName": "Unit 2",
       "breed": "LSL",
-      "totalBirds": 35000,
-      "originalTotalBirds": 31739,
+      "totalBirds": 31739,
+      "originalTotalBirds": 35000,
       "cost": 8750000,
       "isActive": true,
       "acquiredDate": "2025-01-01T00:00:00.000Z",
@@ -34,15 +35,16 @@
         "name": "GreenOva",
         "code": "GVF2025",
         "location": "Multan, Punjab"
-      }
+      },
+      "mortality": 7
     },
     {
       "id": 10,
       "farmId": 9,
       "flockName": "Unit 3",
       "breed": "LSL",
-      "totalBirds": 25500,
-      "originalTotalBirds": 25189,
+      "totalBirds": 25189,
+      "originalTotalBirds": 25500,
       "cost": 7650000,
       "isActive": true,
       "acquiredDate": "2025-06-01T00:00:00.000Z",
@@ -52,7 +54,8 @@
         "name": "GreenOva",
         "code": "GVF2025",
         "location": "Multan, Punjab"
-      }
+      },
+      "mortality": 3
     }
   ],
   "farmList": [
@@ -63482,5 +63485,6 @@
         "unit": "cans"
       }
     ]
-  }
+  },
+  "bankAccounts": []
 }

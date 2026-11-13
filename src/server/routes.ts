@@ -88,15 +88,15 @@ let flockItems: any[] = [
     farmId: 9,
     flockName: 'Unit 1',
     breed: 'LSL',
-    totalBirds: 25000,
-    originalTotalBirds: 24786,
+    totalBirds: 24786,
+    originalTotalBirds: 25000,
     cost: 8125000,
     isActive: true,
-    ageWeeks: 38,
-    ageInWeeks: 38,
+    ageWeeks: 42,
+    ageInWeeks: 42,
     acquiredDate: '2026-02-25T00:00:00.000Z',
     exitDate: null,
-    mortality: 0,
+    mortality: 5,
     notes: 'Unit 1 LSL Commercial Layers',
     farm: { id: 9, name: 'GreenOva', code: 'GVF2025', location: 'Multan, Punjab' },
   },
@@ -105,15 +105,15 @@ let flockItems: any[] = [
     farmId: 9,
     flockName: 'Unit 2',
     breed: 'LSL',
-    totalBirds: 35000,
-    originalTotalBirds: 31739,
+    totalBirds: 31739,
+    originalTotalBirds: 35000,
     cost: 8750000,
     isActive: true,
-    ageWeeks: 32,
-    ageInWeeks: 32,
+    ageWeeks: 36,
+    ageInWeeks: 36,
     acquiredDate: '2025-01-01T00:00:00.000Z',
     exitDate: null,
-    mortality: 0,
+    mortality: 7,
     notes: 'Unit 2 Main Production',
     farm: { id: 9, name: 'GreenOva', code: 'GVF2025', location: 'Multan, Punjab' },
   },
@@ -122,15 +122,15 @@ let flockItems: any[] = [
     farmId: 9,
     flockName: 'Unit 3',
     breed: 'LSL',
-    totalBirds: 25500,
-    originalTotalBirds: 25189,
+    totalBirds: 25189,
+    originalTotalBirds: 25500,
     cost: 7650000,
     isActive: true,
-    ageWeeks: 26,
-    ageInWeeks: 26,
+    ageWeeks: 30,
+    ageInWeeks: 30,
     acquiredDate: '2025-06-01T00:00:00.000Z',
     exitDate: null,
-    mortality: 0,
+    mortality: 3,
     notes: 'Unit 3 Layer Batch',
     farm: { id: 9, name: 'GreenOva', code: 'GVF2025', location: 'Multan, Punjab' },
   },
@@ -346,6 +346,8 @@ let stockStoreData: any = {
   ],
 };
 
+let bankAccounts: any[] = [];
+
 // Persistence Store Management
 const STORE_FILE = path.resolve(process.cwd(), 'src/data/app-data.json');
 
@@ -362,6 +364,7 @@ function saveStore() {
       birdHealthItems,
       allConsumptions,
       stockStoreData,
+      bankAccounts,
     };
     fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
@@ -370,10 +373,28 @@ function saveStore() {
 }
 
 function loadStore() {
+  let needsSave = false;
   try {
     if (fs.existsSync(STORE_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8'));
-      if (Array.isArray(parsed.flockItems) && parsed.flockItems.length > 0) flockItems = parsed.flockItems;
+      if (Array.isArray(parsed.flockItems) && parsed.flockItems.length > 0) {
+        flockItems = parsed.flockItems.map((item: any) => {
+          const isSwapped =
+            (item.id === 8 && item.totalBirds === 25000 && item.originalTotalBirds === 24786) ||
+            (item.id === 9 && item.totalBirds === 35000 && item.originalTotalBirds === 31739) ||
+            (item.id === 10 && item.totalBirds === 25500 && item.originalTotalBirds === 25189);
+          const defaultMort = item.id === 8 ? 5 : item.id === 9 ? 7 : item.id === 10 ? 3 : 0;
+          if (isSwapped || item.mortality === undefined) {
+            needsSave = true;
+          }
+          return {
+            ...item,
+            totalBirds: isSwapped ? item.originalTotalBirds : item.totalBirds,
+            originalTotalBirds: isSwapped ? item.totalBirds : item.originalTotalBirds,
+            mortality: item.mortality !== undefined ? Number(item.mortality) : defaultMort,
+          };
+        });
+      }
       if (Array.isArray(parsed.farmList) && parsed.farmList.length > 0) farmList = parsed.farmList;
       if (Array.isArray(parsed.rawExpenses) && parsed.rawExpenses.length >= 1378) {
         rawExpenses = parsed.rawExpenses;
@@ -397,7 +418,7 @@ function loadStore() {
         }));
         saveStore();
       }
-      if (Array.isArray(parsed.rawStocks) && parsed.rawStocks.length === 157) {
+      if (Array.isArray(parsed.rawStocks) && parsed.rawStocks.length >= 157) {
         rawStocks = parsed.rawStocks;
       } else {
         rawStocks = liveStockRecords.map((r: any) => ({
@@ -448,7 +469,7 @@ function loadStore() {
         }));
         saveStore();
       }
-      if (Array.isArray(parsed.rawEggProductions) && parsed.rawEggProductions.length === 413) {
+      if (Array.isArray(parsed.rawEggProductions) && parsed.rawEggProductions.length >= 413) {
         rawEggProductions = parsed.rawEggProductions;
       } else {
         // Automatically upgrade store with all 413 official PDF egg production records
@@ -470,6 +491,8 @@ function loadStore() {
       if (Array.isArray(parsed.birdHealthItems) && parsed.birdHealthItems.length > 0) birdHealthItems = parsed.birdHealthItems;
       if (Array.isArray(parsed.allConsumptions) && parsed.allConsumptions.length > 0) allConsumptions = parsed.allConsumptions;
       if (parsed.stockStoreData) stockStoreData = parsed.stockStoreData;
+      if (Array.isArray(parsed.bankAccounts)) bankAccounts = parsed.bankAccounts;
+      if (needsSave) saveStore();
     } else {
       // Seed user expense of 121000.4 if not already present
       const hasFeedExpense = rawExpenses.some((e: any) => Math.abs((Number(e.expenseCost) || 0) - 121000.4) < 0.01);
@@ -496,17 +519,21 @@ function loadStore() {
   }
 }
 
+const hasLocalStore = fs.existsSync(STORE_FILE);
+
 // Initial load
 loadStore();
 
-// Live sync from Supabase PostgreSQL database
-syncFromSupabase({
-  setExpenses: (items) => { rawExpenses = items; },
-  setFlocks: (items) => { flockItems = items; },
-  setEggs: (items) => { rawEggProductions = items; },
-  setSales: (items) => { rawSales = items; },
-  setStocks: (items) => { rawStocks = items; },
-});
+// Only bootstrap from Supabase if local persistent store file does not yet exist
+if (!hasLocalStore) {
+  syncFromSupabase({
+    setExpenses: (items) => { rawExpenses = items; },
+    setFlocks: (items) => { flockItems = items; },
+    setEggs: (items) => { rawEggProductions = items; },
+    setSales: (items) => { rawSales = items; },
+    setStocks: (items) => { rawStocks = items; },
+  });
+}
 
 // Challan Upload Handlers
 const dummyChallan = (_req: Request, res: Response) => {
@@ -890,7 +917,11 @@ apiRouter.get(['/flock', '/flocks'], (req: Request, res: Response) => {
 
 apiRouter.post(['/flock', '/flocks'], (req: Request, res: Response) => {
   const body = req.body || {};
-  const newId = flockItems.length > 0 ? Math.max(...flockItems.map(f => Number(f.id) || 0)) + 1 : 11;
+  const requestedId = Number(body.id);
+  const idAvailable = !isNaN(requestedId) && requestedId > 0 && !flockItems.some(f => Number(f.id) === requestedId);
+  const newId = idAvailable
+    ? requestedId
+    : (flockItems.length > 0 ? Math.max(...flockItems.map(f => Number(f.id) || 0)) + 1 : 11);
   const fid = body.farmId ? Number(body.farmId) : 9;
   const foundFarm = farmList.find(f => f.id === fid) || { id: 9, name: 'GreenOva', code: 'GVF2025', location: 'Multan, Punjab' };
   const acquiredDate = body.acquiredDate ? new Date(body.acquiredDate).toISOString() : new Date().toISOString();
@@ -927,12 +958,46 @@ apiRouter.post(['/flock', '/flocks'], (req: Request, res: Response) => {
 apiRouter.put(['/flock/:id', '/flocks/:id'], (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const body = req.body || {};
-  const idx = flockItems.findIndex(f => f.id === id);
+  const idx = flockItems.findIndex(f => Number(f.id) === id);
   if (idx >= 0) {
+    const existing = flockItems[idx];
+    const resolvedTotalBirds =
+      body.totalBirds !== undefined
+        ? Number(body.totalBirds)
+        : body.currentCount !== undefined
+        ? Number(body.currentCount)
+        : existing.totalBirds;
+    const resolvedOriginal =
+      body.originalTotalBirds !== undefined
+        ? Number(body.originalTotalBirds)
+        : body.initialCount !== undefined
+        ? Number(body.initialCount)
+        : existing.originalTotalBirds;
+    const resolvedName = body.flockName || body.name || existing.flockName;
+    const resolvedActive =
+      body.isActive !== undefined
+        ? Boolean(body.isActive)
+        : body.status !== undefined
+        ? body.status === 'Active'
+        : existing.isActive;
+    const resolvedDate =
+      body.acquiredDate ||
+      (body.startDate ? (String(body.startDate).includes('T') ? body.startDate : `${body.startDate}T00:00:00.000Z`) : existing.acquiredDate);
+    const resolvedMortality =
+      body.mortality !== undefined ? Number(body.mortality) : (Number(existing.mortality) || 0);
+
     flockItems[idx] = {
-      ...flockItems[idx],
+      ...existing,
       ...body,
       id,
+      flockName: resolvedName,
+      totalBirds: resolvedTotalBirds,
+      originalTotalBirds: resolvedOriginal,
+      isActive: resolvedActive,
+      acquiredDate: resolvedDate,
+      mortality: resolvedMortality,
+      ageWeeks: body.ageWeeks !== undefined ? Number(body.ageWeeks) : existing.ageWeeks,
+      ageInWeeks: body.ageWeeks !== undefined ? Number(body.ageWeeks) : existing.ageInWeeks,
       updatedAt: new Date().toISOString(),
     };
     saveStore();
@@ -984,40 +1049,51 @@ apiRouter.get('/farms', (_req: Request, res: Response) => {
 
 apiRouter.post('/farms', (req: Request, res: Response) => {
   const body = req.body || {};
-  const newId = farmList.length > 0 ? Math.max(...farmList.map(f => Number(f.id) || 0)) + 1 : 10;
+  const newId = body.id || (farmList.length > 0 ? Math.max(...farmList.map(f => Number(f.id) || 0)) + 1 : 10);
   const newFarm = {
     id: newId,
     name: body.name || 'New Farm Facility',
     code: body.code || `GVF-${newId}`,
     location: body.location || 'Punjab, Pakistan',
     description: body.description || '',
+    capacity: Number(body.capacity) || 50000,
+    currentBirds: Number(body.currentBirds) || 0,
+    shedsCount: Number(body.shedsCount) || 1,
+    manager: body.manager || 'Farm Supervisor',
+    temperature: Number(body.temperature) || 25.0,
+    humidity: Number(body.humidity) || 56,
     active: true,
     isUserAdded: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  farmList.unshift(newFarm);
-  saveStore();
+  const alreadyExists = farmList.some(f => String(f.id) === String(newId));
+  if (!alreadyExists) {
+    farmList.unshift(newFarm);
+    saveStore();
+  }
   res.json({ message: 'success', data: newFarm });
 });
 
 apiRouter.put('/farms/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+  const rawId = String(req.params.id);
+  const numId = Number(rawId);
   const body = req.body || {};
-  const idx = farmList.findIndex(f => f.id === id);
+  const idx = farmList.findIndex(f => String(f.id) === rawId || (!isNaN(numId) && Number(f.id) === numId));
   if (idx >= 0) {
-    farmList[idx] = { ...farmList[idx], ...body, id, updatedAt: new Date().toISOString() };
+    farmList[idx] = { ...farmList[idx], ...body, id: farmList[idx].id, updatedAt: new Date().toISOString() };
     saveStore();
     return res.json({ message: 'success', data: farmList[idx] });
   }
-  res.json({ message: 'success', data: { id, ...body } });
+  res.json({ message: 'success', data: { id: rawId, ...body } });
 });
 
 apiRouter.delete('/farms/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
-  farmList = farmList.filter(f => f.id !== id);
+  const rawId = String(req.params.id);
+  const numId = Number(rawId);
+  farmList = farmList.filter(f => String(f.id) !== rawId && (isNaN(numId) || Number(f.id) !== numId));
   saveStore();
-  res.json({ message: 'success', data: { id } });
+  res.json({ message: 'success', data: { id: rawId } });
 });
 
 // 5. Stock Store
@@ -1163,16 +1239,20 @@ apiRouter.get('/bird-health', (req: Request, res: Response) => {
 apiRouter.post('/bird-health', (req: Request, res: Response) => {
   const body = req.body || {};
   const fid = Number(body.flockId) || 8;
-  const foundFlock = flockItems.find(f => f.id === fid);
+  const foundFlock = flockItems.find(f => Number(f.id) === fid);
   const flockName = foundFlock ? foundFlock.flockName : (fid === 8 ? 'Unit 1' : fid === 9 ? 'Unit 2' : 'Unit 3');
   const newHealth = {
     id: birdHealthItems.length > 0 ? Math.max(...birdHealthItems.map(b => Number(b.id) || 0)) + 1 : 1,
+    clientId: body.clientId || null,
     date: body.date ? new Date(body.date).toISOString() : new Date().toISOString(),
     flockId: fid,
     flock: { id: fid, flockName },
-    openingBirds: Number(body.openingBirds) || 25000,
+    openingBirds: Number(body.openingBirds) || (foundFlock ? Number(foundFlock.totalBirds) : 25000),
     mortality: Number(body.mortality) || 0,
     cull: Number(body.cull) || 0,
+    cause: body.notes || body.cause || 'Daily Mortality',
+    notes: body.notes || body.cause || '',
+    recordedBy: body.recordedBy || 'Farm Admin',
     feedId: body.feedId || '13',
     feedConsumed: Number(body.feedConsumed) || 80,
     waterConsumption: Number(body.waterConsumption) || 4000,
@@ -1182,7 +1262,31 @@ apiRouter.post('/bird-health', (req: Request, res: Response) => {
     humidity: Number(body.humidity) || 60,
     isUserAdded: true,
   };
-  birdHealthItems.unshift(newHealth);
+  const alreadySaved = body.clientId && birdHealthItems.some((b: any) => b.clientId === body.clientId);
+  if (!alreadySaved) {
+    birdHealthItems.unshift(newHealth);
+  }
+  const mortCount = Number(body.mortality) || 0;
+  const fIdx = flockItems.findIndex(f => Number(f.id) === fid);
+  if (fIdx >= 0 && !body.skipFlockAdjust) {
+    if (body.flockTotalBirds !== undefined && body.flockMortality !== undefined) {
+      flockItems[fIdx] = {
+        ...flockItems[fIdx],
+        totalBirds: Math.max(0, Number(body.flockTotalBirds)),
+        mortality: Math.max(0, Number(body.flockMortality)),
+        updatedAt: new Date().toISOString(),
+      };
+      persistFlockToSupabase(flockItems[fIdx]);
+    } else if (mortCount > 0 && !alreadySaved) {
+      flockItems[fIdx] = {
+        ...flockItems[fIdx],
+        totalBirds: Math.max(0, (Number(flockItems[fIdx].totalBirds) || 0) - mortCount),
+        mortality: (Number(flockItems[fIdx].mortality) || 0) + mortCount,
+        updatedAt: new Date().toISOString(),
+      };
+      persistFlockToSupabase(flockItems[fIdx]);
+    }
+  }
   saveStore();
   res.json({ message: 'success', data: newHealth });
 });
@@ -1293,9 +1397,28 @@ apiRouter.post(['/egg-production', '/egg-productions'], (req: Request, res: Resp
 apiRouter.put(['/egg-production/:id', '/egg-productions/:id'], (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const body = req.body || {};
-  const idx = rawEggProductions.findIndex((e: any) => e.id === id);
+  const idx = rawEggProductions.findIndex(
+    (e: any) => Number(e.id) === id || String(e.id) === String(req.params.id) || Number(e.trackingId) === id
+  );
   if (idx >= 0) {
-    rawEggProductions[idx] = { ...rawEggProductions[idx], ...body, id, updatedAt: new Date().toISOString() };
+    const existing = rawEggProductions[idx];
+    const resolvedId = existing.id;
+    const resolvedFid = body.flockId !== undefined ? Number(body.flockId) : existing.flockId;
+    const resolvedBroken =
+      body.brokenEggs !== undefined ? Number(body.brokenEggs) : body.damagedEggs !== undefined ? Number(body.damagedEggs) : existing.brokenEggs;
+    const resolvedWeight =
+      body.averageWeight !== undefined ? Number(body.averageWeight) : body.avgWeightGrams !== undefined ? Number(body.avgWeightGrams) : existing.averageWeight;
+    const resolvedGrade = body.grade || body.eggGrade || existing.grade;
+    rawEggProductions[idx] = {
+      ...existing,
+      ...body,
+      id: resolvedId,
+      flockId: resolvedFid,
+      brokenEggs: resolvedBroken,
+      averageWeight: resolvedWeight,
+      grade: resolvedGrade,
+      updatedAt: new Date().toISOString(),
+    };
     saveStore();
     persistEggProductionToSupabase(rawEggProductions[idx]);
     return res.json({ message: 'success', data: rawEggProductions[idx] });
@@ -1400,10 +1523,24 @@ apiRouter.post(['/expense', '/expenses'], (req: Request, res: Response) => {
 apiRouter.put(['/expense/:id', '/expenses/:id'], (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const body = req.body || {};
-  const idx = rawExpenses.findIndex((e: any) => e.id === id);
+  const idx = rawExpenses.findIndex(
+    (e: any) => Number(e.id) === id || String(e.id) === String(req.params.id) || Number(e.trackingId) === id
+  );
   if (idx >= 0) {
-    const cost = body.expenseCost !== undefined ? Number(body.expenseCost) : (body.amount !== undefined ? Number(body.amount) : rawExpenses[idx].expenseCost);
-    rawExpenses[idx] = { ...rawExpenses[idx], ...body, expenseCost: cost, amount: cost, id, updatedAt: new Date().toISOString() };
+    const existing = rawExpenses[idx];
+    const cost = body.expenseCost !== undefined ? Number(body.expenseCost) : (body.amount !== undefined ? Number(body.amount) : existing.expenseCost);
+    const headVal = body.head || body.category || existing.head;
+    rawExpenses[idx] = {
+      ...existing,
+      ...body,
+      expenseCost: cost,
+      amount: cost,
+      head: headVal,
+      notes: body.notes ?? body.description ?? existing.notes,
+      flockId: body.flockId !== undefined ? Number(body.flockId) : existing.flockId,
+      id: existing.id,
+      updatedAt: new Date().toISOString(),
+    };
     saveStore();
     persistExpenseToSupabase(rawExpenses[idx]);
     return res.json({ message: 'success', data: rawExpenses[idx] });
@@ -1613,6 +1750,10 @@ apiRouter.post(['/sale', '/sales'], (req: Request, res: Response) => {
     rate: rateVal,
     totalAmount: totAmount,
     amount: totAmount,
+    cashPayment: body.cashPayment !== undefined ? Number(body.cashPayment) : 0,
+    onlinePayment: body.onlinePayment !== undefined ? Number(body.onlinePayment) : 0,
+    bankId: body.bankId || undefined,
+    bankName: body.bankName || undefined,
     weight: Number(body.weight) || 60.0,
     attachment: body.attachment || null,
     isUserAdded: true,
@@ -1628,10 +1769,28 @@ apiRouter.post(['/sale', '/sales'], (req: Request, res: Response) => {
 apiRouter.put(['/sale/:id', '/sales/:id'], (req: Request, res: Response) => {
   const id = Number(req.params.id);
   const body = req.body || {};
-  const idx = rawSales.findIndex((s: any) => s.id === id);
+  const idx = rawSales.findIndex(
+    (s: any) => Number(s.id) === id || String(s.id) === String(req.params.id) || Number(s.trackingId) === id
+  );
   if (idx >= 0) {
-    const totAmount = body.totalAmount !== undefined ? Number(body.totalAmount) : (body.amount !== undefined ? Number(body.amount) : rawSales[idx].totalAmount);
-    rawSales[idx] = { ...rawSales[idx], ...body, totalAmount: totAmount, amount: totAmount, id, updatedAt: new Date().toISOString() };
+    const existing = rawSales[idx];
+    const totAmount = body.totalAmount !== undefined ? Number(body.totalAmount) : (body.amount !== undefined ? Number(body.amount) : existing.totalAmount);
+    const itemsSoldVal = body.itemsSold !== undefined ? Number(body.itemsSold) : (body.quantity !== undefined ? Number(body.quantity) : existing.itemsSold);
+    const headVal = body.head || body.category || existing.head;
+    rawSales[idx] = {
+      ...existing,
+      ...body,
+      totalAmount: totAmount,
+      amount: totAmount,
+      itemsSold: itemsSoldVal,
+      head: headVal,
+      notes: body.notes ?? body.description ?? existing.notes,
+      flockId: body.flockId !== undefined ? Number(body.flockId) : existing.flockId,
+      bankId: body.bankId !== undefined ? body.bankId : existing.bankId,
+      bankName: body.bankName !== undefined ? body.bankName : existing.bankName,
+      id: existing.id,
+      updatedAt: new Date().toISOString(),
+    };
     saveStore();
     persistSaleToSupabase(rawSales[idx]);
     return res.json({ message: 'success', data: rawSales[idx] });
@@ -1889,6 +2048,78 @@ apiRouter.get('/reports/income-statement', (req: Request, res: Response) => {
       },
     },
   });
+});
+
+// 15. Bank Accounts & Opening Balances CRUD
+apiRouter.get('/banks', (_req: Request, res: Response) => {
+  res.json({
+    message: 'success',
+    data: { items: bankAccounts },
+  });
+});
+
+apiRouter.post('/banks', (req: Request, res: Response) => {
+  const body = req.body || {};
+  const idStr = String(body.id || `bank-${Date.now()}`);
+  const now = new Date().toISOString();
+  const newBank = {
+    id: idStr,
+    bankName: String(body.bankName || 'Bank Account').trim(),
+    accountTitle: String(body.accountTitle || 'GreenOva Poultry Farm').trim(),
+    accountNumber: String(body.accountNumber || '').trim(),
+    openingBalance: Number(body.openingBalance) || 0,
+    openingDate: body.openingDate || now.slice(0, 10),
+    notes: body.notes || '',
+    createdAt: body.createdAt || now,
+    updatedAt: now,
+  };
+  const existingIdx = bankAccounts.findIndex((b: any) => String(b.id) === idStr);
+  if (existingIdx >= 0) {
+    bankAccounts[existingIdx] = newBank;
+  } else {
+    bankAccounts.push(newBank);
+  }
+  saveStore();
+  res.json({ message: 'success', data: newBank });
+});
+
+apiRouter.put('/banks/:id', (req: Request, res: Response) => {
+  const idStr = String(req.params.id);
+  const body = req.body || {};
+  const idx = bankAccounts.findIndex((b: any) => String(b.id) === idStr);
+  const now = new Date().toISOString();
+  if (idx >= 0) {
+    bankAccounts[idx] = {
+      ...bankAccounts[idx],
+      ...body,
+      id: idStr,
+      openingBalance: body.openingBalance !== undefined ? Number(body.openingBalance) : bankAccounts[idx].openingBalance,
+      updatedAt: now,
+    };
+    saveStore();
+    return res.json({ message: 'success', data: bankAccounts[idx] });
+  }
+  const created = {
+    id: idStr,
+    bankName: String(body.bankName || 'Bank Account').trim(),
+    accountTitle: String(body.accountTitle || 'GreenOva Poultry Farm').trim(),
+    accountNumber: String(body.accountNumber || '').trim(),
+    openingBalance: Number(body.openingBalance) || 0,
+    openingDate: body.openingDate || now.slice(0, 10),
+    notes: body.notes || '',
+    createdAt: now,
+    updatedAt: now,
+  };
+  bankAccounts.push(created);
+  saveStore();
+  res.json({ message: 'success', data: created });
+});
+
+apiRouter.delete('/banks/:id', (req: Request, res: Response) => {
+  const idStr = String(req.params.id);
+  bankAccounts = bankAccounts.filter((b: any) => String(b.id) !== idStr);
+  saveStore();
+  res.json({ message: 'success', data: { id: idStr } });
 });
 
 // Safe Fallback for any other API sub-route

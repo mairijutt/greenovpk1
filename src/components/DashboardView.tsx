@@ -27,6 +27,7 @@ import {
   Clock,
   Sun,
   Moon,
+  ExternalLink,
 } from 'lucide-react';
 import { Farm, Flock, EggProduction, MortalityLog, FeedConsumption, FinancialRecord } from '../types/farm.ts';
 import { DateRangePickerBar, DatePreset } from './ui';
@@ -74,21 +75,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenRecordModal,
   onNavigateTab,
 }) => {
-  // Official latest operational date in the farm ledger
-  const latestDate = '2026-10-24';
+  // Dynamic current operational date (e.g., 2026-11-12)
+  const getTodayDateStr = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const dynamicToday = getTodayDateStr();
 
-  // Date and Flock filter state - default to 'today' so user immediately sees today's live data
+  // Date and Flock filter state - default to 'all' so user immediately sees complete farm totals
   const [selectedFlock, setSelectedFlock] = useState('all');
-  const [fromDate, setFromDate] = useState(latestDate);
-  const [toDate, setToDate] = useState(latestDate);
-  const [preset, setPreset] = useState<DatePreset>('today');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [preset, setPreset] = useState<DatePreset>('all');
 
   // Interactive Graph States
   const [hoveredFinanceMonth, setHoveredFinanceMonth] = useState<number | null>(null);
   const [hoveredEggDay, setHoveredEggDay] = useState<number | null>(null);
   const [hoveredConsumptionIndex, setHoveredConsumptionIndex] = useState<number | null>(null);
   const [hoveredStockMonth, setHoveredStockMonth] = useState<number | null>(null);
-  const [financeViewMode, setFinanceViewMode] = useState<'today' | 'monthly'>(preset === 'today' ? 'today' : 'monthly');
+  const [financeViewMode, setFinanceViewMode] = useState<'today' | 'monthly'>('monthly');
 
   // Handle preset selection
   const handlePresetChange = (selectedPreset: DatePreset) => {
@@ -98,25 +106,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       setToDate('');
       setFinanceViewMode('monthly');
     } else if (selectedPreset === 'today') {
-      setFromDate(latestDate);
-      setToDate(latestDate);
+      const todayStr = getTodayDateStr();
+      setFromDate(todayStr);
+      setToDate(todayStr);
       setFinanceViewMode('today');
     } else if (selectedPreset === '30d') {
-      const ref = new Date(latestDate);
+      const todayStr = getTodayDateStr();
+      const ref = new Date(todayStr);
       const prior = new Date(ref);
       prior.setDate(prior.getDate() - 30);
       setFromDate(prior.toISOString().split('T')[0]);
-      setToDate(latestDate);
+      setToDate(todayStr);
       setFinanceViewMode('monthly');
     }
   };
 
   const handleReset = () => {
     setSelectedFlock('all');
-    setFromDate(latestDate);
-    setToDate(latestDate);
-    setPreset('today');
-    setFinanceViewMode('today');
+    setFromDate('');
+    setToDate('');
+    setPreset('all');
+    setFinanceViewMode('monthly');
   };
 
   // Helper to match flock selection against any record's ID or name
@@ -228,13 +238,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [selectedFlock, fromDate, toDate]);
 
-  // Active bird population in selected scope
+  // Active bird population in selected scope - dynamically reflects mortality deducted from flocks
   const liveBirdsCount = useMemo(() => {
+    if (flocks && flocks.length > 0) {
+      const targetFlocks = flocks.filter((f) => isFlockMatch(f.id, f.name));
+      if (targetFlocks.length > 0) {
+        return targetFlocks.reduce((sum, f) => sum + (f.currentCount ?? f.initialCount ?? 0), 0);
+      }
+    }
     if (selectedFlock === 'Unit 1' || selectedFlock === '8') return 24786;
     if (selectedFlock === 'Unit 2' || selectedFlock === '9') return 31739;
     if (selectedFlock === 'Unit 3' || selectedFlock === '10') return 25189;
     return 81714;
-  }, [selectedFlock]);
+  }, [flocks, selectedFlock]);
 
   // --- DYNAMIC SECTION METRICS ---
 
@@ -262,55 +278,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const online = activeSales.reduce((sum, s) => sum + ((s as any).onlinePayment || 0), 0);
     const cash = activeSales.reduce((sum, s) => sum + ((s as any).cashPayment || (s.amount - ((s as any).onlinePayment || 0))), 0);
 
-    let expenses = 0;
-    if (preset === 'all' && !fromDate && !toDate) {
-      if (selectedFlock === 'all') {
-        expenses = 387153843.6;
-      } else if (selectedFlock === 'Unit 1' || selectedFlock === '8') {
-        expenses = 73051255;
-      } else if (selectedFlock === 'Unit 2' || selectedFlock === '9') {
-        expenses = 253509518.6;
-      } else {
-        expenses = 60593070;
-      }
-      // Add any custom user-added expenses from financials
-      const customUserExp = financials
-        .filter((f) => f.type === 'Expense' && !liveExpenseRecords.some((le) => le.id === f.id))
-        .filter((f) => isFlockMatch(f.flockId, f.flockName))
-        .reduce((sum, f) => sum + f.amount, 0);
-      expenses += customUserExp;
-    } else if (preset === 'today') {
-      // For Today: operational feed consumption (195 bags total @ 5,850/bag = Rs. 1,140,750)
-      // + any specific expenses logged on today's date
-      let dailyFeedCost = 0;
-      if (selectedFlock === 'Unit 1' || selectedFlock === '8') {
-        dailyFeedCost = 58 * 5850; // Rs. 339,300
-      } else if (selectedFlock === 'Unit 2' || selectedFlock === '9') {
-        dailyFeedCost = 75 * 5850; // Rs. 438,750
-      } else if (selectedFlock === 'Unit 3' || selectedFlock === '10') {
-        dailyFeedCost = 62 * 5850; // Rs. 362,700
-      } else {
-        dailyFeedCost = 195 * 5850; // Rs. 1,140,750
-      }
-      const vouchersToday = activeUserExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-      expenses = dailyFeedCost + vouchersToday;
-    } else {
-      // 30 Days or custom date range:
-      const dayCount = Math.max(1, Math.min(30, activeEggLogs.length > 0 ? Math.ceil(activeEggLogs.length / (selectedFlock === 'all' ? 3 : 1)) : 30));
-      let dailyRate = 0;
-      if (selectedFlock === 'Unit 1' || selectedFlock === '8') {
-        dailyRate = 58 * 5850;
-      } else if (selectedFlock === 'Unit 2' || selectedFlock === '9') {
-        dailyRate = 75 * 5850;
-      } else if (selectedFlock === 'Unit 3' || selectedFlock === '10') {
-        dailyRate = 62 * 5850;
-      } else {
-        dailyRate = 195 * 5850;
-      }
-      const periodFeed = dailyRate * dayCount;
-      const vouchersInPeriod = activeUserExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-      expenses = periodFeed + vouchersInPeriod;
-    }
+    const expenses = activeUserExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
     const net = revenue - expenses;
     const profitMarginPercent = revenue > 0 ? Number(((net / revenue) * 100).toFixed(1)) : 0;
@@ -330,30 +298,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // 3. Consumption Metrics
   const dynamicConsumption = useMemo(() => {
-    if (preset === 'today') {
-      if (selectedFlock === 'Unit 1' || selectedFlock === '8') {
-        return { bags: 58, feedKg: 2900, waterL: 6400, fcr: 1.46, intakeGrams: 117 };
-      }
-      if (selectedFlock === 'Unit 2' || selectedFlock === '9') {
-        return { bags: 75, feedKg: 3750, waterL: 8500, fcr: 1.48, intakeGrams: 118 };
-      }
-      if (selectedFlock === 'Unit 3' || selectedFlock === '10') {
-        return { bags: 62, feedKg: 3100, waterL: 6900, fcr: 1.47, intakeGrams: 119 };
-      }
-      return { bags: 195, feedKg: 9750, waterL: 21800, fcr: 1.47, intakeGrams: 118 };
+    if (preset === 'today' || fromDate || toDate) {
+      const periodLogs = consumptionLogs.filter((c) => {
+        const matchFlock = isFlockMatch(c.flockId, c.flockName);
+        const matchDate = isDateMatch(c.date);
+        return matchFlock && matchDate;
+      });
+      const bags = periodLogs.reduce((sum, c) => sum + (c.bags || Math.round((c.feedQuantityKg || 0) / 50)), 0);
+      const feedKg = periodLogs.reduce((sum, c) => sum + (c.feedQuantityKg || (c.bags || 0) * 50), 0);
+      const waterL = periodLogs.reduce((sum, c) => sum + (c.waterIntakeLiters || 0), 0);
+      const avgGrams =
+        periodLogs.length > 0
+          ? Number((periodLogs.reduce((s, c) => s + (c.gramsPerBird || 118), 0) / periodLogs.length).toFixed(1))
+          : 0;
+      const avgFcr =
+        periodLogs.length > 0
+          ? Number((periodLogs.reduce((s, c) => s + (c.fcrEstimate || 1.48), 0) / periodLogs.length).toFixed(2))
+          : 0;
+      return { bags, feedKg, waterL, fcr: avgFcr, intakeGrams: avgGrams };
     }
     // All-time or period
     if (selectedFlock === 'Unit 1' || selectedFlock === '8') {
-      return { bags: 7840, feedKg: 392000, waterL: 878000, fcr: 1.47, intakeGrams: 117 };
+      return { bags: 8640, feedKg: 432000, waterL: 968000, fcr: 1.47, intakeGrams: 117 };
     }
     if (selectedFlock === 'Unit 2' || selectedFlock === '9') {
-      return { bags: 34245, feedKg: 1712250, waterL: 3835000, fcr: 1.48, intakeGrams: 118 };
+      return { bags: 34845, feedKg: 1742250, waterL: 3902000, fcr: 1.48, intakeGrams: 118 };
     }
     if (selectedFlock === 'Unit 3' || selectedFlock === '10') {
-      return { bags: 6310, feedKg: 315500, waterL: 707000, fcr: 1.47, intakeGrams: 119 };
+      return { bags: 7060, feedKg: 353000, waterL: 791000, fcr: 1.47, intakeGrams: 119 };
     }
-    return { bags: 48395, feedKg: 2419750, waterL: 5420000, fcr: 1.48, intakeGrams: 118 };
-  }, [preset, selectedFlock]);
+    return { bags: 50545, feedKg: 2527250, waterL: 5661000, fcr: 1.48, intakeGrams: 118 };
+  }, [preset, selectedFlock, consumptionLogs, fromDate, toDate]);
 
   // 4. Stock Metrics
   const dynamicStock = useMemo(() => {
@@ -409,47 +384,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Fully Dynamic 3-Unit Telemetry cards - ALWAYS strictly Unit 1, Unit 2, Unit 3 specific
   const unitCards = useMemo(() => {
+    const f1 = flocks.find((f: any) => f.id === '8' || f.name.includes('Unit 1'));
+    const f2 = flocks.find((f: any) => f.id === '9' || f.name.includes('Unit 2'));
+    const f3 = flocks.find((f: any) => f.id === '10' || f.name.includes('Unit 3'));
+
     const units = [
       {
         unit: 'Unit 1',
         id: '8',
         shed: 'Shed 1',
-        birds: 24786,
+        birds: f1?.currentCount || 24786,
         capacity: 25000,
         temperature: 23.8,
         humidity: 62,
         dailyBags: 58,
-        allTimeExp: 66172253,
-        allTimeEggs: 1931280,
-        allTimeRev: 29798926,
+        allTimeExp: 73051255,
+        allTimeEggs: 2242800,
+        allTimeRev: 34952096,
         status: 'Tunnel Ventilation Active · Bank 1 Online',
       },
       {
         unit: 'Unit 2',
         id: '9',
         shed: 'Shed 2',
-        birds: 31739,
+        birds: f2?.currentCount || 31739,
         capacity: 35000,
         temperature: 24.2,
         humidity: 59,
         dailyBags: 75,
-        allTimeExp: 243997005.6,
-        allTimeEggs: 14103090,
-        allTimeRev: 266379294,
+        allTimeExp: 253509518.6,
+        allTimeEggs: 14463810,
+        allTimeRev: 273821904,
         status: 'Cooling Pads Active · 200 Bags Delivered',
       },
       {
         unit: 'Unit 3',
         id: '10',
         shed: 'Shed 3',
-        birds: 25189,
+        birds: f3?.currentCount || 25189,
         capacity: 25500,
         temperature: 24.0,
         humidity: 64,
         dailyBags: 62,
-        allTimeExp: 51483870,
-        allTimeEggs: 1133820,
-        allTimeRev: 16601857,
+        allTimeExp: 60593070,
+        allTimeEggs: 1420320,
+        allTimeRev: 20920177,
         status: 'Airflow 2.1 m/s · Negative Pressure OK',
       },
     ];
@@ -468,6 +447,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const sourceMortality = mortalityLogs && mortalityLogs.length > 0 ? mortalityLogs : liveMortalityLogs;
     const allPeriodMortality = sourceMortality.filter((m) => isDateMatch(m.date));
 
+    // All expenses in the active date range
+    const allPeriodExpenses = [
+      ...financials.filter((f) => f.type === 'Expense'),
+      ...liveExpenseRecords.filter((le) => !financials.some((f) => f.id === le.id)),
+    ].filter((e) => isDateMatch(e.date));
+
     return units.map((u) => {
       // Filter specifically for this unit only
       const unitEggLogs = allPeriodEggs.filter((e) => isRecordForUnit(e.flockId, e.flockName, u.id, u.unit));
@@ -480,40 +465,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const avgLay =
         unitEggLogs.length > 0
           ? Number((unitEggLogs.reduce((sum, e) => sum + (e.layingRatePercent || 0), 0) / unitEggLogs.length).toFixed(1))
-          : Number(((eggs / u.birds) * 100).toFixed(1));
+          : (u.birds > 0 ? Number(((eggs / u.birds) * 100).toFixed(1)) : 0);
 
       // Unit sales specifically for this unit
       const unitSales = allPeriodSales.filter((s: any) => isRecordForUnit(s.flockId, s.flockName || s.flock, u.id, u.unit));
       const revenue = unitSales.reduce((sum, s) => sum + (s.amount || 0), 0);
+      const onlineRev = unitSales.reduce((sum, s: any) => sum + (Number(s.onlinePayment) || 0), 0);
+      const cashRev = unitSales.reduce((sum, s: any) => sum + (Number(s.cashPayment) || Math.max(0, (s.amount || 0) - (Number(s.onlinePayment) || 0))), 0);
 
-      // Unit expenses based on preset
-      let expenses = 0;
-      if (preset === 'all' && !fromDate && !toDate) {
-        expenses = u.allTimeExp;
-      } else if (preset === 'today') {
-        expenses = u.dailyBags * 5850;
-      } else {
-        const days = Math.max(1, Math.min(30, unitEggLogs.length > 0 ? unitEggLogs.length : 30));
-        expenses = u.dailyBags * 5850 * days;
-      }
+      // Unit expenses computed directly from active period vouchers (so edits update live)
+      const unitExps = allPeriodExpenses.filter((e: any) => isRecordForUnit(e.flockId, e.flockName, u.id, u.unit));
+      const expenses =
+        unitExps.length > 0
+          ? unitExps.reduce((sum, e) => sum + (e.amount || 0), 0)
+          : preset === 'all' && !fromDate && !toDate
+          ? u.allTimeExp
+          : 0;
 
       // Unit mortality specifically for this unit
       const unitMortLogs = allPeriodMortality.filter((m) => isRecordForUnit(m.flockId, m.flockName, u.id, u.unit));
       const mortalityPeriod = unitMortLogs.reduce((sum, m) => sum + (m.count || 0), 0);
-      const allTimeMort = u.unit === 'Unit 1' ? 5 : u.unit === 'Unit 2' ? 7 : 3;
-      const displayMortality = preset === 'all' && !fromDate ? allTimeMort : (mortalityPeriod || (preset === 'today' ? 1 : 0));
+      const flockObj = flocks.find((f: any) => f.id === u.id || f.name.includes(u.unit));
+      const allTimeMort = flockObj?.mortality !== undefined ? flockObj.mortality : (u.unit === 'Unit 1' ? 5 : u.unit === 'Unit 2' ? 7 : 3);
+      const displayMortality = preset === 'all' && !fromDate && !toDate ? allTimeMort : mortalityPeriod;
 
-      const revPerBird = Number((revenue / u.birds).toFixed(2));
-      const expPerBird = Number((expenses / u.birds).toFixed(2));
+      const revPerBird = u.birds > 0 ? Number((revenue / u.birds).toFixed(2)) : 0;
+      const expPerBird = u.birds > 0 ? Number((expenses / u.birds).toFixed(2)) : 0;
       const netPerBird = Number((revPerBird - expPerBird).toFixed(2));
-      const marginPercent = revenue > 0 ? Number(((netPerBird / revPerBird) * 100).toFixed(1)) : 0;
+      const marginPercent = revenue > 0 ? Number((((revenue - expenses) / revenue) * 100).toFixed(1)) : 0;
       const isProfit = netPerBird >= 0;
 
-      const todayMorning = unitEggLogs.reduce((sum, e) => sum + (e.morningEggs || 0), 0) || (u.unit === 'Unit 1' ? 13801 : u.unit === 'Unit 2' ? 16033 : 12741);
-      const todayEvening = unitEggLogs.reduce((sum, e) => sum + (e.eveningEggs || 0), 0) || (u.unit === 'Unit 1' ? 8459 : u.unit === 'Unit 2' ? 9827 : 7809);
-      const todayEggs = eggs || (u.unit === 'Unit 1' ? 22260 : u.unit === 'Unit 2' ? 25860 : 20550);
+      const todayMorning = unitEggLogs.reduce((sum, e) => sum + (e.morningEggs || 0), 0);
+      const todayEvening = unitEggLogs.reduce((sum, e) => sum + (e.eveningEggs || 0), 0);
+      const todayEggs = eggs;
 
-      const finalDisplayEggs = preset === 'all' && !fromDate ? u.allTimeEggs : (eggs || todayEggs);
+      const finalDisplayEggs = unitEggLogs.length > 0 ? eggs : (preset === 'all' && !fromDate && !toDate ? u.allTimeEggs : 0);
       const displayCartons = Number((finalDisplayEggs / 360).toFixed(1));
 
       // Calculate unit's egg sales specifically for accurate carton pricing
@@ -525,11 +511,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const eggsSoldQty = unitEggSales.reduce((sum, s: any) => sum + (s.quantity || 0), 0);
       const cartonsSold = eggsSoldQty > 0 ? eggsSoldQty / 360 : (finalDisplayEggs / 360);
 
-      const benchmarkCartonPrice = u.unit === 'Unit 1' ? 6228 : u.unit === 'Unit 2' ? 6014 : 5750;
       const allTimePrice = u.unit === 'Unit 1' ? 5900 : u.unit === 'Unit 2' ? 6780 : 5753;
       const avgCartonPrice = cartonsSold > 0 && eggRevenue > 0
         ? Math.round(eggRevenue / cartonsSold)
-        : (preset === 'all' && !fromDate ? allTimePrice : benchmarkCartonPrice);
+        : (preset === 'all' && !fromDate && !toDate ? allTimePrice : 0);
 
       return {
         unit: u.unit,
@@ -544,17 +529,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         displayEggs: finalDisplayEggs,
         displayCartons,
         avgCartonPrice,
-        displayTrays: preset === 'all' && !fromDate ? Math.floor(u.allTimeEggs / 30) : cleanTrays,
+        displayTrays: preset === 'all' && !fromDate && !toDate ? Math.floor(u.allTimeEggs / 30) : cleanTrays,
         displayBroken: broken,
         displayLayingRate:
-          preset === 'all' && !fromDate
+          preset === 'all' && !fromDate && !toDate
             ? u.unit === 'Unit 1'
               ? 84.6
               : u.unit === 'Unit 2'
               ? 86.4
               : 83.9
             : avgLay,
-        displayRevenue: preset === 'all' && !fromDate ? u.allTimeRev : revenue,
+        displayRevenue: revenue > 0 ? revenue : (preset === 'all' && !fromDate && !toDate ? u.allTimeRev : 0),
+        salesCount: unitSales.length,
+        eggsSoldQty,
+        onlineRev,
+        cashRev,
         displayExpenses: expenses,
         displayMortality,
         displayRevPerBird: revPerBird,
@@ -565,9 +554,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         status: u.status,
       };
     });
-  }, [eggProductions, financials, mortalityLogs, preset, fromDate, toDate]);
+  }, [eggProductions, financials, mortalityLogs, flocks, preset, fromDate, toDate]);
 
-  // Month-by-month financial ledger (Apr – Oct 2026)
+  // Month-by-month financial ledger (Apr – Nov 2026)
   const monthlyFinanceData = [
     { month: 'Apr 2026', short: 'Apr', income: 191845900, expense: 196840320, net: -4994420 },
     { month: 'May 2026', short: 'May', income: 21450200, expense: 26890450, net: -5440250 },
@@ -576,6 +565,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     { month: 'Aug 2026', short: 'Aug', income: 24510300, expense: 33450900, net: -8940600 },
     { month: 'Sep 2026', short: 'Sep', income: 22765100, expense: 28910400, net: -6145300 },
     { month: 'Oct 2026', short: 'Oct', income: 4407277, expense: 14610538.6, net: -10203261.6 },
+    { month: 'Nov 2026', short: 'Nov', income: 10738000, expense: 13950000, net: -3212000 },
   ];
 
   // Selected flock label for titles
@@ -595,7 +585,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold mb-3 border border-emerald-400/30">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>
-              {preset === 'today' ? `Operational Date: 24 Oct 2026 (Today)` : `Date Scope: ${fromDate || 'Start'} to ${toDate || 'Latest'}`}
+              {preset === 'today' ? `Operational Date: ${fromDate || dynamicToday} (Today)` : `Date Scope: ${fromDate || 'Start'} to ${toDate || 'Latest'}`}
             </span>
             <span>•</span>
             <span className="font-bold text-white">{scopeLabel}</span>
@@ -659,7 +649,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Active Scope
             </span>
             <span className="font-bold text-emerald-900">
-              {preset === 'today' ? 'Today: 24 Oct 2026' : preset === '30d' ? 'Last 30 Days' : preset === 'all' ? 'All-Time Records' : `${fromDate} to ${toDate}`}
+              {preset === 'today' ? `Today: ${fromDate || dynamicToday}` : preset === '30d' ? 'Last 30 Days' : preset === 'all' ? 'All-Time Records' : `${fromDate} to ${toDate}`}
             </span>
             <span className="text-emerald-400">•</span>
             <span className="font-semibold text-slate-800">Flock: {scopeLabel}</span>
@@ -705,29 +695,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 : `Period financial balance and environmental cards for ${scopeLabel}`}
             </p>
           </div>
-          <button
-            onClick={() => onNavigateTab('sales')}
+          <a
+            href="/sales"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center space-x-1 self-start sm:self-auto cursor-pointer"
           >
-            <span>Open Sales Ledger</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+            <span>Open Sales Ledger (New Tab)</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
 
-        {/* Financial KPI Cards - 3 in a Row with Bigger Fonts & Proper UI - Clickable to Relevant Pages */}
+        {/* Financial KPI Cards - 3 in a Row with Bigger Fonts & Proper UI - Open in New Tab */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Card 1: Sales Revenue -> Navigates to Sales */}
-          <div
-            onClick={() => onNavigateTab('sales')}
-            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-emerald-500 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between"
+          {/* Card 1: Sales Revenue -> Opens Sales in new tab */}
+          <a
+            href="/sales"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-emerald-500 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between block"
           >
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-emerald-700 transition-colors">
                   {preset === 'today' ? "Today's Sales Revenue" : 'Period Sales Revenue'}
                 </span>
-                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-colors flex items-center gap-1">
                   <DollarSign className="w-5 h-5" />
+                  <ExternalLink className="w-3.5 h-3.5 opacity-60" />
                 </div>
               </div>
               <div className="mt-4">
@@ -743,24 +738,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
               <span>Dispatched Volume: <strong className="text-slate-900 font-mono">{(dynamicFinance.itemsSold / 360).toFixed(1)} cartons</strong> <span className="text-[11px] text-slate-400">({dynamicFinance.itemsSold.toLocaleString()} eggs)</span></span>
               <span className="font-bold text-emerald-700 group-hover:text-emerald-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Open Sales</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>Open Sales (New Tab)</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
-          </div>
+          </a>
 
-          {/* Card 2: Operating Expenses & Disbursements -> Navigates to Expenses */}
-          <div
-            onClick={() => onNavigateTab('expenses')}
-            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-rose-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between"
+          {/* Card 2: Operating Expenses & Disbursements -> Opens Expenses in new tab */}
+          <a
+            href="/expenses"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-rose-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between block"
           >
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-rose-600 transition-colors">
                   {preset === 'today' ? "Today's Expense" : 'Period Farm Expenses'}
                 </span>
-                <div className="p-2 rounded-xl bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                <div className="p-2 rounded-xl bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-colors flex items-center gap-1">
                   <CreditCard className="w-5 h-5" />
+                  <ExternalLink className="w-3.5 h-3.5 opacity-60" />
                 </div>
               </div>
               <div className="mt-4">
@@ -776,28 +774,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
               <span className="truncate max-w-[160px]">Scope: <strong className="text-slate-900">{scopeLabel}</strong></span>
               <span className="font-bold text-rose-600 group-hover:text-rose-800 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Open Expenses</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>Open Expenses (New Tab)</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
-          </div>
+          </a>
 
-          {/* Card 3: Net Operating Position -> Navigates to Reports */}
-          <div
-            onClick={() => onNavigateTab('reports')}
-            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-amber-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between"
+          {/* Card 3: Net Operating Position -> Opens Reports in new tab */}
+          <a
+            href="/reports"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-amber-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between block"
           >
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-amber-700 transition-colors">
                   {preset === 'today' ? "Today's Net Balance" : 'Net Operating Position'}
                 </span>
-                <div className={`p-2 rounded-xl transition-colors ${
+                <div className={`p-2 rounded-xl transition-colors flex items-center gap-1 ${
                   dynamicFinance.isProfit
                     ? 'bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white'
                     : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'
                 }`}>
                   <Activity className="w-5 h-5" />
+                  <ExternalLink className="w-3.5 h-3.5 opacity-60" />
                 </div>
               </div>
               <div className="mt-4">
@@ -825,24 +826,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {dynamicFinance.isProfit ? `+${dynamicFinance.profitMarginPercent}% Margin` : `${dynamicFinance.profitMarginPercent}% Margin`}
               </span>
               <span className="font-bold text-slate-700 group-hover:text-amber-700 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>P&L Reports</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>P&L Reports (New Tab)</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
-          </div>
+          </a>
 
-          {/* Card 4: 1-Bird Commercial Economics -> Navigates to Flocks */}
-          <div
-            onClick={() => onNavigateTab('flocks')}
-            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-teal-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between"
+          {/* Card 4: 1-Bird Commercial Economics -> Opens Flocks in new tab */}
+          <a
+            href="/flocks"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-teal-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between block"
           >
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-teal-700 transition-colors">
                   Cost per Bird
                 </span>
-                <div className="p-2 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+                <div className="p-2 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition-colors flex items-center gap-1">
                   <Scale className="w-5 h-5" />
+                  <ExternalLink className="w-3.5 h-3.5 opacity-60" />
                 </div>
               </div>
               <div className="mt-4">
@@ -889,24 +893,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Scope: <strong className="text-slate-900 font-mono">{liveBirdsCount.toLocaleString()}</strong> birds
               </span>
               <span className="font-bold text-teal-700 group-hover:text-teal-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Flock Details</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>Flock Details (New Tab)</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
-          </div>
+          </a>
 
-          {/* Card 5: Payment Collections & Settlement -> Navigates to Sales */}
-          <div
-            onClick={() => onNavigateTab('sales')}
-            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-purple-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between"
+          {/* Card 5: Payment Collections & Settlement -> Opens Sales in new tab */}
+          <a
+            href="/sales"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-purple-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between block"
           >
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-purple-700 transition-colors">
                   Payment Collection
                 </span>
-                <div className="p-2 rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                <div className="p-2 rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition-colors flex items-center gap-1">
                   <Banknote className="w-5 h-5" />
+                  <ExternalLink className="w-3.5 h-3.5 opacity-60" />
                 </div>
               </div>
               <div className="mt-4">
@@ -934,24 +941,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {dynamicFinance.revenue > 0 ? `${((dynamicFinance.online / dynamicFinance.revenue) * 100).toFixed(1)}% online` : '0%'}
               </span>
               <span className="font-bold text-purple-700 group-hover:text-purple-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Payment Register</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>Payment Register (New Tab)</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
-          </div>
+          </a>
 
-          {/* Card 6: Feed Stock Procurement Logistics -> Navigates to Stocks */}
-          <div
-            onClick={() => onNavigateTab('stocks')}
-            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-indigo-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between"
+          {/* Card 6: Feed Stock Procurement Logistics -> Opens Stocks in new tab */}
+          <a
+            href="/stocks"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-indigo-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between block"
           >
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-indigo-700 transition-colors">
                   Feed Stock &amp; Logistics
                 </span>
-                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white transition-colors flex items-center gap-1">
                   <Package className="w-5 h-5" />
+                  <ExternalLink className="w-3.5 h-3.5 opacity-60" />
                 </div>
               </div>
               <div className="mt-4">
@@ -968,11 +978,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
               <span className="text-slate-600">Disbursed: <strong className="text-slate-900 font-mono">Rs. {Math.round(dynamicStock.amount).toLocaleString()}</strong></span>
               <span className="font-bold text-indigo-700 group-hover:text-indigo-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Open Stocks</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>Open Stocks (New Tab)</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
-          </div>
+          </a>
         </div>
 
         {/* Interactive Income vs Expenses Graph (adapts between Today distribution & Monthly timeline) */}
@@ -982,7 +992,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <h3 className="text-sm font-black text-slate-900">
                 {preset === 'today' && financeViewMode === 'today'
                   ? "Today's Revenue by Units"
-                  : 'Commercial Revenue vs. Expenses Timeline (April – October 2026)'}
+                  : 'Commercial Revenue vs. Expenses Timeline (April – November 2026)'}
               </h3>
               <p className="text-xs text-slate-500">
                 {preset === 'today' && financeViewMode === 'today'
@@ -1016,72 +1026,66 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {financeViewMode === 'today' ? (
             /* TODAY'S REVENUE DISTRIBUTION BARS ACROSS UNITS */
-            <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-100 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-800">Unit 1 (Shed 1)</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-900">
-                      4 Sales
-                    </span>
+            (() => {
+              const totalTodayRev = unitCards.reduce((s, u) => s + (u.displayRevenue || 0), 0);
+              const totalTodayEggs = unitCards.reduce((s, u) => s + (u.eggsSoldQty || 0), 0);
+              const u1Pct = totalTodayRev > 0 ? ((unitCards[0]?.displayRevenue || 0) / totalTodayRev) * 100 : 0;
+              const u2Pct = totalTodayRev > 0 ? ((unitCards[1]?.displayRevenue || 0) / totalTodayRev) * 100 : 0;
+              const u3Pct = totalTodayRev > 0 ? ((unitCards[2]?.displayRevenue || 0) / totalTodayRev) * 100 : 0;
+              return (
+                <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-100 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {unitCards.map((u, idx) => (
+                      <div
+                        key={u.id}
+                        className={`p-3 bg-white rounded-xl border shadow-2xs ${
+                          idx === 1 ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-900">{u.unit} ({u.shed})</span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              idx === 0
+                                ? 'bg-blue-100 text-blue-900'
+                                : idx === 1
+                                ? 'bg-amber-200 text-amber-900'
+                                : 'bg-emerald-100 text-emerald-900'
+                            }`}
+                          >
+                            {u.salesCount} Sales
+                          </span>
+                        </div>
+                        <div className="text-lg font-black text-emerald-800 font-mono mt-1">
+                          Rs. {Math.round(u.displayRevenue).toLocaleString()}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          {(u.eggsSoldQty / 360).toFixed(1)} Cartons ({u.eggsSoldQty.toLocaleString()} eggs) • Online: Rs.{' '}
+                          {Math.round(u.onlineRev).toLocaleString()} | Cash: Rs. {Math.round(u.cashRev).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-lg font-black text-emerald-800 font-mono mt-1">
-                    Rs. 95,500
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    15.3 Cartons (5,520 eggs) • Online: Rs. 31.5k | Cash: Rs. 64k
-                  </div>
-                </div>
 
-                <div className="p-3 bg-white rounded-xl border border-amber-300 shadow-2xs bg-amber-50/20">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-900">Unit 2 (Shed 2)</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
-                      5 Sales
-                    </span>
-                  </div>
-                  <div className="text-lg font-black text-emerald-800 font-mono mt-1">
-                    Rs. 64,150
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    10.7 Cartons (3,840 eggs) • Online: Rs. 29.4k | Cash: Rs. 34.75k
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-800">Unit 3 (Shed 3)</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900">
-                      2 Sales
-                    </span>
-                  </div>
-                  <div className="text-lg font-black text-emerald-800 font-mono mt-1">
-                    Rs. 346,000
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    60.2 Cartons (21,660 eggs) • Online: Rs. 345k | Cash: Rs. 1k
+                  <div>
+                    <div className="flex justify-between text-xs text-slate-600 font-bold mb-1">
+                      <span>{fromDate || dynamicToday} Turnover: Rs. {Math.round(totalTodayRev).toLocaleString()}</span>
+                      <span>{(totalTodayEggs / 360).toFixed(1)} Cartons Dispatched ({totalTodayEggs.toLocaleString()} Total Eggs)</span>
+                    </div>
+                    <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden flex">
+                      <div style={{ width: `${u1Pct}%` }} className="bg-blue-600" title={`Unit 1: ${u1Pct.toFixed(1)}%`}></div>
+                      <div style={{ width: `${u2Pct}%` }} className="bg-amber-500" title={`Unit 2: ${u2Pct.toFixed(1)}%`}></div>
+                      <div style={{ width: `${u3Pct}%` }} className="bg-emerald-600" title={`Unit 3: ${u3Pct.toFixed(1)}%`}></div>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-slate-500 mt-1">
+                      <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-blue-600 mr-1"></span> Unit 1 ({u1Pct.toFixed(1)}%)</span>
+                      <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-amber-500 mr-1"></span> Unit 2 ({u2Pct.toFixed(1)}%)</span>
+                      <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-emerald-600 mr-1"></span> Unit 3 ({u3Pct.toFixed(1)}%)</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Progress visualizer of Today's total Rs. 505,650 */}
-              <div>
-                <div className="flex justify-between text-xs text-slate-600 font-bold mb-1">
-                  <span>Today's Total Egg Turnover: Rs. 505,650</span>
-                  <span>86.2 Cartons Dispatched (31,020 Total Eggs)</span>
-                </div>
-                <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden flex">
-                  <div style={{ width: '18.9%' }} className="bg-blue-600" title="Unit 1: 18.9%"></div>
-                  <div style={{ width: '12.7%' }} className="bg-amber-500" title="Unit 2: 12.7%"></div>
-                  <div style={{ width: '68.4%' }} className="bg-emerald-600" title="Unit 3: 68.4%"></div>
-                </div>
-                <div className="flex justify-between text-[11px] text-slate-500 mt-1">
-                  <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-blue-600 mr-1"></span> Unit 1 (18.9%)</span>
-                  <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-amber-500 mr-1"></span> Unit 2 (12.7%)</span>
-                  <span className="flex items-center"><span className="w-2 h-2 rounded-full bg-emerald-600 mr-1"></span> Unit 3 (68.4%)</span>
-                </div>
-              </div>
-            </div>
+              );
+            })()
           ) : (
             /* MONTHLY INCOME VS EXPENSE TIMELINE SVG CHART */
             <div className="relative w-full h-64 bg-slate-50/50 rounded-xl p-3 border border-slate-100">
@@ -1202,7 +1206,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 {preset === 'today'
-                  ? 'Real-time telemetry and operational yields for 24 Oct 2026'
+                  ? `Real-time telemetry and operational yields for ${fromDate || dynamicToday}`
                   : 'Aggregated yield telemetry and environmental performance'}
               </p>
             </div>
@@ -1218,10 +1222,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 selectedFlock === unit.id;
 
               return (
-                <div
+                <a
                   key={unit.unit}
-                  onClick={() => setSelectedFlock(selectedFlock === unit.unit ? 'all' : unit.unit)}
-                  className={`bg-white rounded-2xl p-6 border transition-all cursor-pointer flex flex-col justify-between hover:shadow-lg ${
+                  href="/flocks"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`bg-white rounded-2xl p-6 border transition-all cursor-pointer flex flex-col justify-between hover:shadow-lg block group ${
                     isSelected
                       ? 'border-emerald-500 ring-2 ring-emerald-500/25 shadow-md bg-emerald-50/15'
                       : 'border-slate-200 hover:border-emerald-300 shadow-sm'
@@ -1401,7 +1407,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </div>
                   </div>
-                </div>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-emerald-700 font-bold">
+                    <span className="text-[11px] text-slate-500 font-medium">{unit.status}</span>
+                    <span className="flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      <span>Open Flocks (New Tab)</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </a>
               );
             })}
           </div>
@@ -1426,20 +1439,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 : `Period production across ${scopeLabel}: ${dynamicEggs.totalEggs.toLocaleString()} Eggs (${(dynamicEggs.cleanTrays / 12).toLocaleString(undefined, { maximumFractionDigits: 1 })} Cartons)`}
             </p>
           </div>
-          <button
-            onClick={() => onNavigateTab('egg-production')}
+          <a
+            href="/egg-production"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-xs font-bold text-amber-700 hover:text-amber-900 flex items-center space-x-1 self-start sm:self-auto cursor-pointer"
           >
-            <span>Open Egg Production Registry</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+            <span>Open Egg Production Registry (New Tab)</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
 
-        {/* Egg Production KPI Cards */}
+        {/* Egg Production KPI Cards - Click to Open in New Tab */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">
-              {preset === 'today' ? "Today's Total Output" : 'Period Production Output'}
+          <a
+            href="/egg-production"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-amber-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-amber-700">
+              <span>{preset === 'today' ? "Today's Total Output" : 'Period Production Output'}</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
             </div>
             <div className="text-2xl font-black text-amber-700 font-mono mt-1">
               {dynamicEggs.totalEggs.toLocaleString()}{' '}
@@ -1448,11 +1469,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xs text-slate-500 mt-0.5">
               {(dynamicEggs.cleanTrays / 12).toLocaleString(undefined, { maximumFractionDigits: 1 })} Total Cartons
             </div>
-          </div>
+          </a>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">
-              {preset === 'today' ? "Morning Collection (AM)" : 'Morning Collections'}
+          <a
+            href="/egg-production"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-amber-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-amber-700">
+              <span>{preset === 'today' ? "Morning Collection (AM)" : 'Morning Collections'}</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
             </div>
             <div className="text-2xl font-black text-slate-900 font-mono mt-1">
               {dynamicEggs.morningEggs.toLocaleString()}{' '}
@@ -1461,11 +1488,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xs text-slate-500 mt-0.5">
               ~62% of daily yield output
             </div>
-          </div>
+          </a>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">
-              {preset === 'today' ? "Evening Collection (PM)" : 'Evening Collections'}
+          <a
+            href="/egg-production"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-amber-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-amber-700">
+              <span>{preset === 'today' ? "Evening Collection (PM)" : 'Evening Collections'}</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
             </div>
             <div className="text-2xl font-black text-slate-900 font-mono mt-1">
               {dynamicEggs.eveningEggs.toLocaleString()}{' '}
@@ -1474,17 +1507,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xs text-slate-500 mt-0.5">
               ~38% second gathering
             </div>
-          </div>
+          </a>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">Laying Rate Efficiency</div>
+          <a
+            href="/egg-production"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-emerald-700">
+              <span>Laying Rate Efficiency</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+            </div>
             <div className="text-2xl font-black text-emerald-700 font-mono mt-1">
               {dynamicEggs.avgLaying}%
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
               {dynamicEggs.brokenEggs} cracked eggs ({((dynamicEggs.brokenEggs / (dynamicEggs.totalEggs || 1)) * 100).toFixed(2)}%)
             </div>
-          </div>
+          </a>
         </div>
 
         {/* Interactive Production Visualizer & Daily Logs */}
@@ -1517,8 +1558,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Today's Shed-by-Shed Shift Comparison */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {unitCards.map((unit) => {
-              const morningPercent = Math.round((unit.todayMorning / unit.todayEggs) * 100);
-              const eveningPercent = 100 - morningPercent;
+              const morningPercent = unit.todayEggs > 0 ? Math.round((unit.todayMorning / unit.todayEggs) * 100) : 0;
+              const eveningPercent = unit.todayEggs > 0 ? 100 - morningPercent : 0;
               return (
                 <div key={unit.unit} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
                   <div className="flex justify-between items-center text-xs mb-2">
@@ -1614,20 +1655,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 : `Period nutritional consumption for ${scopeLabel}: ${dynamicConsumption.bags.toLocaleString()} Bags`}
             </p>
           </div>
-          <button
-            onClick={() => onNavigateTab('daily-consumption')}
+          <a
+            href="/daily-consumption"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-xs font-bold text-blue-700 hover:text-blue-900 flex items-center space-x-1 self-start sm:self-auto cursor-pointer"
           >
-            <span>Open Consumption Logs</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+            <span>Open Consumption Logs (New Tab)</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
 
-        {/* Nutritional KPI Cards */}
+        {/* Nutritional KPI Cards - Click to Open in New Tab */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">
-              {preset === 'today' ? "Today Feed Consumed" : 'Period Feed Consumed'}
+          <a
+            href="/daily-consumption"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-blue-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-blue-700">
+              <span>{preset === 'today' ? "Today Feed Consumed" : 'Period Feed Consumed'}</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
             </div>
             <div className="text-2xl font-black text-slate-900 font-mono mt-1">
               {dynamicConsumption.bags.toLocaleString()}{' '}
@@ -1636,11 +1685,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xs text-slate-500 mt-0.5">
               {dynamicConsumption.feedKg.toLocaleString()} kg nutritional feed
             </div>
-          </div>
+          </a>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">
-              {preset === 'today' ? "Today's Water Intake" : 'Total Water Intake'}
+          <a
+            href="/daily-consumption"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-blue-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-blue-700">
+              <span>{preset === 'today' ? "Today's Water Intake" : 'Total Water Intake'}</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
             </div>
             <div className="text-2xl font-black text-blue-700 font-mono mt-1">
               {dynamicConsumption.waterL.toLocaleString()}{' '}
@@ -1649,27 +1704,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xs text-slate-500 mt-0.5">
               2.24 L / kg feed water ratio
             </div>
-          </div>
+          </a>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">Feed Conversion Ratio</div>
+          <a
+            href="/daily-consumption"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-emerald-700">
+              <span>Feed Conversion Ratio</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+            </div>
             <div className="text-2xl font-black text-emerald-700 font-mono mt-1">
               {dynamicConsumption.fcr} FCR
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
               Standard commercial efficiency
             </div>
-          </div>
+          </a>
 
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">Intake per Bird / Day</div>
+          <a
+            href="/daily-consumption"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs hover:border-blue-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-blue-700">
+              <span>Intake per Bird / Day</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+            </div>
             <div className="text-2xl font-black text-slate-800 font-mono mt-1">
               {dynamicConsumption.intakeGrams} g
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
               Automated feeder hopper pace
             </div>
-          </div>
+          </a>
         </div>
 
         {/* Today's Unit-Wise Consumption Breakdown */}
@@ -1682,41 +1753,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
-            <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-900">Unit 1 (Shed 1)</span>
-                <span className="font-mono font-bold text-blue-700">
-                  {preset === 'today' ? '58 Bags (2,900 kg)' : '7,840 Bags'}
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-500 mt-1.5">
-                Water: {preset === 'today' ? '6,400 L' : '878,000 L'} • 117 g/bird
-              </div>
-            </div>
+            {([
+              { name: 'Unit 1 (Shed 1)', id: '8', allBags: 8640, allWater: '968,000 L', g: 117 },
+              { name: 'Unit 2 (Shed 2)', id: '9', allBags: 34845, allWater: '3,902,000 L', g: 118 },
+              { name: 'Unit 3 (Shed 3)', id: '10', allBags: 7060, allWater: '791,000 L', g: 119 },
+            ] as const).map((u) => {
+              const unitPeriodLogs = consumptionLogs.filter((c) => isRecordForUnit(c.flockId, c.flockName, u.id, u.name) && isDateMatch(c.date));
+              const unitBags = preset === 'all' && !fromDate && !toDate
+                ? u.allBags
+                : unitPeriodLogs.reduce((s, c) => s + (c.bags || Math.round((c.feedQuantityKg || 0) / 50)), 0);
+              const unitKg = unitBags * 50;
+              const unitWater = preset === 'all' && !fromDate && !toDate
+                ? u.allWater
+                : `${unitPeriodLogs.reduce((s, c) => s + (c.waterIntakeLiters || 0), 0).toLocaleString()} L`;
 
-            <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-900">Unit 2 (Shed 2)</span>
-                <span className="font-mono font-bold text-blue-700">
-                  {preset === 'today' ? '75 Bags (3,750 kg)' : '34,245 Bags'}
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-500 mt-1.5">
-                Water: {preset === 'today' ? '8,500 L' : '3,835,000 L'} • 118 g/bird
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-900">Unit 3 (Shed 3)</span>
-                <span className="font-mono font-bold text-blue-700">
-                  {preset === 'today' ? '62 Bags (3,100 kg)' : '6,310 Bags'}
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-500 mt-1.5">
-                Water: {preset === 'today' ? '6,900 L' : '707,000 L'} • 119 g/bird
-              </div>
-            </div>
+              return (
+                <div key={u.id} className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-900">{u.name}</span>
+                    <span className="font-mono font-bold text-blue-700">
+                      {preset === 'today' ? `${unitBags} Bags (${unitKg.toLocaleString()} kg)` : `${unitBags.toLocaleString()} Bags`}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1.5">
+                    Water: {unitWater} • {u.g} g/bird
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -1735,24 +1799,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
               {preset === 'today'
-                ? `Today's feed delivery log: 200 Bags received for Unit 2 (Rs. 1,109,408)`
+                ? `Today's feed deliveries (${fromDate || dynamicToday}): ${dynamicStock.bags.toLocaleString()} Bags (Rs. ${Math.round(dynamicStock.amount).toLocaleString()})`
                 : `Period stock shipments for ${scopeLabel}: ${dynamicStock.bags.toLocaleString()} Bags`}
             </p>
           </div>
-          <button
-            onClick={() => onNavigateTab('stocks')}
+          <a
+            href="/stocks"
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-xs font-bold text-indigo-700 hover:text-indigo-900 flex items-center space-x-1 self-start sm:self-auto cursor-pointer"
           >
-            <span>Open Stock Ledger</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+            <span>Open Stock Ledger (New Tab)</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
 
-        {/* Stock KPI Cards */}
+        {/* Stock KPI Cards - Click to Open in New Tab */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">
-              {preset === 'today' ? "Today's Stock Received" : 'Total Stock Received'}
+          <a
+            href="/stocks"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-indigo-700">
+              <span>{preset === 'today' ? "Today's Stock Received" : 'Total Stock Received'}</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
             </div>
             <div className="text-2xl font-black text-indigo-900 font-mono mt-1">
               {dynamicStock.bags.toLocaleString()}{' '}
@@ -1761,39 +1833,61 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xs text-slate-500 mt-0.5">
               {dynamicStock.shipments} Shipment{dynamicStock.shipments === 1 ? '' : 's'} Logged
             </div>
-          </div>
+          </a>
 
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">
-              {preset === 'today' ? "Today's Invoice Paid" : 'Total Amount Disbursed'}
+          <a
+            href="/stocks"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-emerald-700">
+              <span>{preset === 'today' ? "Today's Invoice Paid" : 'Total Amount Disbursed'}</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
             </div>
             <div className="text-2xl font-black text-emerald-800 font-mono mt-1">
               Rs. {Math.round(dynamicStock.amount).toLocaleString()}
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
-              {preset === 'today' ? 'Challan #1468 (D.O. 3996)' : `${dynamicStock.shipments || 157} Total Deliveries`}
+              {preset === 'today' ? `${dynamicStock.shipments} Shipment${dynamicStock.shipments === 1 ? '' : 's'} Today` : `${dynamicStock.shipments || 157} Total Deliveries`}
             </div>
-          </div>
+          </a>
 
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">Warehouse Safety Buffer</div>
+          <a
+            href="/stocks"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs hover:border-amber-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-amber-700">
+              <span>Warehouse Safety Buffer</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+            </div>
             <div className="text-2xl font-black text-amber-700 font-mono mt-1">
               2,150 Bags
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
               ~16 Days Safety Reserve on Site
             </div>
-          </div>
+          </a>
 
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs">
-            <div className="text-[11px] font-bold uppercase text-slate-500">Commercial Trays Stock</div>
+          <a
+            href="/stocks"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs hover:border-slate-400 hover:shadow-md transition-all cursor-pointer block group"
+          >
+            <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-slate-800">
+              <span>Commercial Trays Stock</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+            </div>
             <div className="text-2xl font-black text-slate-800 font-mono mt-1">
               42,500 Trays
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
               Standard 30-egg pulp trays
             </div>
-          </div>
+          </a>
         </div>
 
         {/* Today's Delivery Highlight Card */}
@@ -1802,7 +1896,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center space-x-2 text-indigo-950 font-bold text-xs">
               <Truck className="w-4 h-4 text-indigo-700" />
               <span>
-                {preset === 'today' ? "Today's Feed Delivery Log (24 Oct 2026)" : 'Recent Stock Deliveries'}
+                {preset === 'today' ? `Today's Feed Delivery Log (${fromDate || dynamicToday})` : 'Recent Stock Deliveries'}
               </span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

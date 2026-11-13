@@ -26,8 +26,13 @@ import {
   Calendar,
   Info,
   Wheat,
+  Edit,
+  CheckCircle2,
+  Landmark,
+  Package,
 } from 'lucide-react';
-import { FinancialRecord } from '../types/farm.ts';
+import { FinancialRecord, BankAccount } from '../types/farm.ts';
+import { BankFormModal } from './BankFormModal.tsx';
 import {
   EXPENSE_HEADS_21,
   unitWiseExpenseSummary,
@@ -55,19 +60,35 @@ import {
 interface FinanceViewProps {
   financials: FinancialRecord[];
   onAddTransaction: (record: FinancialRecord) => void;
+  onEditTransaction?: (updated: FinancialRecord) => void;
   defaultType?: 'all' | 'Income' | 'Expense';
+  bankAccounts?: BankAccount[];
+  onAddBank?: (bank: BankAccount) => void;
 }
 
 export const FinanceView: React.FC<FinanceViewProps> = ({
   financials,
   onAddTransaction,
+  onEditTransaction,
   defaultType = 'all',
+  bankAccounts = [],
+  onAddBank,
 }) => {
+  const getTodayDateStr = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   const latestDate = useMemo(() => {
-    return financials[0]?.date || '2026-10-25';
+    return financials[0]?.date || getTodayDateStr();
   }, [financials]);
 
   const [showModal, setShowModal] = useState(false);
+  const [editingTx, setEditingTx] = useState<FinancialRecord | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'Income' | 'Expense'>(defaultType);
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
@@ -106,14 +127,16 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       setFromDate('');
       setToDate('');
     } else if (selectedPreset === 'today') {
-      setFromDate(latestDate);
-      setToDate(latestDate);
+      const todayStr = getTodayDateStr();
+      setFromDate(todayStr);
+      setToDate(todayStr);
     } else if (selectedPreset === '30d') {
-      const ref = new Date(latestDate);
+      const todayStr = getTodayDateStr();
+      const ref = new Date(todayStr);
       const prior = new Date(ref);
       prior.setDate(prior.getDate() - 30);
       setFromDate(prior.toISOString().split('T')[0]);
-      setToDate(latestDate);
+      setToDate(todayStr);
     }
   };
 
@@ -127,6 +150,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     setCurrentPage(1);
   };
 
+  const [showQuickBankModal, setShowQuickBankModal] = useState(false);
+
   const [newRecord, setNewRecord] = useState({
     type: defaultType === 'Expense' ? ('Expense' as const) : ('Income' as const),
     head: defaultType === 'Income' ? 'EGG' : 'FEED',
@@ -136,6 +161,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     paymentMode: 'Online' as 'Online' | 'Cash' | 'Split',
     onlineAmount: defaultType === 'Income' ? 250000 : 0,
     cashAmount: 0,
+    bankId: '',
     referenceNo: `INV-${Date.now().toString().slice(-4)}`,
     challanNo: `${Math.floor(100 + Math.random() * 900)}`,
     description: '',
@@ -273,6 +299,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       totalEggsSold,
       eggRevenue,
       eggCartons: Math.round(totalEggsSold / 360),
+      eggCount: eggRecords.length,
       avgCartonPrice,
       otherItemsSold,
       otherRevenue,
@@ -315,7 +342,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
     // Sort descending by date
     const sortedSales = [...relevantSales].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    const refDateStr = toDate || sortedSales[0]?.date || '2026-10-24';
+    const refDateStr = toDate || sortedSales[0]?.date || getTodayDateStr();
     const refDate = new Date(refDateStr);
 
     // 12 weeks prior = 12 * 7 = 84 days
@@ -456,7 +483,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   // Weekly Revenue Chart Data (Last 12 consecutive 7-day buckets)
   const weeklyRevenueData = useMemo(() => {
     const sorted = [...chartSales].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    const refDateStr = toDate || sorted[0]?.date || '2026-10-24';
+    const refDateStr = toDate || sorted[0]?.date || getTodayDateStr();
     const refDate = new Date(refDateStr);
 
     const weeks: {
@@ -690,7 +717,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   // Weekly Expense Chart Data (Last 12 consecutive 7-day buckets)
   const weeklyExpenseData = useMemo(() => {
     const sorted = [...chartExpenses].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    const refDateStr = toDate || sorted[0]?.date || '2026-10-24';
+    const refDateStr = toDate || sorted[0]?.date || getTodayDateStr();
     const refDate = new Date(refDateStr);
 
     const weeks: {
@@ -957,6 +984,12 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       }
     }
 
+    const effectiveBankId =
+      newRecord.type === 'Income' && newRecord.paymentMode !== 'Cash'
+        ? newRecord.bankId || (bankAccounts.length > 0 ? bankAccounts[0].id : '')
+        : '';
+    const matchedBank = bankAccounts.find((b) => String(b.id) === String(effectiveBankId));
+
     const record: FinancialRecord & { onlinePayment?: number; cashPayment?: number; quantity?: number; unitPrice?: number } = {
       id: `${newRecord.type === 'Income' ? 'inc' : 'exp'}-${trackingId}`,
       trackingId: Number(trackingId),
@@ -964,7 +997,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       category: newRecord.head,
       head: newRecord.head,
       amount: Number(newRecord.amount),
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayDateStr(),
       referenceNo: newRecord.referenceNo,
       challanNo: newRecord.challanNo,
       flockId: fid,
@@ -977,6 +1010,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         : 'Bank Transfer',
       onlinePayment: onlinePayment,
       cashPayment: cashPayment,
+      bankId: matchedBank?.id || undefined,
+      bankName: matchedBank?.bankName || undefined,
       quantity: Math.round(Number(newRecord.amount) / 17.5),
       unitPrice: 17.5,
       attachment: attachmentData || null,
@@ -1196,7 +1231,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       <div
         className={`grid gap-3.5 sm:gap-4 ${
           selectedType === 'Income'
-            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
             : selectedType === 'Expense'
             ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
             : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
@@ -1212,7 +1247,21 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               valueColor="text-emerald-700"
               badge={{ text: `${filtered.length} Sales`, color: 'emerald' }}
               trend={{ value: selectedUnit !== 'all' ? selectedUnit : 'All 3 Units', isUp: true }}
-              subtext="Total Egg Sales Revenue"
+              subtext="Total Egg & Farm Sales Revenue"
+            />
+
+            <StatCard
+              title="Total Cartons Sold"
+              value={eggSalesData.eggCartons.toLocaleString()}
+              unit="Cartons"
+              icon={Package}
+              color="indigo"
+              valueColor="text-indigo-700"
+              badge={{
+                text: `${eggSalesData.eggCount.toLocaleString()} Egg Sales`,
+                color: 'indigo',
+              }}
+              subtext={`${eggSalesData.totalEggsSold.toLocaleString()} Eggs • Avg Rs. ${eggSalesData.avgCartonPrice.toLocaleString()} / ctn`}
             />
 
             <StatCard
@@ -2327,6 +2376,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-3 px-3 text-right">Total Amount</th>
                   <th className="py-3 px-3">Vehicle / Challan</th>
                   <th className="py-3 px-3 text-center">Attachment</th>
+                  <th className="py-3 px-3 text-center">Action</th>
                 </tr>
               ) : selectedType === 'Expense' ? (
                 <tr>
@@ -2339,6 +2389,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-3 px-3 text-right">Amount (PKR)</th>
                   <th className="py-3 px-3 text-center">Attachment</th>
                   <th className="py-3 px-3 text-center">Status</th>
+                  <th className="py-3 px-3 text-center">Action</th>
                 </tr>
               ) : (
                 <tr>
@@ -2352,13 +2403,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-3 px-3 text-right">Amount (PKR)</th>
                   <th className="py-3 px-3 text-center">Attachment</th>
                   <th className="py-3 px-3 text-center">Status</th>
+                  <th className="py-3 px-3 text-center">Action</th>
                 </tr>
               )}
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
+                  <td colSpan={12} className="py-12 text-center text-slate-400">
                     No financial records match the selected unit, head, date range, and filters.
                   </td>
                 </tr>
@@ -2440,6 +2492,17 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                             <span className="text-slate-300 font-mono text-xs">—</span>
                           )}
                         </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setEditingTx(fin)}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title={`Edit Sale #${trackingId}`}
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                        </td>
                       </tr>
                     );
                   }
@@ -2511,6 +2574,17 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                           <CheckCircle className="w-3 h-3 mr-1 text-emerald-600" />
                           {fin.status}
                         </span>
+                      </td>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setEditingTx(fin)}
+                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          title={`Edit Voucher #${trackingId}`}
+                        >
+                          <Edit className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -2800,6 +2874,46 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                       />
                     </div>
                   )}
+
+                  {/* Deposit Bank Selector when Online or Split payment is used */}
+                  {newRecord.paymentMode !== 'Cash' && (
+                    <div className="pt-1 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700 flex items-center space-x-1">
+                          <Landmark className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Deposit Bank Account (Auto-updates Bank Balance)</span>
+                        </label>
+                        {onAddBank && (
+                          <button
+                            type="button"
+                            onClick={() => setShowQuickBankModal(true)}
+                            className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
+                          >
+                            + Add Bank
+                          </button>
+                        )}
+                      </div>
+                      <select
+                        value={newRecord.bankId || (bankAccounts.length > 0 ? bankAccounts[0].id : '')}
+                        onChange={(e) => setNewRecord({ ...newRecord, bankId: e.target.value })}
+                        className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-hidden"
+                      >
+                        {bankAccounts.length === 0 ? (
+                          <option value="">No Bank Accounts Added Yet (Click + Add Bank)</option>
+                        ) : (
+                          <>
+                            <option value="">Unassigned / General Online Pool</option>
+                            {bankAccounts.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.bankName} — {b.accountTitle}
+                                {b.accountNumber ? ` (${b.accountNumber})` : ''}
+                              </option>
+                            ))}
+                          </>
+                        )}
+                      </select>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2989,6 +3103,346 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center space-x-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-3">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Edit Sale / Expense Transaction Modal */}
+      {editingTx && (
+        <EditTransactionModal
+          record={editingTx}
+          bankAccounts={bankAccounts}
+          onClose={() => setEditingTx(null)}
+          onSave={(updated) => {
+            onEditTransaction?.(updated);
+            setEditingTx(null);
+            const label = updated.type === 'Income' ? 'Sale record' : 'Expense voucher';
+            setToastMessage(`${label} #${updated.trackingId || updated.id} updated.`);
+            setTimeout(() => setToastMessage(null), 3500);
+          }}
+        />
+      )}
+
+      {/* Quick Add Bank Account Modal from Sales Form */}
+      {showQuickBankModal && onAddBank && (
+        <BankFormModal
+          onClose={() => setShowQuickBankModal(false)}
+          onSave={(newBank) => {
+            onAddBank(newBank);
+            setNewRecord((prev) => ({ ...prev, bankId: newBank.id }));
+            setShowQuickBankModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+interface EditTransactionModalProps {
+  record: FinancialRecord;
+  bankAccounts?: BankAccount[];
+  onClose: () => void;
+  onSave: (updated: FinancialRecord) => void;
+}
+
+const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
+  record,
+  bankAccounts = [],
+  onClose,
+  onSave,
+}) => {
+  const s = record as any;
+  const isSale = record.type === 'Income';
+
+  const [date, setDate] = useState(record.date ? record.date.split('T')[0] : '');
+  const [flockId, setFlockId] = useState<string>(String(record.flockId || '8'));
+  const [head, setHead] = useState<string>(record.head || record.category || (isSale ? 'EGG' : 'FEED'));
+  const [challanNo, setChallanNo] = useState<string>(record.challanNo || '');
+  const [notes, setNotes] = useState<string>(record.notes || record.description || '');
+  const [amount, setAmount] = useState<number>(record.amount || 0);
+
+  // Sale-specific fields
+  const [quantity, setQuantity] = useState<number>(s.quantity || 0);
+  const [unitPrice, setUnitPrice] = useState<number>(s.unitPrice || (s.quantity > 0 ? Number((record.amount / s.quantity).toFixed(2)) : 0));
+  const [onlinePayment, setOnlinePayment] = useState<number>(s.onlinePayment || 0);
+  const [cashPayment, setCashPayment] = useState<number>(s.cashPayment || (isSale ? Math.max(0, record.amount - (s.onlinePayment || 0)) : 0));
+  const [vehicleNumber, setVehicleNumber] = useState<string>(s.vehicleNumber || '');
+  const [bankId, setBankId] = useState<string>(s.bankId || '');
+
+  const unitLabel =
+    flockId === '8' ? 'Unit 1' : flockId === '9' ? 'Unit 2' : flockId === '10' ? 'Unit 3' : (record.flockName || 'Unit 1');
+
+  const handleQtyOrPriceChange = (nextQty: number, nextPrice: number) => {
+    setQuantity(nextQty);
+    setUnitPrice(nextPrice);
+    if (nextQty > 0 && nextPrice > 0) {
+      const calcTotal = Math.round(nextQty * nextPrice);
+      setAmount(calcTotal);
+      setCashPayment(Math.max(0, calcTotal - (Number(onlinePayment) || 0)));
+    }
+  };
+
+  const handlePaymentSplitChange = (nextOnline: number, nextCash: number) => {
+    setOnlinePayment(nextOnline);
+    setCashPayment(nextCash);
+    const sum = (Number(nextOnline) || 0) + (Number(nextCash) || 0);
+    if (sum > 0) {
+      setAmount(sum);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const matchedBank = bankAccounts.find((b) => String(b.id) === String(bankId));
+    const updated: any = {
+      ...record,
+      date,
+      flockId: Number(flockId) || flockId,
+      flockName: unitLabel,
+      head,
+      category: head,
+      challanNo: challanNo.trim() || undefined,
+      notes: notes.trim() || '',
+      description: notes.trim() || record.description || head,
+      amount: Number(amount) || 0,
+    };
+
+    if (isSale) {
+      updated.quantity = Number(quantity) || 0;
+      updated.unitPrice = Number(unitPrice) || 0;
+      updated.onlinePayment = Number(onlinePayment) || 0;
+      updated.cashPayment = Number(cashPayment) || 0;
+      updated.totalAmount = Number(amount) || 0;
+      updated.vehicleNumber = vehicleNumber.trim() || undefined;
+      updated.bankId = matchedBank?.id || undefined;
+      updated.bankName = matchedBank?.bankName || undefined;
+    }
+
+    onSave(updated as FinancialRecord);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-6 my-auto">
+        <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+          <div>
+            <h3 className="text-lg font-black text-slate-900">
+              Edit {isSale ? 'Commercial Sale' : 'Expense Voucher'} #{record.trackingId || record.id}
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isSale ? 'Modify egg volume, rates, payment split, or unit' : 'Modify expense head, challan, description, or amount'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Date</label>
+              <input
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Unit / Flock</label>
+              <select
+                value={flockId}
+                onChange={(e) => setFlockId(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-semibold bg-white"
+              >
+                <option value="8">Unit 1 (Shed 1)</option>
+                <option value="9">Unit 2 (Shed 2)</option>
+                <option value="10">Unit 3 (Shed 3)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">
+                {isSale ? 'Sale Category / Head' : 'Expense Head'}
+              </label>
+              {isSale ? (
+                <input
+                  type="text"
+                  required
+                  value={head}
+                  onChange={(e) => setHead(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-semibold"
+                />
+              ) : (
+                <select
+                  value={head}
+                  onChange={(e) => setHead(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-semibold bg-white"
+                >
+                  {EXPENSE_HEADS_21.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Challan / Voucher No</label>
+              <input
+                type="text"
+                value={challanNo}
+                onChange={(e) => setChallanNo(e.target.value)}
+                placeholder="e.g. 1468"
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-mono"
+              />
+            </div>
+          </div>
+
+          {isSale && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Quantity (Eggs)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={quantity}
+                    onChange={(e) => handleQtyOrPriceChange(Number(e.target.value), unitPrice)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-mono font-bold"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    {(quantity / 360).toFixed(1)} cartons
+                  </span>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Unit Price (Rs/egg)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={unitPrice}
+                    onChange={(e) => handleQtyOrPriceChange(quantity, Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-mono"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Rs. {Math.round(unitPrice * 360).toLocaleString()} / ctn
+                  </span>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Vehicle Number</label>
+                  <input
+                    type="text"
+                    value={vehicleNumber}
+                    onChange={(e) => setVehicleNumber(e.target.value)}
+                    placeholder="e.g. ABC"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Online / Bank Payment (PKR)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={onlinePayment}
+                    onChange={(e) => handlePaymentSplitChange(Number(e.target.value), cashPayment)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none font-mono font-semibold text-teal-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Cash Payment (PKR)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={cashPayment}
+                    onChange={(e) => handlePaymentSplitChange(onlinePayment, Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-mono font-semibold text-emerald-800"
+                  />
+                </div>
+              </div>
+
+              {bankAccounts.length > 0 && (
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Deposit Bank Account
+                  </label>
+                  <select
+                    value={bankId}
+                    onChange={(e) => setBankId(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-semibold bg-white"
+                  >
+                    <option value="">Unassigned / General Online</option>
+                    {bankAccounts.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.bankName} — {b.accountTitle}
+                        {b.accountNumber ? ` (${b.accountNumber})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
+          )}
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Total Amount (PKR)</label>
+            <input
+              type="number"
+              step="0.01"
+              min={0}
+              required
+              value={amount}
+              onChange={(e) => setAmount(Number(e.target.value))}
+              className={`w-full px-3 py-2.5 border border-slate-300 rounded-xl outline-none font-mono font-black text-base ${
+                isSale ? 'text-emerald-800 focus:ring-2 focus:ring-emerald-500' : 'text-rose-700 focus:ring-2 focus:ring-rose-500'
+              }`}
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Description &amp; Notes</label>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Transaction notes or voucher particulars..."
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2.5 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm cursor-pointer"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

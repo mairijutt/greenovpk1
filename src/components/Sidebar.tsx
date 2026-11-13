@@ -377,15 +377,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = currentTab === item.id;
+                  const itemHref = item.id === 'dashboard' ? '/dashboard' : `/${item.id}`;
+
+                  const handleItemClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) {
+                      return; // Allow native open in new tab
+                    }
+                    e.preventDefault();
+                    onSelectTab(item.id);
+                    onClose?.();
+                  };
 
                   if (isCollapsed) {
                     return (
-                      <button
+                      <a
                         key={item.id}
-                        onClick={() => {
-                          onSelectTab(item.id);
-                          onClose?.();
-                        }}
+                        href={itemHref}
+                        onClick={handleItemClick}
                         title={item.label}
                         aria-label={item.label}
                         className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all cursor-pointer group relative ${
@@ -415,17 +423,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             </span>
                           )}
                         </div>
-                      </button>
+                      </a>
                     );
                   }
 
                   return (
-                    <button
+                    <a
                       key={item.id}
-                      onClick={() => {
-                        onSelectTab(item.id);
-                        onClose?.();
-                      }}
+                      href={itemHref}
+                      onClick={handleItemClick}
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs transition-colors cursor-pointer ${
                         isActive
                           ? 'bg-emerald-600 text-white font-bold shadow-xs'
@@ -451,7 +457,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           {item.badge}
                         </span>
                       )}
-                    </button>
+                    </a>
                   );
                 })}
               </div>

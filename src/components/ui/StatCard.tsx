@@ -1,5 +1,5 @@
 import React from 'react';
-import { LucideIcon, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { LucideIcon, ArrowUpRight, ArrowDownRight, ExternalLink } from 'lucide-react';
 
 export type StatColor = 'emerald' | 'amber' | 'rose' | 'blue' | 'teal' | 'indigo' | 'sky' | 'slate' | 'purple';
 
@@ -20,6 +20,9 @@ interface StatCardProps {
     isUp?: boolean;
     neutral?: boolean;
   };
+  href?: string;
+  linkLabel?: string;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   className?: string;
 }
 
@@ -57,58 +60,90 @@ export const StatCard: React.FC<StatCardProps> = ({
   badge,
   subtext,
   trend,
+  href,
+  linkLabel,
+  onClick,
   className = '',
 }) => {
   const iconStyle = colorMap[color] || colorMap.emerald;
+
+  const content = (
+    <>
+      <div>
+        <div className="flex items-center justify-between text-slate-500 mb-2">
+          <span className="text-xs font-semibold uppercase tracking-wider group-hover:text-emerald-700 transition-colors">
+            {title}
+          </span>
+          <div className={`p-2 rounded-lg ${iconStyle.bg} ${iconStyle.text}`}>
+            <Icon className="w-4 h-4" />
+          </div>
+        </div>
+        <div className={`text-2xl font-black ${valueColor} flex items-baseline space-x-1.5`}>
+          <span>{typeof value === 'number' ? value.toLocaleString() : value}</span>
+          {unit && <span className="text-xs font-semibold text-slate-400">{unit}</span>}
+        </div>
+        {(badge || subtext || trend) && (
+          <div className="mt-2 flex items-center flex-wrap text-xs text-slate-500">
+            {badge && (
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold mr-1.5 ${
+                  badgeColorMap[badge.color || 'emerald'] || badgeColorMap.emerald
+                }`}
+              >
+                {badge.text}
+              </span>
+            )}
+            {trend && (
+              <span
+                className={`inline-flex items-center font-bold mr-1.5 ${
+                  trend.neutral
+                    ? 'text-slate-600'
+                    : trend.isUp
+                    ? 'text-emerald-600'
+                    : 'text-rose-600'
+                }`}
+              >
+                {!trend.neutral && (
+                  trend.isUp ? (
+                    <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
+                  ) : (
+                    <ArrowDownRight className="w-3.5 h-3.5 mr-0.5" />
+                  )
+                )}
+                {trend.value}
+              </span>
+            )}
+            {subtext && <span className="text-slate-500">{subtext}</span>}
+          </div>
+        )}
+      </div>
+
+      {href && (
+        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-500 group-hover:text-emerald-700 transition-colors">
+          <span>{linkLabel || 'Open Page'}</span>
+          <ExternalLink className="w-3.5 h-3.5 opacity-70 group-hover:translate-x-0.5 transition-transform" />
+        </div>
+      )}
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        onClick={onClick}
+        className={`bg-white rounded-xl p-5 border border-slate-200 shadow-xs hover:border-emerald-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer flex flex-col justify-between group ${className}`}
+      >
+        {content}
+      </a>
+    );
+  }
 
   return (
     <div
       className={`bg-white rounded-xl p-5 border border-slate-200 shadow-xs hover:border-emerald-300 transition-colors ${className}`}
     >
-      <div className="flex items-center justify-between text-slate-500 mb-2">
-        <span className="text-xs font-semibold uppercase tracking-wider">{title}</span>
-        <div className={`p-2 rounded-lg ${iconStyle.bg} ${iconStyle.text}`}>
-          <Icon className="w-4 h-4" />
-        </div>
-      </div>
-      <div className={`text-2xl font-black ${valueColor} flex items-baseline space-x-1.5`}>
-        <span>{typeof value === 'number' ? value.toLocaleString() : value}</span>
-        {unit && <span className="text-xs font-semibold text-slate-400">{unit}</span>}
-      </div>
-      {(badge || subtext || trend) && (
-        <div className="mt-2 flex items-center flex-wrap text-xs text-slate-500">
-          {badge && (
-            <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-bold mr-1.5 ${
-                badgeColorMap[badge.color || 'emerald'] || badgeColorMap.emerald
-              }`}
-            >
-              {badge.text}
-            </span>
-          )}
-          {trend && (
-            <span
-              className={`inline-flex items-center font-bold mr-1.5 ${
-                trend.neutral
-                  ? 'text-slate-600'
-                  : trend.isUp
-                  ? 'text-emerald-600'
-                  : 'text-rose-600'
-              }`}
-            >
-              {!trend.neutral && (
-                trend.isUp ? (
-                  <ArrowUpRight className="w-3.5 h-3.5 mr-0.5" />
-                ) : (
-                  <ArrowDownRight className="w-3.5 h-3.5 mr-0.5" />
-                )
-              )}
-              {trend.value}
-            </span>
-          )}
-          {subtext && <span className="text-slate-500">{subtext}</span>}
-        </div>
-      )}
+      {content}
     </div>
   );
 };

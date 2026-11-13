@@ -20,6 +20,9 @@ import {
   Scale,
   DollarSign,
   ChevronDown,
+  Edit,
+  X,
+  CheckCircle2,
 } from 'lucide-react';
 import { EggProduction, Flock, Farm } from '../types/farm';
 import {
@@ -37,6 +40,7 @@ interface EggProductionViewProps {
   eggProductions: EggProduction[];
   flocks: Flock[];
   onOpenRecordModal: (type: 'egg') => void;
+  onEditEgg?: (updated: EggProduction) => void;
   farms?: Farm[];
   selectedFarmId?: string;
   onSelectFarm?: (farmId: string) => void;
@@ -49,6 +53,7 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
   eggProductions,
   flocks,
   onOpenRecordModal,
+  onEditEgg,
   farms = [],
   selectedFarmId = 'farm-1',
   onSelectFarm,
@@ -66,6 +71,8 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [preset, setPreset] = useState<DatePreset>('all');
+  const [editingEgg, setEditingEgg] = useState<EggProduction | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Sync external farm selection if changed
   useEffect(() => {
@@ -102,20 +109,30 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
     setCurrentPage(1);
   }, [searchTerm, selectedFlock, fromDate, toDate, preset]);
 
+  const getTodayDateStr = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   const handlePresetChange = (selectedPreset: DatePreset) => {
     setPreset(selectedPreset);
     if (selectedPreset === 'all') {
       setFromDate('');
       setToDate('');
     } else if (selectedPreset === 'today') {
-      setFromDate(latestDate);
-      setToDate(latestDate);
+      const todayStr = getTodayDateStr();
+      setFromDate(todayStr);
+      setToDate(todayStr);
     } else if (selectedPreset === '30d') {
-      const ref = new Date(latestDate);
+      const todayStr = getTodayDateStr();
+      const ref = new Date(todayStr);
       const prior = new Date(ref);
       prior.setDate(prior.getDate() - 30);
       setFromDate(prior.toISOString().split('T')[0]);
-      setToDate(latestDate);
+      setToDate(todayStr);
     }
   };
 
@@ -1350,12 +1367,13 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                 <th className="py-3 px-4 text-right">Broken</th>
                 <th className="py-3 px-4 text-center">Laying %</th>
                 <th className="py-3 px-4">Notes</th>
+                <th className="py-3 px-4 text-center w-24">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedProductions.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-8 text-center text-slate-400">
+                  <td colSpan={11} className="py-8 text-center text-slate-400">
                     No egg production records match the selected date range and filters.
                   </td>
                 </tr>
@@ -1405,6 +1423,17 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-slate-500 italic max-w-xs truncate">
                       {entry.notes || '—'}
+                    </td>
+                    <td className="py-3 px-4 text-center whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setEditingEgg(entry)}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                        title={`Edit record #${entry.id}`}
+                      >
+                        <Edit className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Edit</span>
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -1489,6 +1518,236 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
           </div>
         )}
       </TableCard>
+
+      {/* Toast Feedback */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center space-x-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-3">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Edit Egg Production Modal */}
+      {editingEgg && (
+        <EditEggModal
+          record={editingEgg}
+          flocks={flocks}
+          onClose={() => setEditingEgg(null)}
+          onSave={(updated) => {
+            onEditEgg?.(updated);
+            setEditingEgg(null);
+            setToastMessage(`Egg production record #${updated.id} updated.`);
+            setTimeout(() => setToastMessage(null), 3500);
+          }}
+        />
+      )}
     </div>
   );
 };
+
+interface EditEggModalProps {
+  record: EggProduction;
+  flocks: Flock[];
+  onClose: () => void;
+  onSave: (updated: EggProduction) => void;
+}
+
+const EditEggModal: React.FC<EditEggModalProps> = ({ record, flocks, onClose, onSave }) => {
+  const [date, setDate] = useState(record.date ? record.date.split('T')[0] : '');
+  const [flockId, setFlockId] = useState(String(record.flockId));
+  const [morningEggs, setMorningEggs] = useState<number>(record.morningEggs || 0);
+  const [eveningEggs, setEveningEggs] = useState<number>(record.eveningEggs || 0);
+  const [damagedEggs, setDamagedEggs] = useState<number>(record.damagedEggs || 0);
+  const [avgWeightGrams, setAvgWeightGrams] = useState<number>(record.avgWeightGrams || 60);
+  const [eggGrade, setEggGrade] = useState<string>(record.eggGrade || 'Standard');
+  const [notes, setNotes] = useState<string>(record.notes || '');
+
+  const totalEggs = Math.max(0, (Number(morningEggs) || 0) + (Number(eveningEggs) || 0));
+  const cleanEggs = Math.max(0, totalEggs - (Number(damagedEggs) || 0));
+  const cleanTrays = Math.floor(cleanEggs / 30);
+  const cartons = Math.floor(totalEggs / 360);
+  const looseEggs = totalEggs % 30;
+
+  const matchedFlock =
+    flocks.find((f) => String(f.id) === String(flockId)) ||
+    flocks.find((f) => f.name === record.flockName) ||
+    flocks[0];
+  const birdCount = matchedFlock?.currentCount || 25000;
+  const layingRatePercent = birdCount > 0 ? Number(((totalEggs / birdCount) * 100).toFixed(1)) : record.layingRatePercent;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      ...record,
+      date,
+      flockId: matchedFlock ? matchedFlock.id : flockId,
+      flockName: matchedFlock ? matchedFlock.name : record.flockName,
+      morningEggs: Number(morningEggs) || 0,
+      eveningEggs: Number(eveningEggs) || 0,
+      totalEggs,
+      damagedEggs: Number(damagedEggs) || 0,
+      cleanTrays,
+      layingRatePercent,
+      cartons,
+      looseEggs,
+      eggGrade,
+      avgWeightGrams: Number(avgWeightGrams) || 60,
+      notes: notes.trim() || undefined,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-6 my-auto">
+        <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+          <div>
+            <h3 className="text-lg font-black text-slate-900">Edit Egg Production Record #{record.id}</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Update shift counts, broken eggs, or flock assignment</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Production Date</label>
+              <input
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Flock / Shed</label>
+              <select
+                value={flockId}
+                onChange={(e) => setFlockId(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none font-semibold bg-white"
+              >
+                {flocks.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} ({f.shedNumber})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Morning Eggs (A.M.)</label>
+              <input
+                type="number"
+                min={0}
+                required
+                value={morningEggs}
+                onChange={(e) => setMorningEggs(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none font-mono font-bold"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Evening Eggs (P.M.)</label>
+              <input
+                type="number"
+                min={0}
+                required
+                value={eveningEggs}
+                onChange={(e) => setEveningEggs(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none font-mono font-bold"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Broken / Cracked Eggs</label>
+              <input
+                type="number"
+                min={0}
+                value={damagedEggs}
+                onChange={(e) => setDamagedEggs(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none font-mono font-bold text-rose-700"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Egg Grade</label>
+              <select
+                value={eggGrade}
+                onChange={(e) => setEggGrade(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white"
+              >
+                <option value="Standard">Standard</option>
+                <option value="Large">Large</option>
+                <option value="Extra Large">Extra Large</option>
+                <option value="Pullet">Pullet</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Avg Egg Weight (g)</label>
+              <input
+                type="number"
+                step="0.1"
+                min={30}
+                max={90}
+                value={avgWeightGrams}
+                onChange={(e) => setAvgWeightGrams(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl grid grid-cols-3 gap-2 text-center">
+            <div>
+              <span className="text-[10px] font-bold uppercase text-amber-800 block">Calculated Total</span>
+              <span className="font-mono font-black text-slate-900 text-sm">{totalEggs.toLocaleString()} eggs</span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold uppercase text-amber-800 block">Clean Cartons</span>
+              <span className="font-mono font-black text-emerald-800 text-sm">{(cleanTrays / 12).toFixed(1)} ctn</span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold uppercase text-amber-800 block">Laying %</span>
+              <span className="font-mono font-black text-emerald-700 text-sm">{layingRatePercent}%</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Notes</label>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Optional collection or quality notes..."
+              className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2.5 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-sm cursor-pointer"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+

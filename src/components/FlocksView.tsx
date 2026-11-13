@@ -84,11 +84,7 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
   const inactiveFlocks = filteredFlocks.filter((f) => f.status !== 'Active').length;
   const totalBirds = filteredFlocks.reduce((acc, f) => acc + (f.currentCount || f.initialCount || 0), 0);
   
-  // Total mortality: matching live system screenshot (15) for GreenOva or computed mortality for other farms
-  const computedMortality = filteredFlocks.reduce((acc, f) => acc + (f.mortality || 0), 0);
-  const totalMortality = isFirstFarm 
-    ? (computedMortality > 0 ? computedMortality : 15)
-    : computedMortality;
+  const totalMortality = filteredFlocks.reduce((acc, f) => acc + (f.mortality || 0), 0);
 
   const handleOpenAddModal = () => {
     // Generate next sequential numeric ID
@@ -139,17 +135,29 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
     const finalFarmName = chosenFarm ? chosenFarm.name : formData.farmName;
 
     if (editingFlock) {
+      const prevCount = editingFlock.currentCount || editingFlock.initialCount;
+      const enteredBirds = Number(formData.totalBirds);
+      const prevMort = editingFlock.mortality || 0;
+      const newMort = Number(formData.mortality) || 0;
+      const mortDelta = newMort - prevMort;
+
+      // If user increased/changed mortality without manually editing Total Birds, deduct delta automatically
+      const nextCurrentCount =
+        enteredBirds === prevCount && mortDelta !== 0
+          ? Math.max(0, enteredBirds - mortDelta)
+          : Math.max(0, enteredBirds);
+
       const updated: Flock = {
         ...editingFlock,
         name: formData.name,
         startDate: formData.startDate,
         farmId: formData.farmId || editingFlock.farmId,
         farmName: finalFarmName,
-        initialCount: Number(formData.totalBirds),
-        currentCount: Number(formData.totalBirds),
+        initialCount: Math.max(editingFlock.initialCount || 0, nextCurrentCount),
+        currentCount: nextCurrentCount,
         ageWeeks: Number(formData.ageWeeks),
         status: formData.status as any,
-        mortality: Number(formData.mortality),
+        mortality: newMort,
       };
       if (onEditFlock) {
         onEditFlock(updated);

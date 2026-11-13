@@ -17,56 +17,26 @@ import { StatCard, UIButton, UIInput, UITextarea } from './ui';
 interface FarmsViewProps {
   farms: Farm[];
   flocks: Flock[];
+  onAddFarm?: (farm: Farm) => void;
+  onEditFarm?: (farm: Farm) => void;
+  onDeleteFarm?: (id: string) => void;
   onUpdateFarms?: (farms: Farm[]) => void;
 }
 
-const defaultInitialFarms: Farm[] = [
-  {
-    id: 'farm-1',
-    name: 'GreenOva',
-    code: 'GVF2025',
-    location: 'Multan, Punjab',
-    description: 'Main Processing Facility',
-    capacity: 100000,
-    currentBirds: 85500,
-    shedsCount: 3,
-    manager: 'Ahsan Nawaz (Super Admin)',
-    temperature: 25.4,
-    humidity: 58,
-  },
-  {
-    id: 'farm-2',
-    name: 'GreenOva South Unit',
-    code: 'GVF-SOUTH',
-    location: 'Khanewal Road, Multan',
-    description: 'Layer and Broiler Complex',
-    capacity: 50000,
-    currentBirds: 47000,
-    shedsCount: 2,
-    manager: 'Mustafa (Supervisor)',
-    temperature: 24.8,
-    humidity: 55,
-  },
-];
-
-export const FarmsView: React.FC<FarmsViewProps> = ({ farms: initialPropsFarms, flocks, onUpdateFarms }) => {
-  const [farmList, setFarmList] = useState<Farm[]>(() => {
-    if (initialPropsFarms && initialPropsFarms.length > 0) return initialPropsFarms;
-    const saved = localStorage.getItem('greenova_farm_records');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // fallback
-      }
-    }
-    return defaultInitialFarms;
-  });
+export const FarmsView: React.FC<FarmsViewProps> = ({
+  farms,
+  flocks,
+  onAddFarm,
+  onEditFarm,
+  onDeleteFarm,
+  onUpdateFarms,
+}) => {
+  const [farmList, setFarmList] = useState<Farm[]>(farms);
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    localStorage.setItem('greenova_farm_records', JSON.stringify(farmList));
-    onUpdateFarms?.(farmList);
-  }, [farmList]);
+    setFarmList(farms);
+  }, [farms]);
 
   const [showModal, setShowModal] = useState(false);
   const [editingFarmId, setEditingFarmId] = useState<string | null>(null);
@@ -79,6 +49,11 @@ export const FarmsView: React.FC<FarmsViewProps> = ({ farms: initialPropsFarms, 
     capacity: 50000,
     manager: 'Farm Supervisor',
   });
+
+  const showNotice = (msg: string) => {
+    setNoticeMessage(msg);
+    setTimeout(() => setNoticeMessage(null), 3500);
+  };
 
   const handleOpenAdd = () => {
     setEditingFarmId(null);
@@ -108,10 +83,13 @@ export const FarmsView: React.FC<FarmsViewProps> = ({ farms: initialPropsFarms, 
 
   const handleDelete = (id: string) => {
     if (farmList.length <= 1) {
-      alert('At least one farm record must be maintained.');
+      showNotice('At least one farm record must be maintained.');
       return;
     }
-    setFarmList(farmList.filter((f) => f.id !== id));
+    const nextList = farmList.filter((f) => String(f.id) !== String(id));
+    setFarmList(nextList);
+    onDeleteFarm?.(id);
+    onUpdateFarms?.(nextList);
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -119,21 +97,27 @@ export const FarmsView: React.FC<FarmsViewProps> = ({ farms: initialPropsFarms, 
     if (!formData.name.trim()) return;
 
     if (editingFarmId) {
-      setFarmList(
-        farmList.map((f) =>
-          f.id === editingFarmId
-            ? {
-                ...f,
-                name: formData.name,
-                code: formData.code || `GVF-${Date.now().toString().slice(-4)}`,
-                location: formData.location || 'Multan, Punjab',
-                description: formData.description || 'Farm Unit',
-                capacity: Number(formData.capacity),
-                manager: formData.manager,
-              }
-            : f
-        )
-      );
+      const existing = farmList.find((f) => String(f.id) === String(editingFarmId));
+      const updatedFarm: Farm = {
+        ...(existing || {
+          id: editingFarmId,
+          currentBirds: 0,
+          shedsCount: 1,
+          temperature: 25,
+          humidity: 56,
+        }),
+        id: editingFarmId,
+        name: formData.name,
+        code: formData.code || `GVF-${Date.now().toString().slice(-4)}`,
+        location: formData.location || 'Multan, Punjab',
+        description: formData.description || 'Farm Unit',
+        capacity: Number(formData.capacity),
+        manager: formData.manager,
+      };
+      const nextList = farmList.map((f) => (String(f.id) === String(editingFarmId) ? updatedFarm : f));
+      setFarmList(nextList);
+      onEditFarm?.(updatedFarm);
+      onUpdateFarms?.(nextList);
     } else {
       const newFarm: Farm = {
         id: `farm-${Date.now()}`,
@@ -148,7 +132,10 @@ export const FarmsView: React.FC<FarmsViewProps> = ({ farms: initialPropsFarms, 
         temperature: 25.0,
         humidity: 56,
       };
-      setFarmList([...farmList, newFarm]);
+      const nextList = [...farmList, newFarm];
+      setFarmList(nextList);
+      onAddFarm?.(newFarm);
+      onUpdateFarms?.(nextList);
     }
 
     setShowModal(false);
@@ -159,6 +146,11 @@ export const FarmsView: React.FC<FarmsViewProps> = ({ farms: initialPropsFarms, 
 
   return (
     <div className="space-y-6">
+      {noticeMessage && (
+        <div className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold">
+          {noticeMessage}
+        </div>
+      )}
       {/* Top Header matching Screenshot: "Farm Records" & "+ Add Farm" button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

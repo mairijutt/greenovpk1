@@ -25,7 +25,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
   onNavigateTab,
 }) => {
   const [flockId, setFlockId] = useState('');
-  const [recordDate, setRecordDate] = useState('2026-10-24');
+  const [recordDate, setRecordDate] = useState('2026-11-12');
 
   // Egg fields matching user screenshot & comprehensive poultry options
   const [cartons, setCartons] = useState<number>(56);
@@ -61,9 +61,9 @@ export const RecordModal: React.FC<RecordModalProps> = ({
           setFlockId(flocks[0].id);
         }
       }
-      // Default to 24 Oct 2026 or today's date
+      // Dynamic operational date
       const todayIso = new Date().toISOString().split('T')[0];
-      setRecordDate(todayIso >= '2026-10-24' ? todayIso : '2026-10-24');
+      setRecordDate(todayIso >= '2026-11-09' ? todayIso : '2026-11-12');
     }
   }, [isOpen, flocks]);
 
@@ -107,7 +107,9 @@ export const RecordModal: React.FC<RecordModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const today = recordDate || '2026-10-24';
+    const now = new Date();
+    const fallbackToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const today = recordDate || fallbackToday;
 
     if (type === 'egg') {
       const newEggRecord: EggProduction = {

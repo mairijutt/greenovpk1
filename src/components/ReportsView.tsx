@@ -21,9 +21,31 @@ import {
   Package,
   Truck,
   Boxes,
+  BarChart3,
+  Calendar,
 } from 'lucide-react';
-import { Flock, EggProduction, MortalityLog, FeedConsumption, FinancialRecord } from '../types/farm.ts';
+import {
+  Flock,
+  EggProduction,
+  MortalityLog,
+  FeedConsumption,
+  FinancialRecord,
+  InventoryItem,
+  BankAccount,
+} from '../types/farm.ts';
 import { StatCard, PageHeader, UIButton, TableCard, DatePreset } from './ui';
+import { initialInventory } from '../data/mockData.ts';
+import { liveExpenseRecords, liveConsumptionRecords } from '../data/productionData.ts';
+import { CeoIncomeExpenseReport } from './CeoIncomeExpenseReport.tsx';
+import {
+  MONTH_OPTIONS,
+  getMonthDateBounds,
+  getAdjacentMonthLabel,
+  computeCeoSummary,
+  computeMonthlyBreakdown,
+  computeBankBalances,
+  normalizeDateStr,
+} from '../utils/ceoReportCalculations.ts';
 import {
   SALES_SUMMARY,
   liveSalesBreakdown,
@@ -50,9 +72,20 @@ interface ReportsViewProps {
   mortalityLogs: MortalityLog[];
   consumptionLogs: FeedConsumption[];
   financials?: FinancialRecord[];
+  inventory?: InventoryItem[];
+  bankAccounts?: BankAccount[];
+  onAddBank?: (bank: BankAccount) => void;
+  onEditBank?: (bank: BankAccount) => void;
+  onDeleteBank?: (id: string) => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
-type ReportType = 'egg-production' | 'sales-revenue' | 'stock-inventory' | 'flock-health';
+type ReportType =
+  | 'income-vs-expense'
+  | 'egg-production'
+  | 'sales-revenue'
+  | 'stock-inventory'
+  | 'flock-health';
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
   flocks,
@@ -60,39 +93,117 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   mortalityLogs,
   consumptionLogs,
   financials = [],
+  inventory = [],
+  bankAccounts = [],
+  onAddBank = () => {},
+  onEditBank = () => {},
+  onDeleteBank = () => {},
+  onNavigateTab,
 }) => {
-  const [activeReport, setActiveReport] = useState<ReportType>('egg-production');
+  const defaultYear = String(new Date().getFullYear());
+  const defaultMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+  const initialBounds = getMonthDateBounds(defaultYear, defaultMonth);
+
+  const [activeReport, setActiveReport] = useState<ReportType>('income-vs-expense');
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [fromDate, setFromDate] = useState<string>('');
-  const [toDate, setToDate] = useState<string>('');
-  const [preset, setPreset] = useState<DatePreset>('all');
+  const [selectedYear, setSelectedYear] = useState<string>(defaultYear);
+  const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
+  const [fromDate, setFromDate] = useState<string>(initialBounds.from);
+  const [toDate, setToDate] = useState<string>(initialBounds.to);
+  const [preset, setPreset] = useState<DatePreset | 'month' | 'year'>('month');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [jumpPageInput, setJumpPageInput] = useState<string>('');
   const recordsPerPage = 10;
 
+  const getTodayDateStr = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   // Find latest reference date
   const latestDate = useMemo(() => {
-    return eggProductions[0]?.date || '2026-10-25';
+    return eggProductions[0]?.date || getTodayDateStr();
   }, [eggProductions]);
 
+  // Handle Month / Year dropdown changes
+  const handleMonthChange = (newMonth: string) => {
+    setSelectedMonth(newMonth);
+    setCurrentPage(1);
+    if (newMonth === 'all') {
+      const targetYear = selectedYear === 'all' ? defaultYear : selectedYear;
+      if (selectedYear === 'all') setSelectedYear(targetYear);
+      const bounds = getMonthDateBounds(targetYear, 'all');
+      setFromDate(bounds.from);
+      setToDate(bounds.to);
+      setPreset('year');
+    } else {
+      const targetYear = selectedYear === 'all' ? defaultYear : selectedYear;
+      if (selectedYear === 'all') setSelectedYear(targetYear);
+      const bounds = getMonthDateBounds(targetYear, newMonth);
+      setFromDate(bounds.from);
+      setToDate(bounds.to);
+      setPreset('month');
+    }
+  };
+
+  const handleYearChange = (newYear: string) => {
+    setSelectedYear(newYear);
+    setCurrentPage(1);
+    if (newYear === 'all') {
+      setSelectedMonth('all');
+      setFromDate('');
+      setToDate('');
+      setPreset('all');
+    } else {
+      const effMonth = selectedMonth === 'custom' ? 'all' : selectedMonth;
+      if (selectedMonth === 'custom') setSelectedMonth('all');
+      const bounds = getMonthDateBounds(newYear, effMonth);
+      setFromDate(bounds.from);
+      setToDate(bounds.to);
+      setPreset(effMonth === 'all' ? 'year' : 'month');
+    }
+  };
+
   // Handle Preset selection
-  const handlePresetChange = (selectedPreset: DatePreset) => {
+  const handlePresetChange = (selectedPreset: DatePreset | 'month' | 'year') => {
     setPreset(selectedPreset);
     setCurrentPage(1);
     if (selectedPreset === 'all') {
+      setSelectedYear('all');
+      setSelectedMonth('all');
       setFromDate('');
       setToDate('');
+    } else if (selectedPreset === 'month') {
+      setSelectedYear(defaultYear);
+      setSelectedMonth(defaultMonth);
+      const bounds = getMonthDateBounds(defaultYear, defaultMonth);
+      setFromDate(bounds.from);
+      setToDate(bounds.to);
+    } else if (selectedPreset === 'year') {
+      const targetYear = selectedYear === 'all' ? defaultYear : selectedYear;
+      setSelectedYear(targetYear);
+      setSelectedMonth('all');
+      const bounds = getMonthDateBounds(targetYear, 'all');
+      setFromDate(bounds.from);
+      setToDate(bounds.to);
     } else if (selectedPreset === 'today') {
-      setFromDate(latestDate);
-      setToDate(latestDate);
+      const todayStr = getTodayDateStr();
+      setSelectedMonth('custom');
+      setFromDate(todayStr);
+      setToDate(todayStr);
     } else if (selectedPreset === '30d') {
-      const ref = new Date(latestDate);
+      const todayStr = getTodayDateStr();
+      const ref = new Date(todayStr);
       const prior = new Date(ref);
       prior.setDate(prior.getDate() - 30);
+      setSelectedMonth('custom');
       setFromDate(prior.toISOString().split('T')[0]);
-      setToDate(latestDate);
+      setToDate(todayStr);
     }
   };
 
@@ -100,10 +211,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     setSelectedUnit('all');
     setSelectedCategory('all');
     setSearchQuery('');
-    setFromDate('');
-    setToDate('');
-    setPreset('all');
     setCurrentPage(1);
+    if (activeReport === 'income-vs-expense') {
+      setSelectedYear(defaultYear);
+      setSelectedMonth(defaultMonth);
+      const bounds = getMonthDateBounds(defaultYear, defaultMonth);
+      setFromDate(bounds.from);
+      setToDate(bounds.to);
+      setPreset('month');
+    } else {
+      setSelectedYear('all');
+      setSelectedMonth('all');
+      setFromDate('');
+      setToDate('');
+      setPreset('all');
+    }
   };
 
   // Egg Production dataset: prefer full liveEggProductions (413 records)
@@ -123,10 +245,59 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     return liveSalesRecords;
   }, [financials]);
 
-  // Stock dataset: 157 authentic records
+  // Expense dataset: prefer full liveExpenseRecords (1,378 records)
+  const expenseDataset: FinancialRecord[] = useMemo(() => {
+    const expenseFromFinancials = financials.filter((f) => f.type === 'Expense');
+    if (expenseFromFinancials.length >= 1378) {
+      return expenseFromFinancials;
+    }
+    return liveExpenseRecords;
+  }, [financials]);
+
+  // Feed consumption dataset: 157+ authentic records
+  const consumptionDataset: FeedConsumption[] = useMemo(() => {
+    if (consumptionLogs.length >= 157) {
+      return consumptionLogs;
+    }
+    return liveConsumptionRecords;
+  }, [consumptionLogs]);
+
+  // Stock dataset: 157+ authentic records + any newly logged stock shipments
   const stockDataset: StockRecord[] = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('greenova_stocks_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= liveStockRecords.length) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
     return liveStockRecords;
   }, []);
+
+  // Warehouse inventory dataset
+  const inventoryDataset: InventoryItem[] = useMemo(() => {
+    if (inventory && inventory.length > 0) return inventory;
+    try {
+      const saved = localStorage.getItem('greenova_inventory');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return initialInventory;
+  }, [inventory]);
+
+  // Available years discovered from records + defaultYear
+  const availableYears: string[] = useMemo(() => {
+    const years = new Set<string>([defaultYear]);
+    [...eggDataset, ...salesDataset, ...expenseDataset].forEach((r) => {
+      const d = normalizeDateStr(r.date);
+      if (d.length >= 4 && /^\d{4}/.test(d)) years.add(d.slice(0, 4));
+    });
+    return Array.from(years).sort().reverse();
+  }, [defaultYear, eggDataset, salesDataset, expenseDataset]);
 
   // --- FILTERED EGG PRODUCTIONS ---
   const filteredEggs = useMemo(() => {
@@ -276,9 +447,115 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     return { totalBags, totalAmount, avgCost, count: filteredStocks.length };
   }, [filteredStocks]);
 
+  // --- CEO INCOME VS EXPENSES ANALYTICS CALCULATIONS ---
+  const ceoPeriodLabels = useMemo(() => {
+    if (selectedMonth === 'custom') {
+      return {
+        periodLabel: `${fromDate || 'Start'} to ${toDate || 'Latest'}`,
+        prevPeriodLabel: fromDate ? `Before ${fromDate}` : 'Prior Periods',
+        nextPeriodLabel: toDate ? `After ${toDate}` : 'Subsequent Periods',
+      };
+    }
+    if (selectedYear === 'all' && selectedMonth === 'all') {
+      return {
+        periodLabel: 'All Recorded Periods (Cumulative Audit)',
+        prevPeriodLabel: 'Opening Balance',
+        nextPeriodLabel: 'Next Operating Cycle',
+      };
+    }
+    if (selectedMonth === 'all') {
+      return {
+        periodLabel: `Full Year ${selectedYear}`,
+        prevPeriodLabel: `Prior to ${selectedYear}`,
+        nextPeriodLabel: `Opening ${Number(selectedYear) + 1}`,
+      };
+    }
+    const mName = MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label || selectedMonth;
+    return {
+      periodLabel: `${mName} ${selectedYear}`,
+      prevPeriodLabel: getAdjacentMonthLabel(selectedYear, selectedMonth, -1),
+      nextPeriodLabel: getAdjacentMonthLabel(selectedYear, selectedMonth, 1),
+    };
+  }, [selectedYear, selectedMonth, fromDate, toDate]);
+
+  const computeUnitCeo = (unitKey: string) =>
+    computeCeoSummary({
+      flocks,
+      eggProductions: eggDataset,
+      salesRecords: salesDataset,
+      expenseRecords: expenseDataset,
+      consumptionLogs: consumptionDataset,
+      stockRecords: stockDataset,
+      inventory: inventoryDataset,
+      selectedUnit: unitKey,
+      fromDate,
+      toDate,
+      periodLabel: ceoPeriodLabels.periodLabel,
+      prevPeriodLabel: ceoPeriodLabels.prevPeriodLabel,
+      nextPeriodLabel: ceoPeriodLabels.nextPeriodLabel,
+    });
+
+  const ceoAllMetrics = useMemo(
+    () => computeUnitCeo('all'),
+    [flocks, eggDataset, salesDataset, expenseDataset, consumptionDataset, stockDataset, inventoryDataset, fromDate, toDate, ceoPeriodLabels]
+  );
+
+  const ceoUnit1Metrics = useMemo(
+    () => computeUnitCeo('Unit 1'),
+    [flocks, eggDataset, salesDataset, expenseDataset, consumptionDataset, stockDataset, inventoryDataset, fromDate, toDate, ceoPeriodLabels]
+  );
+
+  const ceoUnit2Metrics = useMemo(
+    () => computeUnitCeo('Unit 2'),
+    [flocks, eggDataset, salesDataset, expenseDataset, consumptionDataset, stockDataset, inventoryDataset, fromDate, toDate, ceoPeriodLabels]
+  );
+
+  const ceoUnit3Metrics = useMemo(
+    () => computeUnitCeo('Unit 3'),
+    [flocks, eggDataset, salesDataset, expenseDataset, consumptionDataset, stockDataset, inventoryDataset, fromDate, toDate, ceoPeriodLabels]
+  );
+
+  const activeCeoMetrics =
+    selectedUnit === 'Unit 1'
+      ? ceoUnit1Metrics
+      : selectedUnit === 'Unit 2'
+      ? ceoUnit2Metrics
+      : selectedUnit === 'Unit 3'
+      ? ceoUnit3Metrics
+      : ceoAllMetrics;
+
+  const ceoMonthlyRows = useMemo(
+    () =>
+      computeMonthlyBreakdown({
+        flocks,
+        eggProductions: eggDataset,
+        salesRecords: salesDataset,
+        expenseRecords: expenseDataset,
+        consumptionLogs: consumptionDataset,
+        stockRecords: stockDataset,
+        inventory: inventoryDataset,
+        selectedUnit,
+        selectedYear,
+      }),
+    [flocks, eggDataset, salesDataset, expenseDataset, consumptionDataset, stockDataset, inventoryDataset, selectedUnit, selectedYear]
+  );
+
+  const bankSummary = useMemo(
+    () =>
+      computeBankBalances({
+        bankAccounts,
+        salesRecords: salesDataset,
+        fromDate,
+        toDate,
+      }),
+    [bankAccounts, salesDataset, fromDate, toDate]
+  );
+
   // Pagination calculation
   const currentDatasetLength =
-    activeReport === 'egg-production'
+    activeReport === 'income-vs-expense'
+      ? activeCeoMetrics.salesCount + activeCeoMetrics.expenseCount + activeCeoMetrics.eggLogCount
+      : activeReport === 'egg-production'
       ? filteredEggs.length
       : activeReport === 'sales-revenue'
       ? filteredSales.length
@@ -323,7 +600,78 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   };
 
   const handleExportCSV = () => {
-    if (activeReport === 'egg-production') {
+    if (activeReport === 'income-vs-expense') {
+      const m = activeCeoMetrics;
+      const lines: string[] = [
+        `GreenOva Income vs Expenses Executive Summary,${m.periodLabel},${selectedUnit === 'all' ? 'All Units Combined' : selectedUnit}`,
+        '',
+        'EXECUTIVE KPI SUMMARY',
+        'Metric,Value,Details',
+        `Total Productions (Cartons),${Math.round(m.totalCartonsProduced)},${m.totalEggsProduced} Eggs | ${m.brokenEggs} Broken | ${m.avgLayingRate.toFixed(1)}% Laying`,
+        `Total Cartons Sold,${Math.round(m.cartonsSold)},${m.eggsSold} Eggs | ${m.eggSalesCount} Egg Bills | Avg Rs. ${Math.round(m.avgCartonPrice)}/ctn`,
+        `Total Sale (PKR),${Math.round(m.totalSalesRevenue)},${m.salesCount} Bills | Egg Sales: ${Math.round(m.eggSalesRevenue)} | Other: ${Math.round(m.otherSalesRevenue)}`,
+        `Total Expense (PKR),${Math.round(m.totalExpenses)},${m.expenseCount} Vouchers | COGS: ${Math.round(m.cogsExpenses)} | OPEX: ${Math.round(m.operatingExpenses)}`,
+        `Net Income (PKR),${Math.round(m.netIncome)},Net Margin: ${m.netMarginPercent.toFixed(1)}% | Operating Margin Excl CAPEX: ${m.operatingMarginPercent.toFixed(1)}%`,
+        `Total Feed Consumption (Bags),${m.feedConsumedBags},${m.feedConsumedKg} kg | Feed Expense: Rs. ${Math.round(m.feedExpenses)}`,
+        `Remaining Production (Cartons),${Math.round(m.carriedNextCartons)},${m.carriedNextEggs} Eggs On Hand | Period Net: ${Math.round(m.periodRemainingCartons)} Ctns`,
+        `Remaining Feed (Bags),${m.remainingFeedBags},${m.remainingFeedKg} kg Remaining (incl. ${m.warehouseReserveBags} warehouse reserve bags)`,
+        `Carried Forward From Previous Month (${m.prevPeriodLabel}),${Math.round(m.carriedPrevCartons)} Ctns Eggs,${m.carriedPrevFeedBags} Bags Feed | Opening Net Cash: Rs. ${Math.round(m.carriedPrevNetCash)}`,
+        `Carried Forward To Next Month (${m.nextPeriodLabel}),${Math.round(m.carriedNextCartons)} Ctns Eggs,${m.carriedNextFeedBags} Bags Feed | Closing Net Cash: Rs. ${Math.round(m.carriedNextNetCash)}`,
+        `Average Carton Price (PKR),${Math.round(m.avgCartonPrice)},Rs. ${m.avgEggPrice.toFixed(2)} per egg (${Math.round(m.cartonsSold)} ctns sold)`,
+        `Average Per Bird Cost (PKR),${Math.round(m.avgPerBirdCost)},Active Birds: ${m.activeBirds} | Rev/Bird: Rs. ${Math.round(m.avgPerBirdRevenue)} | Net/Bird: Rs. ${Math.round(m.avgPerBirdNet)}`,
+        '',
+        'BANK BALANCES LEDGER',
+        'Bank Name,Account Title,Account No,Opening Date,Opening Balance (PKR),Period Sales Added (PKR),Total Sales Added (PKR),Current Live Balance (PKR)',
+        ...bankSummary.banks.map(
+          (b) =>
+            `"${b.bank.bankName}","${b.bank.accountTitle}","${b.bank.accountNumber}","${b.bank.openingDate}",${Math.round(b.openingBalance)},${Math.round(b.salesInPeriod)},${Math.round(b.totalSalesAdded)},${Math.round(b.currentBalance)}`
+        ),
+        `Total All Banks,,,,${Math.round(bankSummary.totalOpeningBalance)},${Math.round(bankSummary.totalPeriodSalesAddedToBanks)},${Math.round(bankSummary.totalSalesAddedToBanks)},${Math.round(bankSummary.totalCurrentBankBalance)}`,
+        '',
+        'UNIT-WISE COMPARATIVE SUMMARY',
+        'Unit,Active Birds,Production (Ctns),Cartons Sold,Total Sale (PKR),Total Expense (PKR),Net Income (PKR),Feed Consumed (Bags),Rem Production (Ctns),Rem Feed (Bags),Avg Carton Price (PKR),Avg Cost Per Bird (PKR)',
+        ...[
+          { name: 'Unit 1', u: ceoUnit1Metrics },
+          { name: 'Unit 2', u: ceoUnit2Metrics },
+          { name: 'Unit 3', u: ceoUnit3Metrics },
+          { name: 'All Units Combined', u: ceoAllMetrics },
+        ].map(
+          ({ name, u }) =>
+            `${name},${u.activeBirds},${Math.round(u.totalCartonsProduced)},${Math.round(u.cartonsSold)},${Math.round(u.totalSalesRevenue)},${Math.round(u.totalExpenses)},${Math.round(u.netIncome)},${u.feedConsumedBags},${Math.round(u.carriedNextCartons)},${u.remainingFeedBags},${Math.round(u.avgCartonPrice)},${Math.round(u.avgPerBirdCost)}`
+        ),
+        '',
+        'MONTHLY ROLLOVER LEDGER',
+        'Month,C/F Prev (Ctns),Produced (Ctns),Sold (Ctns),Rem Prod Next (Ctns),Total Sale (PKR),Total Expense (PKR),Net Income (PKR),Feed Consumed (Bags),Rem Feed (Bags),Avg Carton Price (PKR),Avg Cost/Bird (PKR)',
+        ...ceoMonthlyRows.map(
+          (r) =>
+            `"${r.monthLabel}",${Math.round(r.carriedPrevCartons)},${Math.round(r.totalCartonsProduced)},${Math.round(r.cartonsSold)},${Math.round(r.carriedNextCartons)},${Math.round(r.totalSales)},${Math.round(r.totalExpenses)},${Math.round(r.netIncome)},${r.feedConsumedBags},${r.remainingFeedBags},${Math.round(r.avgCartonPrice)},${Math.round(r.avgPerBirdCost)}`
+        ),
+        '',
+        'SIMPLIFIED INCOME STATEMENT (PROFIT & LOSS)',
+        'Particulars,Amount (PKR),% of Revenue',
+        `Egg Sales Revenue,${Math.round(m.eggSalesRevenue)},${m.totalSalesRevenue > 0 ? ((m.eggSalesRevenue / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Other Farm Sales,${Math.round(m.otherSalesRevenue)},${m.totalSalesRevenue > 0 ? ((m.otherSalesRevenue / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Total Revenue (A),${Math.round(m.totalSalesRevenue)},${m.totalSalesRevenue > 0 ? '100.0%' : '0.0%'}`,
+        `Feed Expenses,${Math.round(m.feedExpenses)},${m.totalSalesRevenue > 0 ? ((m.feedExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Chicken / Flock Purchases (CAPEX),${Math.round(m.chickenCapexExpenses)},${m.totalSalesRevenue > 0 ? ((m.chickenCapexExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Medicine & Vaccines,${Math.round(m.medicineVaccineExpenses)},${m.totalSalesRevenue > 0 ? ((m.medicineVaccineExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Total Cost of Goods Sold (B),${Math.round(m.cogsExpenses)},${m.totalSalesRevenue > 0 ? ((m.cogsExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Gross Profit / (Loss) (A - B),${Math.round(m.totalSalesRevenue - m.cogsExpenses)},${m.totalSalesRevenue > 0 ? (((m.totalSalesRevenue - m.cogsExpenses) / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Staff Salaries & Labor,${Math.round(m.salariesExpenses)},${m.totalSalesRevenue > 0 ? ((m.salariesExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Utilities Electricity & Fuel (POL),${Math.round(m.utilitiesPolExpenses)},${m.totalSalesRevenue > 0 ? ((m.utilitiesPolExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Other Farm Overheads,${Math.round(Math.max(0, m.operatingExpenses - m.salariesExpenses - m.utilitiesPolExpenses))},${m.totalSalesRevenue > 0 ? ((Math.max(0, m.operatingExpenses - m.salariesExpenses - m.utilitiesPolExpenses) / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Total Operating Expenses (C),${Math.round(m.operatingExpenses)},${m.totalSalesRevenue > 0 ? ((m.operatingExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Total Expenses (B + C),${Math.round(m.totalExpenses)},${m.totalSalesRevenue > 0 ? ((m.totalExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
+        `Net Income / (Net Loss),${Math.round(m.netIncome)},${m.netMarginPercent.toFixed(1)}%`,
+      ];
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `GreenOva_Income_vs_Expense_Summary_${selectedUnit}_${selectedYear}_${selectedMonth}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else if (activeReport === 'egg-production') {
       const headers =
         'Tracking ID,Date,Flock/Unit,Morning Eggs,Evening Eggs,Total Eggs,Cartons (360/ctn),Damaged/Broken,Clean Trays (30s),Avg Weight (g),Laying Rate %\n';
       const rows = filteredEggs
@@ -402,7 +750,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               icon={Download}
               onClick={handleExportCSV}
             >
-              Export CSV ({currentDatasetLength.toLocaleString()})
+              {activeReport === 'income-vs-expense'
+                ? 'Export Summary CSV'
+                : `Export CSV (${currentDatasetLength.toLocaleString()})`}
             </UIButton>
             <UIButton
               variant="primary"
@@ -417,6 +767,30 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
       {/* Main Report Navigation Tabs */}
       <div className="flex items-center space-x-2 border-b border-slate-200 pb-2 overflow-x-auto">
+        <button
+          onClick={() => {
+            setActiveReport('income-vs-expense');
+            setCurrentPage(1);
+          }}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+            activeReport === 'income-vs-expense'
+              ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-900/20'
+              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 text-emerald-400" />
+          <span>Income vs Expenses Summary</span>
+          <span
+            className={`ml-1 text-[10px] px-2 py-0.5 rounded-full ${
+              activeReport === 'income-vs-expense'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-emerald-50 text-emerald-700'
+            }`}
+          >
+            Executive Summary
+          </span>
+        </button>
+
         <button
           onClick={() => {
             setActiveReport('egg-production');
@@ -518,7 +892,70 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {activeReport === 'egg-production' ? (
+          {activeReport === 'income-vs-expense' ? (
+            <>
+              {[
+                { key: 'all', label: 'All Units Combined', data: ceoAllMetrics },
+                { key: 'Unit 1', label: 'Unit 1', data: ceoUnit1Metrics },
+                { key: 'Unit 2', label: 'Unit 2', data: ceoUnit2Metrics },
+                { key: 'Unit 3', label: 'Unit 3', data: ceoUnit3Metrics },
+              ].map(({ key, label, data }) => {
+                const isSelected = selectedUnit === key;
+                const isProfit = data.netIncome >= 0;
+                const fmtM = (val: number) => {
+                  const sign = val < 0 ? '-' : '';
+                  const abs = Math.abs(val);
+                  return abs >= 1_000_000
+                    ? `${sign}Rs. ${(abs / 1_000_000).toFixed(2)}M`
+                    : `${sign}Rs. ${Math.round(abs).toLocaleString()}`;
+                };
+
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedUnit(key);
+                      setCurrentPage(1);
+                    }}
+                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                        : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-emerald-400'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center text-[11px] font-bold">
+                      <span>{label}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                          isSelected
+                            ? isProfit
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-rose-600 text-white'
+                            : isProfit
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
+                        {isProfit ? '+' : ''}
+                        {data.netMarginPercent.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="text-xs font-black mt-1">
+                      Net: {fmtM(data.netIncome)}
+                    </div>
+                    <div
+                      className={`text-[10px] font-medium mt-0.5 ${
+                        isSelected ? 'text-slate-300' : 'text-slate-500'
+                      }`}
+                    >
+                      Sale: {fmtM(data.totalSalesRevenue)} • Exp: {fmtM(data.totalExpenses)}
+                    </div>
+                  </button>
+                );
+              })}
+            </>
+          ) : activeReport === 'egg-production' ? (
             <>
               <button
                 type="button"
@@ -816,29 +1253,65 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
       </div>
 
-      {/* Date & Search Filter Bar */}
+      {/* Date, Month/Year & Search Filter Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          {/* Search Input */}
-          <div className="relative min-w-[220px]">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder={
-                activeReport === 'egg-production'
-                  ? 'Search by ID, date, flock...'
-                  : activeReport === 'sales-revenue'
-                  ? 'Search by ID, vehicle, category...'
-                  : 'Search by ID, challan, D.O. #, notes...'
-              }
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
-            />
+          {/* Month & Year Selectors */}
+          <div className="flex items-center space-x-2 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
+            <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span className="text-slate-500 font-semibold">Month:</span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => handleMonthChange(e.target.value)}
+              aria-label="Select Report Month"
+              className="bg-transparent font-bold text-slate-800 focus:outline-hidden cursor-pointer py-0.5"
+            >
+              {selectedMonth === 'custom' && <option value="custom">Custom Range</option>}
+              {MONTH_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-500 font-semibold">Year:</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => handleYearChange(e.target.value)}
+              aria-label="Select Report Year"
+              className="bg-transparent font-bold text-slate-800 focus:outline-hidden cursor-pointer py-0.5"
+            >
+              <option value="all">All Years</option>
+              {availableYears.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {/* Search Input (shown for detailed audit registries) */}
+          {activeReport !== 'income-vs-expense' && (
+            <div className="relative min-w-[220px]">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder={
+                  activeReport === 'egg-production'
+                    ? 'Search by ID, date, flock...'
+                    : activeReport === 'sales-revenue'
+                    ? 'Search by ID, vehicle, category...'
+                    : 'Search by ID, challan, D.O. #, notes...'
+                }
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+              />
+            </div>
+          )}
 
           {/* Sales Category filter (if Sales Report is active) */}
           {activeReport === 'sales-revenue' && (
@@ -910,6 +1383,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               value={fromDate}
               onChange={(e) => {
                 setFromDate(e.target.value);
+                setSelectedMonth('custom');
                 setPreset('all');
                 setCurrentPage(1);
               }}
@@ -921,6 +1395,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               value={toDate}
               onChange={(e) => {
                 setToDate(e.target.value);
+                setSelectedMonth('custom');
                 setPreset('all');
                 setCurrentPage(1);
               }}
@@ -931,6 +1406,28 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
         {/* Date Presets */}
         <div className="flex items-center space-x-1">
+          <button
+            type="button"
+            onClick={() => handlePresetChange('month')}
+            className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+              preset === 'month'
+                ? 'bg-emerald-600 text-white font-bold'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Current Month
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePresetChange('year')}
+            className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+              preset === 'year'
+                ? 'bg-emerald-600 text-white font-bold'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Full Year
+          </button>
           <button
             type="button"
             onClick={() => handlePresetChange('all')}
@@ -962,6 +1459,34 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* --- REPORT VIEW 0: INCOME VS EXPENSES SUMMARY --- */}
+      {activeReport === 'income-vs-expense' && (
+        <CeoIncomeExpenseReport
+          metrics={activeCeoMetrics}
+          monthlyRows={ceoMonthlyRows}
+          unitMatrix={[
+            { unitName: 'Unit 1', metrics: ceoUnit1Metrics },
+            { unitName: 'Unit 2', metrics: ceoUnit2Metrics },
+            { unitName: 'Unit 3', metrics: ceoUnit3Metrics },
+            { unitName: 'All Units', metrics: ceoAllMetrics },
+          ]}
+          bankSummary={bankSummary}
+          bankAccounts={bankAccounts}
+          selectedUnit={selectedUnit}
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+          onSelectMonth={(m) => handleMonthChange(m)}
+          onSelectUnit={(u) => {
+            setSelectedUnit(u);
+            setCurrentPage(1);
+          }}
+          onAddBank={onAddBank}
+          onEditBank={onEditBank}
+          onDeleteBank={onDeleteBank}
+          onNavigateTab={onNavigateTab}
+        />
+      )}
 
       {/* --- REPORT VIEW 1: EGG PRODUCTION AUDIT REPORT --- */}
       {activeReport === 'egg-production' && (
@@ -1637,7 +2162,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               title="Period Mortality"
-              value={filteredMortality.reduce((acc, curr) => acc + curr.count, 0)}
+              value={
+                !fromDate && !toDate && selectedUnit === 'all'
+                  ? Math.max(
+                      filteredMortality.reduce((acc, curr) => acc + curr.count, 0),
+                      flocks.reduce((acc, f) => acc + (f.mortality || 0), 0)
+                    )
+                  : filteredMortality.reduce((acc, curr) => acc + curr.count, 0)
+              }
               unit="Birds"
               icon={HeartPulse}
               color="rose"
@@ -1702,7 +2234,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   (e) => e.flockId === flock.id || e.flockName === flock.name
                 );
                 const flockEggsCount = flockEggs.reduce((acc, curr) => acc + curr.totalEggs, 0);
-                const livability = ((flock.currentCount / flock.initialCount) * 100).toFixed(1);
+                const livability = flock.initialCount > 0 ? ((flock.currentCount / flock.initialCount) * 100).toFixed(1) : '100.0';
+                const flockMort = Math.max(
+                  flock.mortality || 0,
+                  filteredMortality
+                    .filter((m) => String(m.flockId) === String(flock.id) || m.flockName === flock.name)
+                    .reduce((s, m) => s + (m.count || 0), 0)
+                );
 
                 return (
                   <div
@@ -1732,6 +2270,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                         <span>Population:</span>
                         <span className="font-bold text-slate-900">
                           {flock.currentCount.toLocaleString()} birds
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Mortality:</span>
+                        <span className="font-bold text-rose-600">
+                          {flockMort.toLocaleString()} birds
                         </span>
                       </div>
                       <div className="flex justify-between">

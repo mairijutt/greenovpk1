@@ -29,6 +29,7 @@ export interface Flock {
   targetFCR?: number;
   cost?: number;
   notes?: string;
+  updatedAt?: string;
 }
 
 export interface EggProduction {
@@ -134,6 +135,20 @@ export interface FinancialRecord {
   onlinePayment?: number;
   cashPayment?: number;
   vehicleNumber?: string;
+  bankId?: string;
+  bankName?: string;
+}
+
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  accountTitle: string;
+  accountNumber: string;
+  openingBalance: number;
+  openingDate: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Worker {

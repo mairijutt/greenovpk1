@@ -18,19 +18,31 @@ export async function syncFromSupabase(stores: {
     ]);
 
     if (flockRes.rows.length > 0) {
-      const flocks = flockRes.rows.map((r: any) => ({
-        id: r.id,
-        farmId: r.farmId,
-        flockName: r.flockName,
-        breed: r.breed,
-        totalBirds: r.totalBirds,
-        originalTotalBirds: r.originalTotalBirds,
-        cost: r.cost,
-        isActive: r.isActive,
-        acquiredDate: r.acquiredDate ? new Date(r.acquiredDate).toISOString() : new Date().toISOString(),
-        notes: r.notes || '',
-        farm: { id: 9, name: 'GreenOva', code: 'GVF2025', location: 'Multan, Punjab' },
-      }));
+      const flocks = flockRes.rows.map((r: any) => {
+        const isSwapped =
+          (r.id === 8 && r.totalBirds === 25000 && r.originalTotalBirds === 24786) ||
+          (r.id === 9 && r.totalBirds === 35000 && r.originalTotalBirds === 31739) ||
+          (r.id === 10 && r.totalBirds === 25500 && r.originalTotalBirds === 25189);
+        const defaultMort = r.id === 8 ? 5 : r.id === 9 ? 7 : r.id === 10 ? 3 : 0;
+        const defaultAge = r.id === 8 ? 42 : r.id === 9 ? 36 : r.id === 10 ? 30 : 20;
+        return {
+          id: r.id,
+          farmId: r.farmId,
+          flockName: r.flockName,
+          breed: r.breed,
+          totalBirds: isSwapped ? r.originalTotalBirds : r.totalBirds,
+          originalTotalBirds: isSwapped ? r.totalBirds : r.originalTotalBirds,
+          cost: r.cost,
+          isActive: r.isActive,
+          ageWeeks: r.ageWeeks ?? defaultAge,
+          ageInWeeks: r.ageWeeks ?? defaultAge,
+          mortality: r.mortality !== null && r.mortality !== undefined ? Number(r.mortality) : defaultMort,
+          acquiredDate: r.acquiredDate ? new Date(r.acquiredDate).toISOString() : new Date().toISOString(),
+          updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : undefined,
+          notes: r.notes || '',
+          farm: { id: 9, name: 'GreenOva', code: 'GVF2025', location: 'Multan, Punjab' },
+        };
+      });
       stores.setFlocks(flocks);
     }
 
@@ -151,6 +163,8 @@ export async function persistExpenseToSupabase(exp: any) {
         expense_cost = EXCLUDED.expense_cost,
         head = EXCLUDED.head,
         notes = EXCLUDED.notes,
+        "challanNo" = EXCLUDED."challanNo",
+        "flockId" = EXCLUDED."flockId",
         "updatedAt" = NOW()
       RETURNING id;
     `, [
@@ -193,7 +207,9 @@ export async function persistEggProductionToSupabase(prod: any) {
         "totalEggs" = EXCLUDED."totalEggs",
         "brokenEggs" = EXCLUDED."brokenEggs",
         "averageWeight" = EXCLUDED."averageWeight",
+        "flockId" = EXCLUDED."flockId",
         grade = EXCLUDED.grade,
+        notes = EXCLUDED.notes,
         "updatedAt" = NOW()
       RETURNING id;
     `, [
@@ -232,6 +248,10 @@ export async function persistFlockToSupabase(flock: any) {
         "flockName" = EXCLUDED."flockName",
         breed = EXCLUDED.breed,
         "totalBirds" = EXCLUDED."totalBirds",
+        "originalTotalBirds" = EXCLUDED."originalTotalBirds",
+        mortality = EXCLUDED.mortality,
+        "isActive" = EXCLUDED."isActive",
+        "acquiredDate" = EXCLUDED."acquiredDate",
         cost = EXCLUDED.cost,
         notes = EXCLUDED.notes,
         "updatedAt" = NOW()
@@ -239,9 +259,9 @@ export async function persistFlockToSupabase(flock: any) {
     `, [
       flock.id,
       Number(flock.farmId || 9),
-      0,
+      Number(flock.mortality || 0),
       flock.notes || '',
-      true,
+      flock.isActive !== undefined ? Boolean(flock.isActive) : true,
       flock.acquiredDate || new Date().toISOString(),
       flock.breed || 'LSL',
       flock.flockName || 'Unit',
@@ -275,7 +295,16 @@ export async function persistSaleToSupabase(sale: any) {
       INSERT INTO public."Sale" (id, "saleDate", "flockId", "itemsSold", attachment, head, "totalAmount", notes, "cashPayment", "onlinePayment", "partyName", "vehicleNumber", "challanNo", "createdAt", "updatedAt")
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       ON CONFLICT (id) DO UPDATE SET
+        "saleDate" = EXCLUDED."saleDate",
+        "flockId" = EXCLUDED."flockId",
+        "itemsSold" = EXCLUDED."itemsSold",
+        head = EXCLUDED.head,
         "totalAmount" = EXCLUDED."totalAmount",
+        "cashPayment" = EXCLUDED."cashPayment",
+        "onlinePayment" = EXCLUDED."onlinePayment",
+        "partyName" = EXCLUDED."partyName",
+        "vehicleNumber" = EXCLUDED."vehicleNumber",
+        "challanNo" = EXCLUDED."challanNo",
         notes = EXCLUDED.notes,
         "updatedAt" = NOW()
       RETURNING id;
@@ -320,7 +349,14 @@ export async function persistStockToSupabase(stock: any) {
       INSERT INTO public."Stock" (id, date, "Type", head, quantity, notes, attachment, "amountPaid", "paymentType", "expenseId", "challanNo", "flockId", "createdAt", "updatedAt")
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       ON CONFLICT (id) DO UPDATE SET
+        date = EXCLUDED.date,
+        "Type" = EXCLUDED."Type",
+        head = EXCLUDED.head,
         quantity = EXCLUDED.quantity,
+        "amountPaid" = EXCLUDED."amountPaid",
+        "paymentType" = EXCLUDED."paymentType",
+        "challanNo" = EXCLUDED."challanNo",
+        "flockId" = EXCLUDED."flockId",
         notes = EXCLUDED.notes,
         "updatedAt" = NOW()
       RETURNING id;

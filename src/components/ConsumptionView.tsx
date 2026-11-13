@@ -101,20 +101,30 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
     setCurrentPage(1);
   }, [searchTerm, selectedFlock, fromDate, toDate, preset]);
 
+  const getTodayDateStr = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   const handlePresetChange = (selectedPreset: DatePreset) => {
     setPreset(selectedPreset);
     if (selectedPreset === 'all') {
       setFromDate('');
       setToDate('');
     } else if (selectedPreset === 'today') {
-      setFromDate(latestDate);
-      setToDate(latestDate);
+      const todayStr = getTodayDateStr();
+      setFromDate(todayStr);
+      setToDate(todayStr);
     } else if (selectedPreset === '30d') {
-      const ref = new Date(latestDate);
+      const todayStr = getTodayDateStr();
+      const ref = new Date(todayStr);
       const prior = new Date(ref);
       prior.setDate(prior.getDate() - 30);
       setFromDate(prior.toISOString().split('T')[0]);
-      setToDate(latestDate);
+      setToDate(todayStr);
     }
   };
 
@@ -265,9 +275,26 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
     };
   }, [consumptionLogs, filtered, isFirstFarm]);
 
-  // Active Birds Count based on selected unit or farm census
+  // Active Birds Count based on selected unit or farm census (dynamically reads flocks state)
   const activeBirdsCount = useMemo(() => {
     if (isFirstFarm) {
+      const firstFarmFlocks = flocks.filter(
+        (f) => f.farmId === 'farm-1' || f.id === '8' || f.id === '9' || f.id === '10' || f.name.toLowerCase().includes('unit')
+      );
+      if (firstFarmFlocks.length > 0) {
+        if (selectedFlock === 'all') {
+          return firstFarmFlocks.reduce((acc, f) => acc + (f.currentCount ?? f.initialCount ?? 0), 0);
+        }
+        const matched = firstFarmFlocks.find(
+          (f) =>
+            String(f.id) === selectedFlock ||
+            f.name.toLowerCase() === selectedFlock.toLowerCase() ||
+            (selectedFlock === '8' && f.name.includes('1')) ||
+            (selectedFlock === '9' && f.name.includes('2')) ||
+            (selectedFlock === '10' && f.name.includes('3'))
+        );
+        if (matched) return matched.currentCount ?? matched.initialCount ?? 0;
+      }
       if (selectedFlock === 'all') return 81714;
       if (selectedFlock === '8' || selectedFlock === 'Unit 1') return 24786;
       if (selectedFlock === '9' || selectedFlock === 'Unit 2') return 31739;

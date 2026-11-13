@@ -110,6 +110,14 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
   const [vetNotes, setVetNotes] = useState('Maintain cold chain at 2-8°C. Water withheld 2 hours prior to administration.');
   const [scheduleSuccess, setScheduleSuccess] = useState(false);
 
+  const getTodayDateStr = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   // Handle Preset change
   const handlePresetChange = (selectedPreset: DatePreset) => {
     setPreset(selectedPreset);
@@ -117,14 +125,16 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
       setFromDate('');
       setToDate('');
     } else if (selectedPreset === 'today') {
-      setFromDate(latestDate);
-      setToDate(latestDate);
+      const todayStr = getTodayDateStr();
+      setFromDate(todayStr);
+      setToDate(todayStr);
     } else if (selectedPreset === '30d') {
-      const ref = new Date(latestDate);
+      const todayStr = getTodayDateStr();
+      const ref = new Date(todayStr);
       const prior = new Date(ref);
       prior.setDate(prior.getDate() - 30);
       setFromDate(prior.toISOString().split('T')[0]);
-      setToDate(latestDate);
+      setToDate(todayStr);
     }
   };
 
@@ -174,9 +184,11 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
       const totalCapacity = availableFlocks.reduce((sum, f) => sum + (f.initialCount || f.currentCount || 0), 0);
       const availIds = new Set(availableFlocks.map((f) => String(f.id)));
       const availNames = new Set(availableFlocks.map((f) => f.name.toLowerCase()));
-      const totalMort = mortalityLogs
+      const flMortFromFlocks = availableFlocks.reduce((sum, f) => sum + (f.mortality || 0), 0);
+      const totalMortLogs = mortalityLogs
         .filter((m) => (m.flockId && availIds.has(String(m.flockId))) || (m.flockName && availNames.has(m.flockName.toLowerCase())))
         .reduce((sum, m) => sum + (m.count || 0), 0);
+      const totalMort = Math.max(totalMortLogs, flMortFromFlocks);
       const mortRate = totalActiveBirds > 0 ? Number(((totalMort / totalActiveBirds) * 100).toFixed(3)) : 0;
 
       return {
@@ -201,6 +213,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
       shedNumber: 'Shed 1',
       ageWeeks: 38,
       breed: 'Lohmann Brown (LSL)',
+      mortality: 5,
     };
     const u2 = flocks.find((f) => f.id === '9' || f.name === 'Unit 2') || {
       id: '9',
@@ -210,6 +223,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
       shedNumber: 'Shed 2',
       ageWeeks: 32,
       breed: 'Lohmann Brown (Primary)',
+      mortality: 7,
     };
     const u3 = flocks.find((f) => f.id === '10' || f.name === 'Unit 3') || {
       id: '10',
@@ -219,6 +233,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
       shedNumber: 'Shed 3',
       ageWeeks: 26,
       breed: 'Hy-Line W-36 Batch',
+      mortality: 3,
     };
 
     const getMortCount = (fid: string) =>
@@ -226,10 +241,16 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
         .filter((m) => m.flockId === fid || m.flockName?.includes(fid === '8' ? '1' : fid === '9' ? '2' : '3'))
         .reduce((sum, m) => sum + (m.count || 0), 0);
 
-    const u1Mort = getMortCount('8') || 5;
-    const u2Mort = getMortCount('9') || 7;
-    const u3Mort = getMortCount('10') || 3;
-    const totalMort = mortalityLogs.reduce((sum, m) => sum + (m.count || 0), 0) || (u1Mort + u2Mort + u3Mort);
+    const u1Mort = u1.mortality !== undefined ? Math.max(u1.mortality, getMortCount('8')) : (getMortCount('8') || 5);
+    const u2Mort = u2.mortality !== undefined ? Math.max(u2.mortality, getMortCount('9')) : (getMortCount('9') || 7);
+    const u3Mort = u3.mortality !== undefined ? Math.max(u3.mortality, getMortCount('10')) : (getMortCount('10') || 3);
+    const extraUnitsMort = availableFlocks
+      .filter((f) => f.id !== '8' && f.id !== '9' && f.id !== '10' && !['Unit 1', 'Unit 2', 'Unit 3'].includes(f.name))
+      .reduce((sum, f) => sum + (f.mortality || 0), 0);
+    const totalMort = Math.max(
+      mortalityLogs.reduce((sum, m) => sum + (m.count || 0), 0),
+      u1Mort + u2Mort + u3Mort + extraUnitsMort
+    );
 
     const totalActiveBirds = u1.currentCount + u2.currentCount + u3.currentCount;
     const totalCapacity = (u1.initialCount || 25000) + (u2.initialCount || 35000) + (u3.initialCount || 25500);
@@ -878,128 +899,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
         />
       </div>
 
-      {/* Interactive Mortality & Casualty Graph */}
-      {dailyHealthChartData.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <div>
-              <div className="flex items-center space-x-2">
-                <BarChart2 className="w-4 h-4 text-rose-600" />
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                  Daily Casualties &amp; Biosecurity Monitoring Timeline
-                </h3>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Casualty occurrences across {scopedMetrics.label} • Safe commercial zone (&lt; 0.05% daily)
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200/60">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Flock Health Grade A+</span>
-              </span>
-            </div>
-          </div>
 
-          <div className="relative pt-2">
-            <svg viewBox="0 0 940 180" className="w-full min-w-[700px] h-[180px] overflow-visible">
-              <line x1="50" y1="20" x2="920" y2="20" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="50" y1="60" x2="920" y2="60" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="50" y1="100" x2="920" y2="100" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="50" y1="140" x2="920" y2="140" stroke="#cbd5e1" strokeWidth="1" />
-
-              <text x="42" y="24" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">4</text>
-              <text x="42" y="64" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">3</text>
-              <text x="42" y="104" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">2</text>
-              <text x="42" y="144" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">0</text>
-
-              {dailyHealthChartData.map((d, idx) => {
-                const step = 860 / Math.max(1, dailyHealthChartData.length);
-                const centerX = 60 + idx * step + step / 2;
-                const barWidth = Math.min(28, Math.max(12, step * 0.5));
-                const startX = centerX - barWidth / 2;
-
-                const h = Math.max(4, (d.totalDeaths / 4) * 120);
-                const y = 140 - h;
-                const isHovered = hoveredDayIdx === idx;
-
-                return (
-                  <g
-                    key={d.date}
-                    className="cursor-pointer"
-                    onMouseEnter={() => setHoveredDayIdx(idx)}
-                    onMouseLeave={() => setHoveredDayIdx(null)}
-                  >
-                    {isHovered && (
-                      <rect
-                        x={centerX - step / 2 + 2}
-                        y="10"
-                        width={step - 4}
-                        height="135"
-                        fill="#f43f5e"
-                        opacity="0.08"
-                        rx="6"
-                      />
-                    )}
-                    <rect
-                      x={startX}
-                      y={y}
-                      width={barWidth}
-                      height={h}
-                      fill="#e11d48"
-                      rx="3"
-                      className="transition-all hover:opacity-90"
-                    />
-                    <text
-                      x={centerX}
-                      y="158"
-                      fontSize="10"
-                      fontWeight={isHovered ? 'bold' : 'normal'}
-                      fill={isHovered ? '#0f172a' : '#64748b'}
-                      textAnchor="middle"
-                    >
-                      {d.formattedDate}
-                    </text>
-                    <text
-                      x={centerX}
-                      y="170"
-                      fontSize="9"
-                      fill="#94a3b8"
-                      textAnchor="middle"
-                    >
-                      {d.totalDeaths} {d.totalDeaths === 1 ? 'death' : 'deaths'}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-
-            {/* Hover Tooltip */}
-            {activeTooltipData && (
-              <div
-                className="absolute z-30 pointer-events-none bg-slate-900/95 text-white p-3 rounded-xl shadow-xl text-xs space-y-1.5 border border-slate-700 min-w-[210px]"
-                style={{
-                  left: `${Math.min(76, Math.max(4, ((hoveredDayIdx || 0) / Math.max(1, dailyHealthChartData.length)) * 88))}%`,
-                  top: '10px',
-                }}
-              >
-                <div className="font-bold text-rose-300 border-b border-slate-700 pb-1">
-                  {activeTooltipData.formattedDate} Autopsy Log
-                </div>
-                <div className="flex justify-between items-center text-slate-200">
-                  <span>Casualties:</span>
-                  <span className="font-mono font-bold text-rose-400">
-                    {activeTooltipData.totalDeaths} Birds
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-400">
-                  Causes: {activeTooltipData.causes.join(', ')}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Standardized Filters & Tab Bar */}
       <UIFilterBar>

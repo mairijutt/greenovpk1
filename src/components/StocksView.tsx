@@ -58,8 +58,13 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
     return liveStockRecords;
   });
 
+  const getLocalToday = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+
   // Old System Stock Details Form State matching st1_d471a4d4.png & st2/st3
-  const [formDate, setFormDate] = useState<string>('2026-10-27');
+  const [formDate, setFormDate] = useState<string>(getLocalToday);
   const [formHead, setFormHead] = useState<string>('FEED');
   const [formStockType, setFormStockType] = useState<string>('11');
   const [formFlock, setFormFlock] = useState<string>('Unit 2');
@@ -88,7 +93,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
   };
 
   const handleResetForm = () => {
-    setFormDate('2026-10-27');
+    setFormDate(getLocalToday());
     setFormHead('FEED');
     setFormStockType('11');
     setFormFlock('Unit 2');
@@ -161,6 +166,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
     // Call backend API to persist
     fetch('/api/stocks', {
       method: 'POST',
+      keepalive: true,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date: formDate,
