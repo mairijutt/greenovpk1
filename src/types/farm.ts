@@ -135,6 +135,10 @@ export interface FinancialRecord {
   onlinePayment?: number;
   cashPayment?: number;
   vehicleNumber?: string;
+  partyName?: string;
+  cartons?: number;
+  trays?: number;
+  looseEggs?: number;
   bankId?: string;
   bankName?: string;
 }

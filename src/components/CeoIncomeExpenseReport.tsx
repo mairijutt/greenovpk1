@@ -28,6 +28,7 @@ import {
   CeoSummaryMetrics,
   MonthlyCeoRow,
   BankBalancesReportSummary,
+  getMonthDateBounds,
 } from '../utils/ceoReportCalculations.ts';
 
 interface CeoIncomeExpenseReportProps {
@@ -39,6 +40,8 @@ interface CeoIncomeExpenseReportProps {
   selectedUnit: string;
   selectedMonth: string;
   selectedYear: string;
+  fromDate?: string;
+  toDate?: string;
   onSelectMonth: (month: string) => void;
   onSelectUnit: (unit: string) => void;
   onAddBank: (bank: BankAccount) => void;
@@ -74,22 +77,50 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
   selectedUnit,
   selectedMonth,
   selectedYear,
+  fromDate = '',
+  toDate = '',
   onSelectMonth,
   onSelectUnit,
   onAddBank,
   onEditBank,
   onDeleteBank,
-  onNavigateTab,
 }) => {
   const [showBankModal, setShowBankModal] = useState(false);
   const [editingBank, setEditingBank] = useState<BankAccount | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const handleCardLinkClick = (tab: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (onNavigateTab && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
-      e.preventDefault();
-      onNavigateTab(tab);
+  const buildCardHref = (tabPath: string, extraParams?: Record<string, string>) => {
+    const params = new URLSearchParams();
+    if (selectedUnit && selectedUnit !== 'all') {
+      params.set('unit', selectedUnit);
+    } else {
+      params.set('unit', 'all');
     }
+
+    let effFrom = fromDate;
+    let effTo = toDate;
+    if (!effFrom && !effTo && selectedYear && selectedYear !== 'all' && selectedMonth !== 'custom') {
+      const bounds = getMonthDateBounds(selectedYear, selectedMonth);
+      effFrom = bounds.from;
+      effTo = bounds.to;
+    }
+
+    if (effFrom) params.set('from', effFrom);
+    if (effTo) params.set('to', effTo);
+    if (selectedMonth && selectedMonth !== 'all' && selectedMonth !== 'custom') {
+      params.set('month', selectedMonth);
+    }
+    if (selectedYear && selectedYear !== 'all') {
+      params.set('year', selectedYear);
+    }
+    if (extraParams) {
+      Object.entries(extraParams).forEach(([k, v]) => {
+        if (v) params.set(k, v);
+      });
+    }
+
+    const qs = params.toString();
+    return qs ? `${tabPath}?${qs}` : tabPath;
   };
 
   const isSurplus = metrics.netIncome >= 0;
@@ -189,9 +220,9 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
           valueColor="text-emerald-700"
           badge={{ text: `${metrics.salesCount.toLocaleString()} Bills`, color: 'emerald' }}
           subtext={`${formatFullPkr(metrics.totalSalesRevenue)} • ${eggSharePct}% Eggs • ${onlineSharePct}% Online`}
-          href="/sales"
+          href={buildCardHref('/sales')}
+          target="_blank"
           linkLabel="Open Sales Ledger"
-          onClick={handleCardLinkClick('sales')}
         />
 
         <StatCard
@@ -202,9 +233,9 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
           valueColor="text-rose-700"
           badge={{ text: `${metrics.expenseCount.toLocaleString()} Vouchers`, color: 'rose' }}
           subtext={`${formatFullPkr(metrics.totalExpenses)} • COGS: ${formatPkr(metrics.cogsExpenses)}`}
-          href="/expenses"
+          href={buildCardHref('/expenses')}
+          target="_blank"
           linkLabel="Open Expenses Ledger"
-          onClick={handleCardLinkClick('expenses')}
         />
 
         <StatCard
@@ -218,9 +249,9 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
             isUp: isSurplus,
           }}
           subtext={`Excl. Bird CAPEX Margin: ${metrics.operatingMarginPercent.toFixed(1)}%`}
-          href="/dashboard"
+          href={buildCardHref('/dashboard')}
+          target="_blank"
           linkLabel="Open Financial Dashboard"
-          onClick={handleCardLinkClick('dashboard')}
         />
 
         <StatCard
@@ -235,9 +266,9 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
             color: 'indigo',
           }}
           subtext={`Rev/Bird: Rs. ${Math.round(metrics.avgPerBirdRevenue).toLocaleString()} • Net/Bird: Rs. ${Math.round(metrics.avgPerBirdNet).toLocaleString()}`}
-          href="/flocks"
+          href={buildCardHref('/flocks')}
+          target="_blank"
           linkLabel="Open Flocks & Sheds"
-          onClick={handleCardLinkClick('flocks')}
         />
       </div>
 
@@ -251,9 +282,9 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
           color="amber"
           badge={{ text: `${metrics.avgLayingRate.toFixed(1)}% Laying`, color: 'amber' }}
           subtext={`${metrics.totalEggsProduced.toLocaleString()} Eggs • ${metrics.brokenEggs.toLocaleString()} Broken (${brokenPct}%)`}
-          href="/egg-production"
+          href={buildCardHref('/egg-production')}
+          target="_blank"
           linkLabel="Open Egg Production"
-          onClick={handleCardLinkClick('egg-production')}
         />
 
         <StatCard
@@ -268,9 +299,9 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
             color: 'indigo',
           }}
           subtext={`${metrics.eggsSold.toLocaleString()} Eggs • ${formatPkr(metrics.eggSalesRevenue)} (Avg Rs. ${Math.round(metrics.avgCartonPrice).toLocaleString()}/ctn)`}
-          href="/sales"
+          href={buildCardHref('/sales', { head: 'EGG' })}
+          target="_blank"
           linkLabel="Open Sales Ledger"
-          onClick={handleCardLinkClick('sales')}
         />
 
         <StatCard
@@ -285,9 +316,9 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
             color: metrics.periodRemainingCartons >= 0 ? 'emerald' : 'amber',
           }}
           subtext={`Open ${Math.round(metrics.carriedPrevCartons).toLocaleString()} + Prod ${Math.round(metrics.totalCartonsProduced).toLocaleString()} − Sold ${Math.round(metrics.cartonsSold).toLocaleString()} • Est. ${formatPkr(metrics.carriedNextEggValue)}`}
-          href="/stocks"
+          href={buildCardHref('/stocks')}
+          target="_blank"
           linkLabel="Open Inventory & Stocks"
-          onClick={handleCardLinkClick('stocks')}
         />
 
         <StatCard
@@ -301,9 +332,9 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
             color: 'blue',
           }}
           subtext={`${metrics.feedConsumedKg.toLocaleString()} kg consumed • Feed C/F: ${metrics.carriedPrevFeedBags.toLocaleString()} → ${metrics.carriedNextFeedBags.toLocaleString()} Bags`}
-          href="/daily-consumption"
+          href={buildCardHref('/daily-consumption')}
+          target="_blank"
           linkLabel="Open Daily Consumption"
-          onClick={handleCardLinkClick('daily-consumption')}
         />
       </div>
 
@@ -646,7 +677,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
               <td className="py-3.5 px-4">
                 <div className="font-bold text-slate-900">Feed Bags &amp; Reserve Rollover</div>
                 <div className="text-[11px] text-slate-500">
-                  50 kg/Bag • Incl. Warehouse On-Hand Reserve ({metrics.warehouseReserveBags.toLocaleString()} bags)
+                  50 kg/Bag • Stock Received vs Feed Consumed Continuity
                 </div>
               </td>
               <td className="py-3.5 px-4 text-right bg-amber-50/30">

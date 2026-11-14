@@ -365,14 +365,12 @@ export function computeCeoSummary(params: {
   const avgEggPrice = avgCartonPrice > 0 ? avgCartonPrice / 360 : 0;
   const carriedNextEggValue = carriedNextCartons * avgCartonPrice;
 
-  const carriedPrevFeedBags = Math.max(0, prevFeedReceivedBags - prevFeedConsumedBags);
+  const carriedPrevFeedBags = prevFeedReceivedBags - prevFeedConsumedBags;
   const periodNetFeedBags = feedStockReceivedBags - feedConsumedBags;
-  const closingLedgerFeedBags = Math.max(0, carriedPrevFeedBags + feedStockReceivedBags - feedConsumedBags);
-  const unitShareRatio =
-    selectedUnit === 'Unit 1' ? 0.25 : selectedUnit === 'Unit 2' ? 0.50 : selectedUnit === 'Unit 3' ? 0.25 : 1;
-  const unitWarehouseBags = Math.round(warehouseReserveBags * unitShareRatio);
-  const unitWarehouseKg = Math.round(warehouseReserveKg * unitShareRatio);
-  const remainingFeedBags = closingLedgerFeedBags + unitWarehouseBags;
+  const closingLedgerFeedBags = carriedPrevFeedBags + feedStockReceivedBags - feedConsumedBags;
+  const unitWarehouseBags = 0;
+  const unitWarehouseKg = 0;
+  const remainingFeedBags = closingLedgerFeedBags;
   const remainingFeedKg = remainingFeedBags * 50;
   const carriedNextFeedBags = remainingFeedBags;
 
@@ -551,7 +549,7 @@ export function computeMonthlyBreakdown(params: {
     runningEggsBalance = Math.max(0, runningEggsBalance + totalEggsProduced - eggsSold);
     const carriedNextCartons = runningEggsBalance / 360;
 
-    runningFeedBalance = Math.max(0, runningFeedBalance + feedReceivedBags - feedConsumedBags);
+    runningFeedBalance = runningFeedBalance + feedReceivedBags - feedConsumedBags;
 
     const cartonsSold = eggsSold / 360;
     const avgCartonPrice = cartonsSold > 0 ? eggRevenue / cartonsSold : 0;
@@ -572,8 +570,8 @@ export function computeMonthlyBreakdown(params: {
       carriedPrevCartons,
       remainingProductionCartons: (totalEggsProduced - eggsSold) / 360,
       carriedNextCartons,
-      remainingFeedBags: runningFeedBalance + unitWarehouseBags,
-      carriedNextFeedBags: runningFeedBalance + unitWarehouseBags,
+      remainingFeedBags: runningFeedBalance,
+      carriedNextFeedBags: runningFeedBalance,
       avgCartonPrice,
       avgPerBirdCost,
     };

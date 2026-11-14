@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Egg, Wheat, HeartPulse, X, CheckCircle2 } from 'lucide-react';
+import { Egg, Wheat, HeartPulse, X } from 'lucide-react';
 import { Flock, EggProduction, FeedConsumption, MortalityLog } from '../types/farm';
 import { UIInput, UISelect, UITextarea, UIButton } from './ui';
 
@@ -49,13 +49,9 @@ export const RecordModal: React.FC<RecordModalProps> = ({
   const [cause, setCause] = useState('Heat stress tolerance / natural');
   const [symptoms, setSymptoms] = useState('');
 
-  // Submission feedback
-  const [isSaved, setIsSaved] = useState(false);
-
   // Ensure valid flock selected when modal opens
   useEffect(() => {
     if (isOpen) {
-      setIsSaved(false);
       if (flocks.length > 0) {
         if (!flockId || !flocks.some((f) => f.id === flockId)) {
           setFlockId(flocks[0].id);
@@ -160,11 +156,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
       });
     }
 
-    setIsSaved(true);
-    setTimeout(() => {
-      setIsSaved(false);
-      onClose();
-    }, 900);
+    onClose();
   };
 
   return (
@@ -201,22 +193,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
           </button>
         </div>
 
-        {isSaved ? (
-          <div className="py-12 text-center space-y-3">
-            <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-            <h3 className="text-base font-bold text-slate-900">
-              Record Saved Successfully!
-            </h3>
-            <p className="text-xs text-slate-500">
-              {type === 'egg'
-                ? `${totalEggs.toLocaleString()} eggs (${cleanCartons} cartons / ${cleanTrays.toLocaleString()} trays) logged for ${selectedFlock.name}.`
-                : 'Log recorded and synced to farm ledger.'}
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="mt-5 space-y-5 text-xs">
+        <form onSubmit={handleSubmit} className="mt-5 space-y-5 text-xs">
             {/* EGG PRODUCTION DETAILS FORM (WIDER & ALL OPTIONS) */}
             {type === 'egg' && (
               <>
@@ -609,7 +586,6 @@ export const RecordModal: React.FC<RecordModalProps> = ({
               </>
             )}
           </form>
-        )}
       </div>
     </div>
   );

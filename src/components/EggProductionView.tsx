@@ -25,6 +25,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { EggProduction, Flock, Farm } from '../types/farm';
+import { getInitialUrlFilters } from '../utils/urlFilters';
 import {
   StatCard,
   PageHeader,
@@ -62,15 +63,16 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
     return eggProductions[0]?.date || '2026-10-24';
   }, [eggProductions]);
 
+  const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
   const defaultFarmId = farms[0]?.id || 'farm-1';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFarm, setSelectedFarm] = useState(
     selectedFarmId && selectedFarmId !== 'all' ? selectedFarmId : defaultFarmId
   );
-  const [selectedFlock, setSelectedFlock] = useState('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [preset, setPreset] = useState<DatePreset>('all');
+  const [selectedFlock, setSelectedFlock] = useState<string>(() => initialUrlFilters.flockId);
+  const [fromDate, setFromDate] = useState(() => initialUrlFilters.from);
+  const [toDate, setToDate] = useState(() => initialUrlFilters.to);
+  const [preset, setPreset] = useState<DatePreset>(() => (initialUrlFilters.hasDateRange ? 'custom' : 'all'));
   const [editingEgg, setEditingEgg] = useState<EggProduction | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 

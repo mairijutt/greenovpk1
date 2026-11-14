@@ -17,8 +17,12 @@ import {
   Users,
   AlertTriangle,
   ChevronDown,
+  Edit,
+  X,
+  CheckCircle2,
 } from 'lucide-react';
 import { FeedConsumption, Flock, MortalityLog, Farm } from '../types/farm';
+import { getInitialUrlFilters } from '../utils/urlFilters';
 import {
   StatCard,
   PageHeader,
@@ -28,6 +32,9 @@ import {
   TableCard,
   DateRangePickerBar,
   DatePreset,
+  UIInput,
+  UISelect,
+  UITextarea,
 } from './ui';
 
 interface ConsumptionViewProps {
@@ -35,6 +42,7 @@ interface ConsumptionViewProps {
   flocks: Flock[];
   mortalityLogs?: MortalityLog[];
   onOpenRecordModal: (type: 'feed') => void;
+  onEditConsumption?: (log: FeedConsumption) => void;
   farms?: Farm[];
   selectedFarmId?: string;
   onSelectFarm?: (farmId: string) => void;
@@ -48,6 +56,7 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
   flocks,
   mortalityLogs = [],
   onOpenRecordModal,
+  onEditConsumption,
   farms = [],
   selectedFarmId = 'farm-1',
   onSelectFarm,
@@ -56,15 +65,74 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
     return consumptionLogs[0]?.date || '2026-10-24';
   }, [consumptionLogs]);
 
+  // Edit Consumption Record Modal State
+  const [editingLog, setEditingLog] = useState<FeedConsumption | null>(null);
+  const [editDate, setEditDate] = useState('');
+  const [editFlockId, setEditFlockId] = useState('8');
+  const [editChallanNo, setEditChallanNo] = useState('');
+  const [editFeedType, setEditFeedType] = useState('');
+  const [editBags, setEditBags] = useState<number>(0);
+  const [editFeedKg, setEditFeedKg] = useState<number>(0);
+  const [editWaterL, setEditWaterL] = useState<number>(0);
+  const [editNotes, setEditNotes] = useState('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const openEditModal = (log: FeedConsumption) => {
+    const bags = log.bags || Math.round((log.feedQuantityKg || 0) / 50);
+    setEditingLog(log);
+    setEditDate(log.date ? log.date.split('T')[0] : getTodayDateStr());
+    setEditFlockId(String(log.flockId || '8'));
+    setEditChallanNo(log.challanNo || '');
+    setEditFeedType(log.feedType || 'Layer Phase-2 Mash (Feed 13)');
+    setEditBags(bags);
+    setEditFeedKg(log.feedQuantityKg || bags * 50);
+    setEditWaterL(log.waterIntakeLiters || 0);
+    setEditNotes(log.notes || '');
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLog) return;
+    const matchedFlock =
+      flocks.find((f) => String(f.id) === String(editFlockId)) ||
+      flocks.find((f) => f.name === editingLog.flockName);
+    const birdCount = matchedFlock?.currentCount || matchedFlock?.initialCount || 25000;
+    const kg = Math.max(0, Number(editFeedKg) || 0);
+    const bags = Math.max(0, Number(editBags) || Math.round(kg / 50));
+    const grams = birdCount > 0 ? Number(((kg * 1000) / birdCount).toFixed(1)) : editingLog.gramsPerBird;
+
+    const updatedLog: FeedConsumption = {
+      ...editingLog,
+      date: editDate,
+      flockId: matchedFlock ? matchedFlock.id : editFlockId,
+      flockName:
+        matchedFlock?.name ||
+        (editFlockId === '9' ? 'Unit 2' : editFlockId === '10' ? 'Unit 3' : 'Unit 1'),
+      challanNo: editChallanNo.trim() || undefined,
+      feedType: editFeedType.trim() || 'Layer Phase-2 Mash (Feed 13)',
+      bags,
+      feedQuantityKg: kg,
+      gramsPerBird: isNaN(grams) ? 118 : grams,
+      waterIntakeLiters: Math.max(0, Number(editWaterL) || 0),
+      notes: editNotes.trim() || undefined,
+    };
+
+    onEditConsumption?.(updatedLog);
+    setEditingLog(null);
+    setToastMessage(`Consumption record #${updatedLog.challanNo || updatedLog.trackingId || updatedLog.id.replace('c-', '')} updated.`);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
   const defaultFarmId = farms[0]?.id || 'farm-1';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFarm, setSelectedFarm] = useState(
     selectedFarmId && selectedFarmId !== 'all' ? selectedFarmId : defaultFarmId
   );
-  const [selectedFlock, setSelectedFlock] = useState('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [preset, setPreset] = useState<DatePreset>('all');
+  const [selectedFlock, setSelectedFlock] = useState<string>(() => initialUrlFilters.flockId);
+  const [fromDate, setFromDate] = useState(() => initialUrlFilters.from);
+  const [toDate, setToDate] = useState(() => initialUrlFilters.to);
+  const [preset, setPreset] = useState<DatePreset>(() => (initialUrlFilters.hasDateRange ? 'custom' : 'all'));
 
   // Sync external farm selection if changed
   useEffect(() => {
@@ -504,7 +572,7 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
             </h3>
           </div>
           <div className="text-[11px] text-slate-500 font-medium">
-            {consumptionLogs.length} Authentic Records from Stock Delivery &amp; Issuance Ledger • Water intake defaults to 0 L
+            {consumptionLogs.length} Feed Consumption Records • Unit 3 Mar–Oct Monthly Consumption Reconciled
           </div>
         </div>
 
@@ -1306,12 +1374,13 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
                 <th className="py-3 px-4 text-right">Grams / Bird</th>
                 <th className="py-3 px-4 text-right">Water Intake (L)</th>
                 <th className="py-3 px-4">Dispatch Notes / Remarks</th>
+                <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
+                  <td colSpan={10} className="py-8 text-center text-slate-400">
                     No feed intake records match the selected date range and filters.
                   </td>
                 </tr>
@@ -1358,6 +1427,17 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
                       </td>
                       <td className="py-3 px-4 text-slate-500 italic max-w-xs truncate">
                         {log.notes || '—'}
+                      </td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(log)}
+                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                          title={`Edit Consumption Record #${log.challanNo || log.trackingId || log.id.replace('c-', '')}`}
+                        >
+                          <Edit className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -1443,6 +1523,129 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
           </div>
         )}
       </TableCard>
+
+      {/* Edit Daily Consumption Record Modal */}
+      {editingLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 my-auto">
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h2 className="text-base font-black text-slate-900">
+                  Edit Daily Consumption #{editingLog.challanNo || editingLog.trackingId || editingLog.id.replace('c-', '')}
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Update date, unit, feed formulation, bags, water intake, or dispatch notes
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingLog(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="mt-4 space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <UIInput
+                  label="Date"
+                  type="date"
+                  required
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                />
+                <UISelect
+                  label="Flock / Shed"
+                  value={editFlockId}
+                  onChange={(e) => setEditFlockId(e.target.value)}
+                >
+                  {flocks.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name} ({f.shedNumber || `Shed ${f.id}`})
+                    </option>
+                  ))}
+                </UISelect>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <UIInput
+                  label="Feed Formulation"
+                  type="text"
+                  required
+                  value={editFeedType}
+                  onChange={(e) => setEditFeedType(e.target.value)}
+                />
+                <UIInput
+                  label="Challan / Voucher No."
+                  type="text"
+                  value={editChallanNo}
+                  onChange={(e) => setEditChallanNo(e.target.value)}
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <UIInput
+                  label="Bags (50kg)"
+                  type="number"
+                  min="0"
+                  required
+                  value={editBags}
+                  onChange={(e) => {
+                    const b = Number(e.target.value) || 0;
+                    setEditBags(b);
+                    setEditFeedKg(b * 50);
+                  }}
+                />
+                <UIInput
+                  label="Total Weight (Kg)"
+                  type="number"
+                  min="0"
+                  required
+                  value={editFeedKg}
+                  onChange={(e) => {
+                    const kg = Number(e.target.value) || 0;
+                    setEditFeedKg(kg);
+                    setEditBags(Math.round(kg / 50));
+                  }}
+                />
+                <UIInput
+                  label="Water Intake (L)"
+                  type="number"
+                  min="0"
+                  value={editWaterL}
+                  onChange={(e) => setEditWaterL(Number(e.target.value) || 0)}
+                />
+              </div>
+
+              <UITextarea
+                label="Dispatch Notes / Remarks"
+                rows={2}
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Feed ration or shed dispensation notes..."
+              />
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <UIButton type="button" variant="secondary" onClick={() => setEditingLog(null)}>
+                  Cancel
+                </UIButton>
+                <UIButton type="submit" variant="primary">
+                  Save Changes
+                </UIButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center space-x-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-3">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 };

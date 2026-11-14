@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Pencil, Trash2, X, Building2, ChevronDown } from 'lucide-react';
 import { Flock, Farm } from '../types/farm';
+import { getInitialUrlFilters } from '../utils/urlFilters';
 
 interface FlocksViewProps {
   flocks: Flock[];
@@ -23,15 +24,17 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
   selectedFarmId,
   onSelectFarm,
 }) => {
+  const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
   const defaultFarmId = farms[0]?.id || 'farm-1';
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingFlock, setEditingFlock] = useState<Flock | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // Farm filter state - default to first farm registered on system
+  // Farm & Unit filter state
   const [selectedFarmFilter, setSelectedFarmFilter] = useState(
     selectedFarmId && selectedFarmId !== 'all' ? selectedFarmId : defaultFarmId
   );
+  const [selectedUnitFilter, setSelectedUnitFilter] = useState<string>(() => initialUrlFilters.unit);
 
   useEffect(() => {
     if (selectedFarmId !== undefined) {
@@ -70,6 +73,13 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
   });
 
   const filteredFlocks = flocks.filter((f) => {
+    const unitMatches =
+      selectedUnitFilter === 'all' ||
+      f.name.toLowerCase() === selectedUnitFilter.toLowerCase() ||
+      (selectedUnitFilter === 'Unit 1' && f.id === '8') ||
+      (selectedUnitFilter === 'Unit 2' && f.id === '9') ||
+      (selectedUnitFilter === 'Unit 3' && f.id === '10');
+    if (!unitMatches) return false;
     if (isFirstFarm) {
       return f.farmId === 'farm-1' || f.id === '8' || f.id === '9' || f.id === '10';
     }
@@ -254,6 +264,23 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
               </div>
             </div>
           )}
+          <div className="relative flex items-center">
+            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white shadow-2xs text-xs">
+              <span className="font-semibold text-slate-500 hidden sm:inline">Unit:</span>
+              <select
+                value={selectedUnitFilter}
+                onChange={(e) => setSelectedUnitFilter(e.target.value)}
+                aria-label="Filter flocks by unit"
+                className="bg-transparent font-bold text-slate-800 pr-5 cursor-pointer focus:outline-none"
+              >
+                <option value="all">All Units</option>
+                <option value="Unit 1">Unit 1</option>
+                <option value="Unit 2">Unit 2</option>
+                <option value="Unit 3">Unit 3</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
+            </div>
+          </div>
         </div>
         <button
           type="button"

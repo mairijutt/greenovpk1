@@ -33,7 +33,7 @@ import {
   InventoryItem,
   BankAccount,
 } from '../types/farm.ts';
-import { StatCard, PageHeader, UIButton, TableCard, DatePreset } from './ui';
+import { StatCard, PageHeader, UIButton, TableCard, DateRangePickerBar, DatePreset } from './ui';
 import { initialInventory } from '../data/mockData.ts';
 import { liveExpenseRecords, liveConsumptionRecords } from '../data/productionData.ts';
 import { CeoIncomeExpenseReport } from './CeoIncomeExpenseReport.tsx';
@@ -254,9 +254,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     return liveExpenseRecords;
   }, [financials]);
 
-  // Feed consumption dataset: 157+ authentic records
+  // Feed consumption dataset: live consumptionLogs including Unit 3 Mar-Oct records
   const consumptionDataset: FeedConsumption[] = useMemo(() => {
-    if (consumptionLogs.length >= 157) {
+    if (consumptionLogs.length > 0) {
       return consumptionLogs;
     }
     return liveConsumptionRecords;
@@ -1253,212 +1253,116 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
       </div>
 
-      {/* Date, Month/Year & Search Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Month & Year Selectors */}
-          <div className="flex items-center space-x-2 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
-            <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span className="text-slate-500 font-semibold">Month:</span>
-            <select
-              value={selectedMonth}
-              onChange={(e) => handleMonthChange(e.target.value)}
-              aria-label="Select Report Month"
-              className="bg-transparent font-bold text-slate-800 focus:outline-hidden cursor-pointer py-0.5"
-            >
-              {selectedMonth === 'custom' && <option value="custom">Custom Range</option>}
-              {MONTH_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <span className="text-slate-300">|</span>
-            <span className="text-slate-500 font-semibold">Year:</span>
-            <select
-              value={selectedYear}
-              onChange={(e) => handleYearChange(e.target.value)}
-              aria-label="Select Report Year"
-              className="bg-transparent font-bold text-slate-800 focus:outline-hidden cursor-pointer py-0.5"
-            >
-              <option value="all">All Years</option>
-              {availableYears.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Unified Date, Month/Year & Filter Bar */}
+      <DateRangePickerBar
+        showFarmSelector={false}
+        showFlockSelector={false}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
+        onMonthChange={handleMonthChange}
+        onYearChange={handleYearChange}
+        availableYears={availableYears}
+        fromDate={fromDate}
+        toDate={toDate}
+        onDateChange={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+          setSelectedMonth('custom');
+          setPreset('custom');
+          setCurrentPage(1);
+        }}
+        activePreset={preset}
+        onPresetChange={handlePresetChange}
+        onReset={handleResetFilters}
+        leftSlot={
+          <>
+            {/* Search Input (shown for detailed audit registries) */}
+            {activeReport !== 'income-vs-expense' && (
+              <div className="relative min-w-[220px]">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder={
+                    activeReport === 'egg-production'
+                      ? 'Search by ID, date, flock...'
+                      : activeReport === 'sales-revenue'
+                      ? 'Search by ID, vehicle, category...'
+                      : 'Search by ID, challan, D.O. #, notes...'
+                  }
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                />
+              </div>
+            )}
 
-          {/* Search Input (shown for detailed audit registries) */}
-          {activeReport !== 'income-vs-expense' && (
-            <div className="relative min-w-[220px]">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder={
-                  activeReport === 'egg-production'
-                    ? 'Search by ID, date, flock...'
-                    : activeReport === 'sales-revenue'
-                    ? 'Search by ID, vehicle, category...'
-                    : 'Search by ID, challan, D.O. #, notes...'
-                }
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
-              />
-            </div>
-          )}
-
-          {/* Sales Category filter (if Sales Report is active) */}
-          {activeReport === 'sales-revenue' && (
-            <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedCategory('all');
-                  setCurrentPage(1);
-                }}
-                className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
-                  selectedCategory === 'all'
-                    ? 'bg-white text-emerald-800 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                All Items
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedCategory('EGG');
-                  setCurrentPage(1);
-                }}
-                className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
-                  selectedCategory === 'EGG'
-                    ? 'bg-white text-amber-800 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Eggs (Rs. 311.9M)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedCategory('Manure');
-                  setCurrentPage(1);
-                }}
-                className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
-                  selectedCategory === 'Manure'
-                    ? 'bg-white text-emerald-800 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Manure
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedCategory('Feed BAGS');
-                  setCurrentPage(1);
-                }}
-                className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
-                  selectedCategory === 'Feed BAGS'
-                    ? 'bg-white text-blue-800 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Feed Bags
-              </button>
-            </div>
-          )}
-
-          {/* Date Range Inputs */}
-          <div className="flex items-center space-x-2 text-xs">
-            <span className="text-slate-500 font-medium">From:</span>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => {
-                setFromDate(e.target.value);
-                setSelectedMonth('custom');
-                setPreset('all');
-                setCurrentPage(1);
-              }}
-              className="py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-            />
-            <span className="text-slate-500 font-medium">To:</span>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => {
-                setToDate(e.target.value);
-                setSelectedMonth('custom');
-                setPreset('all');
-                setCurrentPage(1);
-              }}
-              className="py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-            />
-          </div>
-        </div>
-
-        {/* Date Presets */}
-        <div className="flex items-center space-x-1">
-          <button
-            type="button"
-            onClick={() => handlePresetChange('month')}
-            className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
-              preset === 'month'
-                ? 'bg-emerald-600 text-white font-bold'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Current Month
-          </button>
-          <button
-            type="button"
-            onClick={() => handlePresetChange('year')}
-            className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
-              preset === 'year'
-                ? 'bg-emerald-600 text-white font-bold'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Full Year
-          </button>
-          <button
-            type="button"
-            onClick={() => handlePresetChange('all')}
-            className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
-              preset === 'all' && !fromDate && !toDate
-                ? 'bg-emerald-600 text-white font-bold'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            All Time
-          </button>
-          <button
-            type="button"
-            onClick={() => handlePresetChange('30d')}
-            className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
-              preset === '30d'
-                ? 'bg-emerald-600 text-white font-bold'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Last 30 Days
-          </button>
-          <button
-            type="button"
-            onClick={handleResetFilters}
-            className="px-2.5 py-1 text-xs rounded-lg font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer ml-1"
-          >
-            Reset
-          </button>
-        </div>
-      </div>
+            {/* Sales Category filter (if Sales Report is active) */}
+            {activeReport === 'sales-revenue' && (
+              <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory('all');
+                    setCurrentPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                    selectedCategory === 'all'
+                      ? 'bg-white text-emerald-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All Items
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory('EGG');
+                    setCurrentPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                    selectedCategory === 'EGG'
+                      ? 'bg-white text-amber-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Eggs (Rs. 311.9M)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory('Manure');
+                    setCurrentPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                    selectedCategory === 'Manure'
+                      ? 'bg-white text-emerald-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Manure
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory('Feed BAGS');
+                    setCurrentPage(1);
+                  }}
+                  className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                    selectedCategory === 'Feed BAGS'
+                      ? 'bg-white text-blue-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Feed Bags
+                </button>
+              </div>
+            )}
+          </>
+        }
+      />
 
       {/* --- REPORT VIEW 0: INCOME VS EXPENSES SUMMARY --- */}
       {activeReport === 'income-vs-expense' && (
@@ -1476,6 +1380,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           selectedUnit={selectedUnit}
           selectedMonth={selectedMonth}
           selectedYear={selectedYear}
+          fromDate={fromDate}
+          toDate={toDate}
           onSelectMonth={(m) => handleMonthChange(m)}
           onSelectUnit={(u) => {
             setSelectedUnit(u);

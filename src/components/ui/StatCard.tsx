@@ -21,6 +21,7 @@ interface StatCardProps {
     neutral?: boolean;
   };
   href?: string;
+  target?: string;
   linkLabel?: string;
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   className?: string;
@@ -61,6 +62,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   subtext,
   trend,
   href,
+  target,
   linkLabel,
   onClick,
   className = '',
@@ -131,6 +133,8 @@ export const StatCard: React.FC<StatCardProps> = ({
     return (
       <a
         href={href}
+        target={target}
+        rel={target === '_blank' ? 'noopener noreferrer' : undefined}
         onClick={onClick}
         className={`bg-white rounded-xl p-5 border border-slate-200 shadow-xs hover:border-emerald-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer flex flex-col justify-between group ${className}`}
       >

@@ -20,15 +20,18 @@ import {
   CreditCard,
   Banknote,
   Layers,
+  Edit,
+  X,
 } from 'lucide-react';
 import { InventoryItem, FinancialRecord } from '../types/farm.ts';
-import { StatCard, PageHeader, UIButton, TableCard } from './ui';
+import { StatCard, PageHeader, UIButton, TableCard, DateRangePickerBar, DatePreset } from './ui';
 import {
   STOCK_SUMMARY,
   unitWiseStockSummary,
   liveStockRecords,
   StockRecord,
 } from '../data/liveStocks.ts';
+import { getInitialUrlFilters } from '../utils/urlFilters.ts';
 
 interface StocksViewProps {
   inventory: InventoryItem[];
@@ -37,10 +40,14 @@ interface StocksViewProps {
 }
 
 export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, onAddTransaction }) => {
+  const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
   const [activeTab, setActiveTab] = useState<'shipments' | 'add-stock' | 'warehouse'>('shipments');
-  const [selectedUnit, setSelectedUnit] = useState<string>('all');
+  const [selectedUnit, setSelectedUnit] = useState<string>(() => initialUrlFilters.unit);
   const [selectedFeedType, setSelectedFeedType] = useState<string>('all');
   const [selectedPayment, setSelectedPayment] = useState<string>('all');
+  const [fromDate, setFromDate] = useState<string>(() => initialUrlFilters.from);
+  const [toDate, setToDate] = useState<string>(() => initialUrlFilters.to);
+  const [preset, setPreset] = useState<DatePreset>(() => (initialUrlFilters.hasDateRange ? 'custom' : 'all'));
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [jumpPageInput, setJumpPageInput] = useState<string>('');
@@ -76,6 +83,92 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
   const [attachmentName, setAttachmentName] = useState<string>('');
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Edit Stock Record Modal State
+  const [editingStock, setEditingStock] = useState<StockRecord | null>(null);
+  const [editDate, setEditDate] = useState('');
+  const [editHead, setEditHead] = useState('FEED');
+  const [editType, setEditType] = useState('13');
+  const [editFlock, setEditFlock] = useState('Unit 1');
+  const [editQuantity, setEditQuantity] = useState<number>(0);
+  const [editAmount, setEditAmount] = useState<number>(0);
+  const [editPaymentType, setEditPaymentType] = useState('CASH');
+  const [editChallan, setEditChallan] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+
+  const openEditStockModal = (record: StockRecord) => {
+    setEditingStock(record);
+    setEditDate((record.rawDate || record.date || getLocalToday()).split('T')[0]);
+    setEditHead(record.head || 'FEED');
+    setEditType(record.type || '13');
+    setEditFlock(record.flockName || 'Unit 1');
+    setEditQuantity(Number(record.quantity) || 0);
+    setEditAmount(Number(record.amount) || 0);
+    setEditPaymentType(record.paymentType || 'CASH');
+    setEditChallan(record.challanNo || '');
+    setEditNotes(record.notes || '');
+  };
+
+  const handleSaveEditedStock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStock) return;
+    const qty = Math.max(0, Number(editQuantity) || 0);
+    const amt = Math.max(0, Number(editAmount) || 0);
+    const costBag = qty > 0 ? Math.round(amt / qty) : 0;
+    const flockId = editFlock === 'Unit 2' ? '9' : editFlock === 'Unit 3' ? '10' : '8';
+
+    const updatedRecord: StockRecord = {
+      ...editingStock,
+      date: editDate,
+      rawDate: editDate,
+      head: editHead,
+      category: editHead,
+      type: editType,
+      feedType: editHead === 'FEED' ? `Layer Feed ${editType}` : editType,
+      flockName: editFlock,
+      flockId,
+      quantity: qty,
+      bags: qty,
+      amount: amt,
+      costPerBag: costBag,
+      paymentType: editPaymentType,
+      challanNo: editChallan.trim(),
+      notes: editNotes.trim(),
+    };
+
+    const nextList = allStockRecords.map((r) => (r.id === updatedRecord.id ? updatedRecord : r));
+    setAllStockRecords(nextList);
+    try {
+      localStorage.setItem('greenova_stocks_v2', JSON.stringify(nextList));
+    } catch (err) {
+      console.warn('LocalStorage error:', err);
+    }
+
+    const resolvedId = updatedRecord.trackingId || updatedRecord.id;
+    fetch(`/api/stocks/${resolvedId}`, {
+      method: 'PUT',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: updatedRecord.id,
+        date: editDate,
+        challanNo: updatedRecord.challanNo,
+        Type: editType,
+        flockId: Number(flockId),
+        flockName: editFlock,
+        head: editHead,
+        quantity: qty,
+        amount: amt,
+        amountPaid: amt,
+        paymentType: editPaymentType,
+        notes: updatedRecord.notes,
+      }),
+    }).catch((err) => console.warn('Stock update persistence error:', err));
+
+    setEditingStock(null);
+    setToastMessage(`Stock record #${updatedRecord.trackingId} updated successfully.`);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const handleHeadChange = (newHead: string) => {
     setFormHead(newHead);
@@ -169,6 +262,8 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
       keepalive: true,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        clientId: newRecord.id,
+        trackingId: newRecord.trackingId,
         date: formDate,
         challanNo: formChallan,
         Type: formStockType,
@@ -219,9 +314,6 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
       }
     }
 
-    // Show toast and reset form
-    setToastMessage(`Stock record #${newRecord.trackingId} saved & automatically logged to Farm Expenses (Rs. ${amt.toLocaleString()})!`);
-    setTimeout(() => setToastMessage(null), 4000);
     handleResetForm();
     setActiveTab('shipments');
     setCurrentPage(1);
@@ -243,6 +335,9 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
       const paymentMatch =
         selectedPayment === 'all' || record.paymentType === selectedPayment;
 
+      const recDate = (record.date || '').slice(0, 10);
+      const dateMatch = (!fromDate || recDate >= fromDate) && (!toDate || recDate <= toDate);
+
       const q = searchQuery.trim().toLowerCase();
       const searchMatch =
         !q ||
@@ -253,9 +348,9 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
         record.notes.toLowerCase().includes(q) ||
         record.feedType.toLowerCase().includes(q);
 
-      return unitMatch && feedTypeMatch && paymentMatch && searchMatch;
+      return unitMatch && feedTypeMatch && paymentMatch && dateMatch && searchMatch;
     });
-  }, [allStockRecords, selectedUnit, selectedFeedType, selectedPayment, searchQuery]);
+  }, [allStockRecords, selectedUnit, selectedFeedType, selectedPayment, fromDate, toDate, searchQuery]);
 
   // Aggregated stats of filtered shipments
   const filteredStats = useMemo(() => {
@@ -289,10 +384,33 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
     }
   };
 
+  const handlePresetChange = (selectedPreset: DatePreset) => {
+    setPreset(selectedPreset);
+    setCurrentPage(1);
+    if (selectedPreset === 'all') {
+      setFromDate('');
+      setToDate('');
+    } else if (selectedPreset === 'today') {
+      const todayStr = getLocalToday();
+      setFromDate(todayStr);
+      setToDate(todayStr);
+    } else if (selectedPreset === '30d') {
+      const todayStr = getLocalToday();
+      const ref = new Date(todayStr);
+      const prior = new Date(ref);
+      prior.setDate(prior.getDate() - 30);
+      setFromDate(prior.toISOString().split('T')[0]);
+      setToDate(todayStr);
+    }
+  };
+
   const handleResetFilters = () => {
     setSelectedUnit('all');
     setSelectedFeedType('all');
     setSelectedPayment('all');
+    setFromDate('');
+    setToDate('');
+    setPreset('all');
     setSearchQuery('');
     setCurrentPage(1);
   };
@@ -875,7 +993,23 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
             </div>
           </div>
 
-          {/* Filters Bar */}
+          {/* Unified Date & Month/Year Range Picker Bar */}
+          <DateRangePickerBar
+            showFarmSelector={false}
+            showFlockSelector={false}
+            fromDate={fromDate}
+            toDate={toDate}
+            onDateChange={(from, to) => {
+              setFromDate(from);
+              setToDate(to);
+              setCurrentPage(1);
+            }}
+            activePreset={preset}
+            onPresetChange={handlePresetChange}
+            onReset={handleResetFilters}
+          />
+
+          {/* Search, Feed Type & Payment Filters Bar */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               {/* Search */}
@@ -999,14 +1133,6 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                 </button>
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="px-2.5 py-1 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer"
-            >
-              Reset Filters
-            </button>
           </div>
 
           {/* Table Card for Feed Stock with 10 records per page */}
@@ -1044,12 +1170,13 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                     <th className="py-3 px-3">Payment</th>
                     <th className="py-3 px-3">Challan #</th>
                     <th className="py-3 px-3">D.O. / Dispatch Notes</th>
+                    <th className="py-3 px-3 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedShipments.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="py-8 text-center text-slate-400">
+                      <td colSpan={12} className="py-8 text-center text-slate-400">
                         No feed stock records match the selected filter criteria.
                       </td>
                     </tr>
@@ -1072,7 +1199,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                                 : 'bg-teal-100 text-teal-900'
                             }`}
                           >
-                            Feed {record.type}
+                            {record.head === 'FEED' ? `Feed ${record.type}` : record.type}
                           </span>
                         </td>
                         <td className="py-3 px-3 font-bold text-slate-900">
@@ -1117,6 +1244,17 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                         </td>
                         <td className="py-3 px-3 text-slate-600 text-[11px] max-w-[200px] truncate" title={record.notes}>
                           {record.notes || '-'}
+                        </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => openEditStockModal(record)}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title={`Edit Stock Record #${record.trackingId}`}
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -1351,6 +1489,162 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Stock Record Modal */}
+      {editingStock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 my-auto">
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h2 className="text-base font-black text-slate-900">
+                  Edit Stock Record #{editingStock.trackingId}
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Update shipment date, unit, stock category, quantity, amount, or challan reference
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingStock(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedStock} className="mt-4 space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Unit / Flock</label>
+                  <select
+                    value={editFlock}
+                    onChange={(e) => setEditFlock(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-semibold bg-white"
+                  >
+                    <option value="Unit 1">Unit 1 (Shed 1)</option>
+                    <option value="Unit 2">Unit 2 (Shed 2)</option>
+                    <option value="Unit 3">Unit 3 (Shed 3)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Head / Category</label>
+                  <select
+                    value={editHead}
+                    onChange={(e) => setEditHead(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-semibold bg-white"
+                  >
+                    <option value="FEED">FEED</option>
+                    <option value="MEDICINE">MEDICINE</option>
+                    <option value="VACCINE">VACCINE</option>
+                    <option value="EQUIPMENT">EQUIPMENT</option>
+                    <option value="OTHER">OTHER</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Stock Type</label>
+                  <input
+                    type="text"
+                    required
+                    value={editType}
+                    onChange={(e) => setEditType(e.target.value)}
+                    placeholder="e.g. 13, 11, 12"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Quantity (Bags / Units)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={editQuantity}
+                    onChange={(e) => setEditQuantity(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Amount (PKR)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-mono font-bold text-emerald-800"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Payment Type</label>
+                  <select
+                    value={editPaymentType}
+                    onChange={(e) => setEditPaymentType(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-semibold bg-white"
+                  >
+                    <option value="CASH">CASH</option>
+                    <option value="BANK_TRANSFER">BANK_TRANSFER</option>
+                    <option value="CREDIT">CREDIT</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Challan No</label>
+                  <input
+                    type="text"
+                    value={editChallan}
+                    onChange={(e) => setEditChallan(e.target.value)}
+                    placeholder="e.g. 1445"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">D.O. / Dispatch Notes</label>
+                <textarea
+                  rows={2}
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingStock(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Egg,
   Layers,
@@ -29,8 +29,19 @@ import {
   Moon,
   ExternalLink,
 } from 'lucide-react';
-import { Farm, Flock, EggProduction, MortalityLog, FeedConsumption, FinancialRecord } from '../types/farm.ts';
+import {
+  Farm,
+  Flock,
+  EggProduction,
+  MortalityLog,
+  FeedConsumption,
+  FinancialRecord,
+  BankAccount,
+  InventoryItem,
+} from '../types/farm.ts';
 import { DateRangePickerBar, DatePreset } from './ui';
+import { getInitialUrlFilters } from '../utils/urlFilters.ts';
+import { DashboardTransactionModal, DashboardStockModal } from './DashboardQuickActionModals.tsx';
 import {
   SALES_SUMMARY,
   unitWiseSalesSummary,
@@ -61,6 +72,11 @@ interface DashboardViewProps {
   mortalityLogs: MortalityLog[];
   consumptionLogs: FeedConsumption[];
   financials: FinancialRecord[];
+  inventory?: InventoryItem[];
+  bankAccounts?: BankAccount[];
+  onAddTransaction?: (record: FinancialRecord) => void;
+  onAddBank?: (bank: BankAccount) => void;
+  onRestock?: (id: string, amount: number) => void;
   onOpenRecordModal: (type: 'egg' | 'mortality' | 'feed') => void;
   onNavigateTab: (tab: any) => void;
 }
@@ -72,6 +88,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   mortalityLogs,
   consumptionLogs,
   financials,
+  inventory = [],
+  bankAccounts = [],
+  onAddTransaction,
+  onAddBank,
+  onRestock,
   onOpenRecordModal,
   onNavigateTab,
 }) => {
@@ -85,11 +106,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
   const dynamicToday = getTodayDateStr();
 
-  // Date and Flock filter state - default to 'all' so user immediately sees complete farm totals
-  const [selectedFlock, setSelectedFlock] = useState('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [preset, setPreset] = useState<DatePreset>('all');
+  // Date and Flock filter state - hydrated from URL query params when opened from Report cards
+  const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
+  const [selectedFlock, setSelectedFlock] = useState<string>(() => initialUrlFilters.flockId);
+  const [fromDate, setFromDate] = useState(() => initialUrlFilters.from);
+  const [toDate, setToDate] = useState(() => initialUrlFilters.to);
+  const [preset, setPreset] = useState<DatePreset>(() => (initialUrlFilters.hasDateRange ? 'custom' : 'all'));
 
   // Interactive Graph States
   const [hoveredFinanceMonth, setHoveredFinanceMonth] = useState<number | null>(null);
@@ -97,6 +119,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [hoveredConsumptionIndex, setHoveredConsumptionIndex] = useState<number | null>(null);
   const [hoveredStockMonth, setHoveredStockMonth] = useState<number | null>(null);
   const [financeViewMode, setFinanceViewMode] = useState<'today' | 'monthly'>('monthly');
+  const [quickActionModal, setQuickActionModal] = useState<'sale' | 'expense' | 'stock' | null>(null);
+  const [stockRefreshKey, setStockRefreshKey] = useState(0);
+  const [actionToast, setActionToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'greenova_stocks_v2') {
+        setStockRefreshKey((k) => k + 1);
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  const showQuickToast = (msg: string) => {
+    setActionToast(msg);
+    setTimeout(() => setActionToast(null), 4000);
+  };
 
   // Handle preset selection
   const handlePresetChange = (selectedPreset: DatePreset) => {
@@ -117,6 +157,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       prior.setDate(prior.getDate() - 30);
       setFromDate(prior.toISOString().split('T')[0]);
       setToDate(todayStr);
+      setFinanceViewMode('monthly');
+    } else {
       setFinanceViewMode('monthly');
     }
   };
@@ -236,7 +278,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const matchDate = isDateMatch(s.date);
       return matchFlock && matchDate;
     });
-  }, [selectedFlock, fromDate, toDate]);
+  }, [selectedFlock, fromDate, toDate, stockRefreshKey]);
 
   // Active bird population in selected scope - dynamically reflects mortality deducted from flocks
   const liveBirdsCount = useMemo(() => {
@@ -298,37 +340,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // 3. Consumption Metrics
   const dynamicConsumption = useMemo(() => {
-    if (preset === 'today' || fromDate || toDate) {
-      const periodLogs = consumptionLogs.filter((c) => {
-        const matchFlock = isFlockMatch(c.flockId, c.flockName);
-        const matchDate = isDateMatch(c.date);
-        return matchFlock && matchDate;
-      });
-      const bags = periodLogs.reduce((sum, c) => sum + (c.bags || Math.round((c.feedQuantityKg || 0) / 50)), 0);
-      const feedKg = periodLogs.reduce((sum, c) => sum + (c.feedQuantityKg || (c.bags || 0) * 50), 0);
-      const waterL = periodLogs.reduce((sum, c) => sum + (c.waterIntakeLiters || 0), 0);
-      const avgGrams =
-        periodLogs.length > 0
-          ? Number((periodLogs.reduce((s, c) => s + (c.gramsPerBird || 118), 0) / periodLogs.length).toFixed(1))
-          : 0;
-      const avgFcr =
-        periodLogs.length > 0
-          ? Number((periodLogs.reduce((s, c) => s + (c.fcrEstimate || 1.48), 0) / periodLogs.length).toFixed(2))
-          : 0;
-      return { bags, feedKg, waterL, fcr: avgFcr, intakeGrams: avgGrams };
-    }
-    // All-time or period
-    if (selectedFlock === 'Unit 1' || selectedFlock === '8') {
-      return { bags: 8640, feedKg: 432000, waterL: 968000, fcr: 1.47, intakeGrams: 117 };
-    }
-    if (selectedFlock === 'Unit 2' || selectedFlock === '9') {
-      return { bags: 34845, feedKg: 1742250, waterL: 3902000, fcr: 1.48, intakeGrams: 118 };
-    }
-    if (selectedFlock === 'Unit 3' || selectedFlock === '10') {
-      return { bags: 7060, feedKg: 353000, waterL: 791000, fcr: 1.47, intakeGrams: 119 };
-    }
-    return { bags: 50545, feedKg: 2527250, waterL: 5661000, fcr: 1.48, intakeGrams: 118 };
-  }, [preset, selectedFlock, consumptionLogs, fromDate, toDate]);
+    const periodLogs = consumptionLogs.filter((c) => {
+      const matchFlock = isFlockMatch(c.flockId, c.flockName);
+      const matchDate = isDateMatch(c.date);
+      return matchFlock && matchDate;
+    });
+    const bags = periodLogs.reduce(
+      (sum, c) => sum + (c.bags || Math.round((c.feedQuantityKg || 0) / 50)),
+      0
+    );
+    const feedKg = periodLogs.reduce(
+      (sum, c) => sum + (c.feedQuantityKg || (c.bags || 0) * 50),
+      0
+    );
+    const waterL = periodLogs.reduce((sum, c) => sum + (c.waterIntakeLiters || 0), 0);
+    const avgGrams =
+      periodLogs.length > 0
+        ? Number(
+            (
+              periodLogs.reduce((s, c) => s + (c.gramsPerBird || 118), 0) / periodLogs.length
+            ).toFixed(1)
+          )
+        : 0;
+    const avgFcr =
+      periodLogs.length > 0
+        ? Number(
+            (
+              periodLogs.reduce((s, c) => s + (c.fcrEstimate || 1.48), 0) / periodLogs.length
+            ).toFixed(2)
+          )
+        : 0;
+    return { bags, feedKg, waterL, fcr: avgFcr, intakeGrams: avgGrams };
+  }, [selectedFlock, consumptionLogs, fromDate, toDate]);
 
   // 4. Stock Metrics
   const dynamicStock = useMemo(() => {
@@ -556,17 +599,74 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [eggProductions, financials, mortalityLogs, flocks, preset, fromDate, toDate]);
 
-  // Month-by-month financial ledger (Apr – Nov 2026)
-  const monthlyFinanceData = [
-    { month: 'Apr 2026', short: 'Apr', income: 191845900, expense: 196840320, net: -4994420 },
-    { month: 'May 2026', short: 'May', income: 21450200, expense: 26890450, net: -5440250 },
-    { month: 'Jun 2026', short: 'Jun', income: 24180400, expense: 29750120, net: -5569720 },
-    { month: 'Jul 2026', short: 'Jul', income: 23620900, expense: 31200400, net: -7579500 },
-    { month: 'Aug 2026', short: 'Aug', income: 24510300, expense: 33450900, net: -8940600 },
-    { month: 'Sep 2026', short: 'Sep', income: 22765100, expense: 28910400, net: -6145300 },
-    { month: 'Oct 2026', short: 'Oct', income: 4407277, expense: 14610538.6, net: -10203261.6 },
-    { month: 'Nov 2026', short: 'Nov', income: 10738000, expense: 13950000, net: -3212000 },
-  ];
+  // Month-by-month financial ledger (Dynamically computed from sales & expenses, Apr – Nov 2026+)
+  const monthlyFinanceData = useMemo(() => {
+    const monthMap = new Map<string, { month: string; short: string; key: string; income: number; expense: number; net: number }>();
+
+    const seededMonths = [
+      { key: '2026-04', month: 'Apr 2026', short: 'Apr' },
+      { key: '2026-05', month: 'May 2026', short: 'May' },
+      { key: '2026-06', month: 'Jun 2026', short: 'Jun' },
+      { key: '2026-07', month: 'Jul 2026', short: 'Jul' },
+      { key: '2026-08', month: 'Aug 2026', short: 'Aug' },
+      { key: '2026-09', month: 'Sep 2026', short: 'Sep' },
+      { key: '2026-10', month: 'Oct 2026', short: 'Oct' },
+      { key: '2026-11', month: 'Nov 2026', short: 'Nov' },
+    ];
+
+    for (const m of seededMonths) {
+      monthMap.set(m.key, { key: m.key, month: m.month, short: m.short, income: 0, expense: 0, net: 0 });
+    }
+
+    const getOrCreateMonth = (dateStr: string | undefined) => {
+      if (!dateStr) return null;
+      const mKey = String(dateStr).slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(mKey)) return null;
+      if (!monthMap.has(mKey)) {
+        const [yr, mo] = mKey.split('-').map(Number);
+        const dObj = new Date(yr, (mo || 1) - 1, 1);
+        const monthLabel = isNaN(dObj.getTime())
+          ? mKey
+          : dObj.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        const shortLabel = isNaN(dObj.getTime())
+          ? mKey.slice(5)
+          : dObj.toLocaleDateString('en-US', { month: 'short' });
+        monthMap.set(mKey, { key: mKey, month: monthLabel, short: shortLabel, income: 0, expense: 0, net: 0 });
+      }
+      return monthMap.get(mKey)!;
+    };
+
+    const combinedSales = [
+      ...financials.filter((f) => f.type === 'Income'),
+      ...liveSalesRecords.filter((ls) => !financials.some((f) => f.id === ls.id)),
+    ].filter((s: any) => isFlockMatch(s.flockId, s.flockName || s.flock));
+
+    for (const sale of combinedSales) {
+      const bucket = getOrCreateMonth(sale.date);
+      if (bucket) {
+        bucket.income += Number(sale.amount) || 0;
+      }
+    }
+
+    const combinedExpenses = [
+      ...financials.filter((f) => f.type === 'Expense'),
+      ...liveExpenseRecords.filter((le) => !financials.some((f) => f.id === le.id)),
+    ].filter((e: any) => isFlockMatch(e.flockId, e.flockName || (e as any).flock));
+
+    for (const exp of combinedExpenses) {
+      const bucket = getOrCreateMonth(exp.date);
+      if (bucket) {
+        bucket.expense += Number(exp.amount) || 0;
+      }
+    }
+
+    return Array.from(monthMap.values())
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .map((item) => ({
+        ...item,
+        net: item.income - item.expense,
+      }));
+  }, [financials, selectedFlock]);
 
   // Selected flock label for titles
   const scopeLabel = useMemo(() => {
@@ -579,9 +679,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-12 sm:space-y-16 pb-20">
+      {/* Toast feedback for Dashboard quick-add actions */}
+      {actionToast && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-emerald-500/40 flex items-center space-x-2.5 text-xs font-semibold animate-in fade-in slide-in-from-bottom-3">
+          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{actionToast}</span>
+        </div>
+      )}
+
       {/* Top Banner / Hero Bar */}
       <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 rounded-2xl p-6 sm:p-7 text-white shadow-md relative overflow-hidden border border-emerald-500/20">
-        <div className="relative z-10 max-w-3xl">
+        <div className="relative z-10 max-w-5xl">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold mb-3 border border-emerald-400/30">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>
@@ -602,6 +710,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="mt-5 flex flex-wrap gap-2.5">
             <button
+              type="button"
               onClick={() => onOpenRecordModal('egg')}
               className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer flex items-center space-x-1.5"
             >
@@ -609,12 +718,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span>Record Daily Eggs</span>
             </button>
             <button
+              type="button"
               onClick={() => onOpenRecordModal('feed')}
               className="bg-slate-800/90 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl border border-slate-700 transition-colors cursor-pointer"
             >
               + Log Feed &amp; Water
             </button>
             <button
+              type="button"
+              onClick={() => setQuickActionModal('sale')}
+              className="bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center space-x-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Sale</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickActionModal('expense')}
+              className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center space-x-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Record Expense</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickActionModal('stock')}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center space-x-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Stock Record</span>
+            </button>
+            <button
+              type="button"
               onClick={() => onNavigateTab('reports')}
               className="bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-bold text-xs px-4 py-2.5 rounded-xl border border-emerald-600/40 transition-colors cursor-pointer flex items-center space-x-1"
             >
@@ -701,7 +836,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             rel="noopener noreferrer"
             className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center space-x-1 self-start sm:self-auto cursor-pointer"
           >
-            <span>Open Sales Ledger (New Tab)</span>
+            <span>Open Sales Ledger</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>
@@ -738,7 +873,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
               <span>Dispatched Volume: <strong className="text-slate-900 font-mono">{(dynamicFinance.itemsSold / 360).toFixed(1)} cartons</strong> <span className="text-[11px] text-slate-400">({dynamicFinance.itemsSold.toLocaleString()} eggs)</span></span>
               <span className="font-bold text-emerald-700 group-hover:text-emerald-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Open Sales (New Tab)</span>
+                <span>Open Sales</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
@@ -774,7 +909,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
               <span className="truncate max-w-[160px]">Scope: <strong className="text-slate-900">{scopeLabel}</strong></span>
               <span className="font-bold text-rose-600 group-hover:text-rose-800 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Open Expenses (New Tab)</span>
+                <span>Open Expenses</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
@@ -826,7 +961,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {dynamicFinance.isProfit ? `+${dynamicFinance.profitMarginPercent}% Margin` : `${dynamicFinance.profitMarginPercent}% Margin`}
               </span>
               <span className="font-bold text-slate-700 group-hover:text-amber-700 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>P&L Reports (New Tab)</span>
+                <span>P&amp;L Reports</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
@@ -893,7 +1028,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Scope: <strong className="text-slate-900 font-mono">{liveBirdsCount.toLocaleString()}</strong> birds
               </span>
               <span className="font-bold text-teal-700 group-hover:text-teal-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Flock Details (New Tab)</span>
+                <span>Flock Details</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
@@ -941,7 +1076,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {dynamicFinance.revenue > 0 ? `${((dynamicFinance.online / dynamicFinance.revenue) * 100).toFixed(1)}% online` : '0%'}
               </span>
               <span className="font-bold text-purple-700 group-hover:text-purple-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Payment Register (New Tab)</span>
+                <span>Payment Register</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
@@ -978,7 +1113,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
               <span className="text-slate-600">Disbursed: <strong className="text-slate-900 font-mono">Rs. {Math.round(dynamicStock.amount).toLocaleString()}</strong></span>
               <span className="font-bold text-indigo-700 group-hover:text-indigo-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Open Stocks (New Tab)</span>
+                <span>Open Stocks</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
@@ -992,7 +1127,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <h3 className="text-sm font-black text-slate-900">
                 {preset === 'today' && financeViewMode === 'today'
                   ? "Today's Revenue by Units"
-                  : 'Commercial Revenue vs. Expenses Timeline (April – November 2026)'}
+                  : `Commercial Revenue vs. Expenses Timeline (${monthlyFinanceData[0]?.month || 'Apr 2026'} – ${monthlyFinanceData[monthlyFinanceData.length - 1]?.month || 'Nov 2026'})`}
               </h3>
               <p className="text-xs text-slate-500">
                 {preset === 'today' && financeViewMode === 'today'
@@ -1088,111 +1223,161 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             })()
           ) : (
             /* MONTHLY INCOME VS EXPENSE TIMELINE SVG CHART */
-            <div className="relative w-full h-64 bg-slate-50/50 rounded-xl p-3 border border-slate-100">
-              <svg className="w-full h-full" viewBox="0 0 700 220" preserveAspectRatio="none">
-                <line x1="40" y1="20" x2="680" y2="20" stroke="#e2e8f0" strokeDasharray="3 3" />
-                <line x1="40" y1="70" x2="680" y2="70" stroke="#e2e8f0" strokeDasharray="3 3" />
-                <line x1="40" y1="120" x2="680" y2="120" stroke="#e2e8f0" strokeDasharray="3 3" />
-                <line x1="40" y1="170" x2="680" y2="170" stroke="#cbd5e1" strokeWidth="1.5" />
+            (() => {
+              const rawMax = Math.max(
+                ...monthlyFinanceData.map((m) => Math.max(m.income, m.expense)),
+                1000
+              );
+              const magnitude = Math.pow(10, Math.floor(Math.log10(rawMax)));
+              const tickStep = Math.max(1, magnitude / 2);
+              const maxVal = Math.max(3, Math.ceil(rawMax / (3 * tickStep)) * (3 * tickStep));
+              const fmtAxis = (v: number) => {
+                if (v <= 0) return '0';
+                if (v >= 1_000_000) {
+                  const m = v / 1_000_000;
+                  return `Rs.${Number.isInteger(m) ? m : m.toFixed(1)}M`;
+                }
+                if (v >= 1_000) return `Rs.${Math.round(v / 1_000)}K`;
+                return `Rs.${Math.round(v)}`;
+              };
 
-                <text x="35" y="24" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">Rs.200M</text>
-                <text x="35" y="74" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">Rs.100M</text>
-                <text x="35" y="124" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">Rs.50M</text>
-                <text x="35" y="174" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">0</text>
+              const count = Math.max(1, monthlyFinanceData.length);
+              const plotLeft = 58;
+              const plotRight = 724;
+              const plotWidth = plotRight - plotLeft;
+              const step = plotWidth / count;
+              const barGap = 4;
+              const barW = Math.max(8, Math.min(26, Math.floor((step - 16) / 2)));
+              const groupWidth = barW * 2 + barGap;
 
-                {monthlyFinanceData.map((item, idx) => {
-                  const maxVal = 210000000;
-                  const colWidth = 70;
-                  const startX = 65 + idx * 88;
-                  const incHeight = Math.max(4, (item.income / maxVal) * 150);
-                  const expHeight = Math.max(4, (item.expense / maxVal) * 150);
-                  const incY = 170 - incHeight;
-                  const expY = 170 - expHeight;
-                  const isHovered = hoveredFinanceMonth === idx;
+              return (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-end gap-4 text-[11px] font-semibold text-slate-600 px-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-emerald-600 inline-block"></span>
+                      <span>Revenue (Income)</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-rose-500 inline-block"></span>
+                      <span>Expenses</span>
+                    </span>
+                  </div>
+                  <div className="relative w-full h-64 bg-slate-50/50 rounded-xl p-3 border border-slate-100">
+                    <svg className="w-full h-full" viewBox="0 0 740 220" preserveAspectRatio="none">
+                      <line x1={plotLeft} y1="20" x2={plotRight} y2="20" stroke="#e2e8f0" strokeDasharray="3 3" />
+                      <line x1={plotLeft} y1="70" x2={plotRight} y2="70" stroke="#e2e8f0" strokeDasharray="3 3" />
+                      <line x1={plotLeft} y1="120" x2={plotRight} y2="120" stroke="#e2e8f0" strokeDasharray="3 3" />
+                      <line x1={plotLeft} y1="170" x2={plotRight} y2="170" stroke="#cbd5e1" strokeWidth="1.5" />
 
-                  return (
-                    <g
-                      key={item.month}
-                      className="cursor-pointer transition-all duration-200"
-                      onMouseEnter={() => setHoveredFinanceMonth(idx)}
-                      onMouseLeave={() => setHoveredFinanceMonth(null)}
-                    >
-                      {isHovered && (
-                        <rect
-                          x={startX - 10}
-                          y="15"
-                          width={colWidth + 20}
-                          height="160"
-                          fill="#059669"
-                          opacity="0.08"
-                          rx="8"
-                        />
-                      )}
-                      <rect
-                        x={startX}
-                        y={incY}
-                        width="26"
-                        height={incHeight}
-                        fill="#059669"
-                        rx="3"
-                        className="transition-all hover:opacity-90"
-                      />
-                      <rect
-                        x={startX + 30}
-                        y={expY}
-                        width="26"
-                        height={expHeight}
-                        fill="#f43f5e"
-                        rx="3"
-                        className="transition-all hover:opacity-90"
-                      />
-                      <text
-                        x={startX + 28}
-                        y="192"
-                        fontSize="11"
-                        fontWeight={isHovered ? 'bold' : 'normal'}
-                        fill={isHovered ? '#0f172a' : '#64748b'}
-                        textAnchor="middle"
+                      <text x={plotLeft - 6} y="24" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">{fmtAxis(maxVal)}</text>
+                      <text x={plotLeft - 6} y="74" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">{fmtAxis((maxVal * 2) / 3)}</text>
+                      <text x={plotLeft - 6} y="124" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">{fmtAxis(maxVal / 3)}</text>
+                      <text x={plotLeft - 6} y="174" fontSize="10" fill="#94a3b8" textAnchor="end" fontFamily="monospace">0</text>
+
+                      {monthlyFinanceData.map((item, idx) => {
+                        const cellCenter = plotLeft + step * (idx + 0.5);
+                        const startX = cellCenter - groupWidth / 2;
+                        const incHeight = item.income > 0 ? Math.max(4, (item.income / maxVal) * 150) : 0;
+                        const expHeight = item.expense > 0 ? Math.max(4, (item.expense / maxVal) * 150) : 0;
+                        const incY = 170 - incHeight;
+                        const expY = 170 - expHeight;
+                        const isHovered = hoveredFinanceMonth === idx;
+
+                        return (
+                          <g
+                            key={item.key || item.month}
+                            className="cursor-pointer transition-all duration-200"
+                            onMouseEnter={() => setHoveredFinanceMonth(idx)}
+                            onMouseLeave={() => setHoveredFinanceMonth(null)}
+                          >
+                            <rect
+                              x={plotLeft + step * idx + 2}
+                              y="15"
+                              width={Math.max(10, step - 4)}
+                              height="165"
+                              fill={isHovered ? '#059669' : 'transparent'}
+                              opacity={isHovered ? '0.08' : '0'}
+                              rx="8"
+                            />
+                            {incHeight > 0 && (
+                              <rect
+                                x={startX}
+                                y={incY}
+                                width={barW}
+                                height={incHeight}
+                                fill="#059669"
+                                rx="3"
+                                className="transition-all hover:opacity-90"
+                              />
+                            )}
+                            {expHeight > 0 && (
+                              <rect
+                                x={startX + barW + barGap}
+                                y={expY}
+                                width={barW}
+                                height={expHeight}
+                                fill="#f43f5e"
+                                rx="3"
+                                className="transition-all hover:opacity-90"
+                              />
+                            )}
+                            <text
+                              x={cellCenter}
+                              y="192"
+                              fontSize="11"
+                              fontWeight={isHovered ? 'bold' : 'normal'}
+                              fill={isHovered ? '#0f172a' : '#64748b'}
+                              textAnchor="middle"
+                            >
+                              {item.short}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+
+                    {hoveredFinanceMonth !== null && monthlyFinanceData[hoveredFinanceMonth] && (
+                      <div
+                        className="absolute z-20 pointer-events-none bg-slate-900/95 text-white p-3 rounded-xl shadow-xl text-xs space-y-1.5 border border-slate-700 min-w-[220px]"
+                        style={{
+                          ...(hoveredFinanceMonth >= count - 2
+                            ? { right: '16px' }
+                            : { left: `${Math.min(68, Math.max(8, 8 + (hoveredFinanceMonth / count) * 78))}%` }),
+                          top: '10px',
+                        }}
                       >
-                        {item.short}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-
-              {hoveredFinanceMonth !== null && (
-                <div
-                  className="absolute z-20 pointer-events-none bg-slate-900/95 text-white p-3 rounded-xl shadow-xl text-xs space-y-1.5 border border-slate-700 min-w-[210px]"
-                  style={{
-                    left: `${Math.min(75, 12 + hoveredFinanceMonth * 12)}%`,
-                    top: '10px',
-                  }}
-                >
-                  <div className="font-bold text-amber-300 border-b border-slate-700 pb-1">
-                    {monthlyFinanceData[hoveredFinanceMonth].month} Ledger Summary
-                  </div>
-                  <div className="flex justify-between items-center text-slate-200">
-                    <span>Income:</span>
-                    <span className="font-mono font-bold text-emerald-400">
-                      Rs. {monthlyFinanceData[hoveredFinanceMonth].income.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-slate-200">
-                    <span>Expense:</span>
-                    <span className="font-mono font-bold text-rose-400">
-                      Rs. {monthlyFinanceData[hoveredFinanceMonth].expense.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pt-1 border-t border-slate-700 text-slate-300">
-                    <span>Net Difference:</span>
-                    <span className="font-mono font-bold text-amber-400">
-                      Rs. {monthlyFinanceData[hoveredFinanceMonth].net.toLocaleString()}
-                    </span>
+                        <div className="font-bold text-amber-300 border-b border-slate-700 pb-1">
+                          {monthlyFinanceData[hoveredFinanceMonth].month} Ledger Summary
+                        </div>
+                        <div className="flex justify-between items-center text-slate-200">
+                          <span>Income:</span>
+                          <span className="font-mono font-bold text-emerald-400">
+                            Rs. {Math.round(monthlyFinanceData[hoveredFinanceMonth].income).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-200">
+                          <span>Expense:</span>
+                          <span className="font-mono font-bold text-rose-400">
+                            Rs. {Math.round(monthlyFinanceData[hoveredFinanceMonth].expense).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1 border-t border-slate-700 text-slate-300">
+                          <span>Net Difference:</span>
+                          <span
+                            className={`font-mono font-bold ${
+                              monthlyFinanceData[hoveredFinanceMonth].net >= 0 ? 'text-emerald-400' : 'text-amber-400'
+                            }`}
+                          >
+                            {monthlyFinanceData[hoveredFinanceMonth].net < 0 ? '-' : '+'}Rs.{' '}
+                            {Math.abs(Math.round(monthlyFinanceData[hoveredFinanceMonth].net)).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
+              );
+            })()
           )}
         </div>
 
@@ -1410,7 +1595,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-emerald-700 font-bold">
                     <span className="text-[11px] text-slate-500 font-medium">{unit.status}</span>
                     <span className="flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                      <span>Open Flocks (New Tab)</span>
+                      <span>Open Flocks</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </span>
                   </div>
@@ -1445,7 +1630,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             rel="noopener noreferrer"
             className="text-xs font-bold text-amber-700 hover:text-amber-900 flex items-center space-x-1 self-start sm:self-auto cursor-pointer"
           >
-            <span>Open Egg Production Registry (New Tab)</span>
+            <span>Open Egg Production Registry</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>
@@ -1661,7 +1846,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             rel="noopener noreferrer"
             className="text-xs font-bold text-blue-700 hover:text-blue-900 flex items-center space-x-1 self-start sm:self-auto cursor-pointer"
           >
-            <span>Open Consumption Logs (New Tab)</span>
+            <span>Open Consumption Logs</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>
@@ -1754,18 +1939,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
             {([
-              { name: 'Unit 1 (Shed 1)', id: '8', allBags: 8640, allWater: '968,000 L', g: 117 },
-              { name: 'Unit 2 (Shed 2)', id: '9', allBags: 34845, allWater: '3,902,000 L', g: 118 },
-              { name: 'Unit 3 (Shed 3)', id: '10', allBags: 7060, allWater: '791,000 L', g: 119 },
+              { name: 'Unit 1 (Shed 1)', id: '8', allWater: '968,000 L', g: 117 },
+              { name: 'Unit 2 (Shed 2)', id: '9', allWater: '3,902,000 L', g: 118 },
+              { name: 'Unit 3 (Shed 3)', id: '10', allWater: '791,000 L', g: 76 },
             ] as const).map((u) => {
-              const unitPeriodLogs = consumptionLogs.filter((c) => isRecordForUnit(c.flockId, c.flockName, u.id, u.name) && isDateMatch(c.date));
-              const unitBags = preset === 'all' && !fromDate && !toDate
-                ? u.allBags
-                : unitPeriodLogs.reduce((s, c) => s + (c.bags || Math.round((c.feedQuantityKg || 0) / 50)), 0);
+              const unitPeriodLogs = consumptionLogs.filter(
+                (c) => isRecordForUnit(c.flockId, c.flockName, u.id, u.name) && isDateMatch(c.date)
+              );
+              const unitBags = unitPeriodLogs.reduce(
+                (s, c) => s + (c.bags || Math.round((c.feedQuantityKg || 0) / 50)),
+                0
+              );
               const unitKg = unitBags * 50;
-              const unitWater = preset === 'all' && !fromDate && !toDate
-                ? u.allWater
-                : `${unitPeriodLogs.reduce((s, c) => s + (c.waterIntakeLiters || 0), 0).toLocaleString()} L`;
+              const loggedWater = unitPeriodLogs.reduce(
+                (s, c) => s + (c.waterIntakeLiters || 0),
+                0
+              );
+              const unitWater =
+                preset === 'all' && !fromDate && !toDate && loggedWater === 0
+                  ? u.allWater
+                  : `${loggedWater.toLocaleString()} L`;
 
               return (
                 <div key={u.id} className="p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
@@ -1809,7 +2002,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             rel="noopener noreferrer"
             className="text-xs font-bold text-indigo-700 hover:text-indigo-900 flex items-center space-x-1 self-start sm:self-auto cursor-pointer"
           >
-            <span>Open Stock Ledger (New Tab)</span>
+            <span>Open Stock Ledger</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>
@@ -1923,6 +2116,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         )}
       </section>
+
+      {/* Dashboard Quick Action Modals (Add Sale, Record Expense, Add Stock Record) */}
+      {onAddTransaction && (
+        <DashboardTransactionModal
+          isOpen={quickActionModal === 'sale' || quickActionModal === 'expense'}
+          initialType={quickActionModal === 'expense' ? 'Expense' : 'Income'}
+          bankAccounts={bankAccounts}
+          onClose={() => setQuickActionModal(null)}
+          onAddTransaction={onAddTransaction}
+          onAddBank={onAddBank}
+          onSuccessToast={showQuickToast}
+        />
+      )}
+
+      <DashboardStockModal
+        isOpen={quickActionModal === 'stock'}
+        inventory={inventory}
+        onClose={() => setQuickActionModal(null)}
+        onRestock={onRestock}
+        onAddTransaction={onAddTransaction}
+        onStockSaved={() => setStockRefreshKey((k) => k + 1)}
+        onSuccessToast={showQuickToast}
+      />
     </div>
   );
 };

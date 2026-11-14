@@ -173,6 +173,7 @@ import { liveStockRecords } from '../data/liveStocks.ts';
 import { liveSalesRecords } from '../data/liveSales.ts';
 import { liveEggProductions } from '../data/liveEggProductions.ts';
 import { liveExpenseRecords } from '../data/liveExpenses.ts';
+import { liveConsumptionRecords } from '../data/liveConsumptions.ts';
 
 let rawStocks: any[] = liveStockRecords.map((r: any) => ({
   id: r.trackingId,
@@ -306,20 +307,21 @@ let birdHealthItems: any[] = [
   },
 ];
 
-let allConsumptions: any[] = rawStocks.map((stk: any, idx: number) => ({
-  id: stk.trackingId || idx + 1,
-  date: stk.date ? (stk.date.includes('T') ? stk.date : `${stk.date}T00:00:00.000Z`) : new Date().toISOString(),
-  flockId: Number(stk.flockId) || 8,
-  flock: { id: Number(stk.flockId) || 8, flockName: stk.flockName || 'Unit 1' },
-  feedConsumed: Number(stk.quantity) || 0,
-  feedQuantityKg: (Number(stk.quantity) || 0) * 50,
-  waterConsumed: 0,
-  waterConsumption: 0,
+let allConsumptions: any[] = liveConsumptionRecords.map((c: any, idx: number) => ({
+  id: c.trackingId || idx + 1,
+  clientId: c.id,
+  date: c.date ? (c.date.includes('T') ? c.date : `${c.date}T00:00:00.000Z`) : new Date().toISOString(),
+  flockId: Number(c.flockId) || 8,
+  flock: { id: Number(c.flockId) || 8, flockName: c.flockName || 'Unit 1' },
+  feedConsumed: Number(c.bags) || Math.round((Number(c.feedQuantityKg) || 0) / 50),
+  feedQuantityKg: Number(c.feedQuantityKg) || (Number(c.bags) || 0) * 50,
+  waterConsumed: Number(c.waterIntakeLiters) || 0,
+  waterConsumption: Number(c.waterIntakeLiters) || 0,
   medicineConsumed: 0,
   vaccineConsumed: 0,
-  feedType: stk.feedType || `Layer Feed ${stk.type || '13'}`,
-  challanNo: stk.challanNo,
-  notes: stk.notes,
+  feedType: c.feedType || 'Layer Feed 13',
+  challanNo: c.challanNo,
+  notes: c.notes,
 }));
 
 let stockStoreData: any = {
@@ -1162,13 +1164,18 @@ apiRouter.post(['/daily-consumption', '/daily-consumptions'], (req: Request, res
   const flockName = foundFlock ? foundFlock.flockName : (fid === 8 ? 'Unit 1' : fid === 9 ? 'Unit 2' : 'Unit 3');
   const newConsumption = {
     id: allConsumptions.length > 0 ? Math.max(...allConsumptions.map(c => Number(c.id) || 0)) + 1 : 1,
+    clientId: body.clientId || null,
+    trackingId: body.trackingId || null,
+    challanNo: body.challanNo || undefined,
     date: body.date ? new Date(body.date).toISOString() : (body.consumptionDate ? new Date(body.consumptionDate).toISOString() : new Date().toISOString()),
     flockId: fid,
     flock: { id: fid, flockName },
+    feedType: body.feedType || 'Layer Phase-2 Mash',
     feedConsumed: Number(body.feedConsumed ?? body.feedBags ?? body.bags ?? 0),
-    waterConsumed: Number(body.waterConsumed ?? body.waterLiters ?? body.water ?? 0),
+    waterConsumed: Number(body.waterConsumed ?? body.waterConsumption ?? body.waterLiters ?? body.water ?? 0),
     medicineConsumed: Number(body.medicineConsumed || 0),
     vaccineConsumed: Number(body.vaccineConsumed || 0),
+    notes: body.notes || '',
     isUserAdded: true,
   };
   allConsumptions.unshift(newConsumption);
@@ -1177,15 +1184,55 @@ apiRouter.post(['/daily-consumption', '/daily-consumptions'], (req: Request, res
 });
 
 apiRouter.put(['/daily-consumption/:id', '/daily-consumptions/:id'], (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+  const rawId = String(req.params.id);
+  const id = Number(rawId);
   const body = req.body || {};
-  const idx = allConsumptions.findIndex(c => c.id === id);
+  const idx = allConsumptions.findIndex(
+    (c: any) =>
+      (!isNaN(id) && Number(c.id) === id) ||
+      String(c.id) === rawId ||
+      (c.clientId && (String(c.clientId) === rawId || String(c.clientId) === String(body.id || '')))
+  );
   if (idx >= 0) {
-    allConsumptions[idx] = { ...allConsumptions[idx], ...body, id };
+    const existing = allConsumptions[idx];
+    const resolvedFid = body.flockId !== undefined ? Number(body.flockId) || existing.flockId : existing.flockId;
+    const foundFlock = flockItems.find(f => Number(f.id) === Number(resolvedFid));
+    const resolvedFlockName = body.flockName || foundFlock?.flockName || existing.flock?.flockName || 'Unit 1';
+    const resolvedBags =
+      body.feedConsumed !== undefined
+        ? Number(body.feedConsumed)
+        : body.bags !== undefined
+        ? Number(body.bags)
+        : body.feedQuantityKg !== undefined
+        ? Math.round(Number(body.feedQuantityKg) / 50)
+        : existing.feedConsumed;
+    const resolvedWater =
+      body.waterConsumed !== undefined
+        ? Number(body.waterConsumed)
+        : body.waterIntakeLiters !== undefined
+        ? Number(body.waterIntakeLiters)
+        : body.waterConsumption !== undefined
+        ? Number(body.waterConsumption)
+        : existing.waterConsumed;
+
+    allConsumptions[idx] = {
+      ...existing,
+      ...body,
+      id: existing.id,
+      flockId: resolvedFid,
+      flock: { id: resolvedFid, flockName: resolvedFlockName },
+      feedConsumed: resolvedBags,
+      waterConsumed: resolvedWater,
+      feedType: body.feedType || existing.feedType,
+      challanNo: body.challanNo !== undefined ? body.challanNo : existing.challanNo,
+      notes: body.notes !== undefined ? body.notes : existing.notes,
+      date: body.date ? (String(body.date).includes('T') ? body.date : `${body.date}T00:00:00.000Z`) : existing.date,
+      updatedAt: new Date().toISOString(),
+    };
     saveStore();
     return res.json({ message: 'success', data: allConsumptions[idx] });
   }
-  res.json({ message: 'success', data: { id, ...body } });
+  res.json({ message: 'success', data: { id: rawId, ...body } });
 });
 
 apiRouter.delete(['/daily-consumption/:id', '/daily-consumptions/:id'], (req: Request, res: Response) => {
@@ -1292,15 +1339,39 @@ apiRouter.post('/bird-health', (req: Request, res: Response) => {
 });
 
 apiRouter.put('/bird-health/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+  const rawId = String(req.params.id);
+  const id = Number(rawId);
   const body = req.body || {};
-  const idx = birdHealthItems.findIndex(b => b.id === id);
+  const idx = birdHealthItems.findIndex(
+    (b: any) =>
+      (!isNaN(id) && Number(b.id) === id) ||
+      String(b.id) === rawId ||
+      (b.clientId && (String(b.clientId) === rawId || String(b.clientId) === String(body.id || '')))
+  );
   if (idx >= 0) {
-    birdHealthItems[idx] = { ...birdHealthItems[idx], ...body, id };
+    const existing = birdHealthItems[idx] as any;
+    const resolvedFid = body.flockId !== undefined ? Number(body.flockId) || existing.flockId : existing.flockId;
+    const foundFlock = flockItems.find(f => Number(f.id) === Number(resolvedFid));
+    const resolvedFlockName = body.flockName || foundFlock?.flockName || existing.flock?.flockName || 'Unit 1';
+    const newMort = body.mortality !== undefined ? Number(body.mortality) : (body.count !== undefined ? Number(body.count) : Number(existing.mortality) || 0);
+
+    birdHealthItems[idx] = {
+      ...existing,
+      ...body,
+      id: existing.id,
+      flockId: resolvedFid,
+      flock: { id: resolvedFid, flockName: resolvedFlockName },
+      mortality: newMort,
+      cause: body.cause !== undefined ? body.cause : (body.notes !== undefined ? body.notes : existing.cause),
+      notes: body.symptoms !== undefined ? body.symptoms : (body.notes !== undefined ? body.notes : existing.notes),
+      recordedBy: body.recordedBy !== undefined ? body.recordedBy : existing.recordedBy,
+      date: body.date ? (String(body.date).includes('T') ? body.date : `${body.date}T00:00:00.000Z`) : existing.date,
+      updatedAt: new Date().toISOString(),
+    };
     saveStore();
     return res.json({ message: 'success', data: birdHealthItems[idx] });
   }
-  res.json({ message: 'success', data: { id, ...body } });
+  res.json({ message: 'success', data: { id: rawId, ...body } });
 });
 
 apiRouter.delete('/bird-health/:id', (req: Request, res: Response) => {
@@ -1500,6 +1571,8 @@ apiRouter.post(['/expense', '/expenses'], (req: Request, res: Response) => {
   const expDate = body.expenseDate ? new Date(body.expenseDate).toISOString() : (body.date ? new Date(body.date).toISOString() : new Date().toISOString());
   const newExp = {
     id: rawExpenses.length > 0 ? Math.max(...rawExpenses.map((e: any) => Number(e.id) || 0)) + 1 : 1216,
+    clientId: body.clientId || null,
+    trackingId: body.trackingId || null,
     expenseDate: expDate,
     date: expDate,
     challanNo: body.challanNo || '1450',
@@ -1521,10 +1594,14 @@ apiRouter.post(['/expense', '/expenses'], (req: Request, res: Response) => {
 });
 
 apiRouter.put(['/expense/:id', '/expenses/:id'], (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+  const rawId = String(req.params.id);
+  const id = Number(rawId);
   const body = req.body || {};
   const idx = rawExpenses.findIndex(
-    (e: any) => Number(e.id) === id || String(e.id) === String(req.params.id) || Number(e.trackingId) === id
+    (e: any) =>
+      (!isNaN(id) && (Number(e.id) === id || Number(e.trackingId) === id)) ||
+      String(e.id) === rawId ||
+      (e.clientId && (String(e.clientId) === rawId || String(e.clientId) === String(body.id || '')))
   );
   if (idx >= 0) {
     const existing = rawExpenses[idx];
@@ -1545,7 +1622,7 @@ apiRouter.put(['/expense/:id', '/expenses/:id'], (req: Request, res: Response) =
     persistExpenseToSupabase(rawExpenses[idx]);
     return res.json({ message: 'success', data: rawExpenses[idx] });
   }
-  res.json({ message: 'success', data: { id, ...body } });
+  res.json({ message: 'success', data: { id: rawId, ...body } });
 });
 
 apiRouter.delete(['/expense/:id', '/expenses/:id'], (req: Request, res: Response) => {
@@ -1622,6 +1699,8 @@ apiRouter.post('/stocks', (req: Request, res: Response) => {
   const fname = foundFlock ? foundFlock.flockName : (fid === 8 ? 'Unit 1' : fid === 9 ? 'Unit 2' : 'Unit 3');
   const newStock = {
     id: rawStocks.length > 0 ? Math.max(...rawStocks.map((s: any) => Number(s.id) || 0)) + 1 : 1,
+    clientId: body.clientId || null,
+    trackingId: body.trackingId || null,
     date: body.date ? new Date(body.date).toISOString() : new Date().toISOString(),
     challanNo: body.challanNo || '1445',
     Type: body.Type || 'FEED',
@@ -1632,6 +1711,7 @@ apiRouter.post('/stocks', (req: Request, res: Response) => {
     notes: body.notes || '',
     attachment: body.attachment || null,
     amountPaid: Number(body.amountPaid) || 550000,
+    amount: Number(body.amount ?? body.amountPaid) || 550000,
     paymentType: body.paymentType || 'CASH',
     isUserAdded: true,
     createdAt: new Date().toISOString(),
@@ -1644,16 +1724,37 @@ apiRouter.post('/stocks', (req: Request, res: Response) => {
 });
 
 apiRouter.put('/stocks/:id', (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+  const rawId = String(req.params.id);
+  const id = Number(rawId);
   const body = req.body || {};
-  const idx = rawStocks.findIndex((s: any) => s.id === id);
+  const idx = rawStocks.findIndex(
+    (s: any) =>
+      (!isNaN(id) && (Number(s.id) === id || Number(s.trackingId) === id)) ||
+      String(s.id) === rawId ||
+      (s.clientId && (String(s.clientId) === rawId || String(s.clientId) === String(body.clientId || body.id || '')))
+  );
   if (idx >= 0) {
-    rawStocks[idx] = { ...rawStocks[idx], ...body, id, updatedAt: new Date().toISOString() };
+    const existing = rawStocks[idx];
+    const resolvedFid = body.flockId !== undefined ? Number(body.flockId) || existing.flockId : existing.flockId;
+    const foundFlock = flockItems.find(f => Number(f.id) === Number(resolvedFid));
+    const resolvedFlockName = body.flockName || foundFlock?.flockName || existing.flock?.flockName || 'Unit 1';
+    const resolvedAmt = body.amountPaid !== undefined ? Number(body.amountPaid) : body.amount !== undefined ? Number(body.amount) : existing.amountPaid;
+    rawStocks[idx] = {
+      ...existing,
+      ...body,
+      id: existing.id,
+      flockId: resolvedFid,
+      flock: { id: resolvedFid, flockName: resolvedFlockName },
+      quantity: body.quantity !== undefined ? Number(body.quantity) : existing.quantity,
+      amountPaid: resolvedAmt,
+      amount: resolvedAmt,
+      updatedAt: new Date().toISOString(),
+    };
     saveStore();
     persistStockToSupabase(rawStocks[idx]);
     return res.json({ message: 'success', data: rawStocks[idx] });
   }
-  res.json({ message: 'success', data: { id, ...body } });
+  res.json({ message: 'success', data: { id: rawId, ...body } });
 });
 
 apiRouter.delete('/stocks/:id', (req: Request, res: Response) => {
@@ -1737,6 +1838,8 @@ apiRouter.post(['/sale', '/sales'], (req: Request, res: Response) => {
   const sDate = body.saleDate ? new Date(body.saleDate).toISOString() : (body.date ? new Date(body.date).toISOString() : new Date().toISOString());
   const newSale = {
     id: rawSales.length > 0 ? Math.max(...rawSales.map((s: any) => Number(s.id) || 0)) + 1 : 1,
+    clientId: body.clientId || null,
+    trackingId: body.trackingId || null,
     date: sDate,
     saleDate: sDate,
     challanNo: body.challanNo || '1440',
@@ -1767,10 +1870,14 @@ apiRouter.post(['/sale', '/sales'], (req: Request, res: Response) => {
 });
 
 apiRouter.put(['/sale/:id', '/sales/:id'], (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+  const rawId = String(req.params.id);
+  const id = Number(rawId);
   const body = req.body || {};
   const idx = rawSales.findIndex(
-    (s: any) => Number(s.id) === id || String(s.id) === String(req.params.id) || Number(s.trackingId) === id
+    (s: any) =>
+      (!isNaN(id) && (Number(s.id) === id || Number(s.trackingId) === id)) ||
+      String(s.id) === rawId ||
+      (s.clientId && (String(s.clientId) === rawId || String(s.clientId) === String(body.id || '')))
   );
   if (idx >= 0) {
     const existing = rawSales[idx];
@@ -1795,7 +1902,7 @@ apiRouter.put(['/sale/:id', '/sales/:id'], (req: Request, res: Response) => {
     persistSaleToSupabase(rawSales[idx]);
     return res.json({ message: 'success', data: rawSales[idx] });
   }
-  res.json({ message: 'success', data: { id, ...body } });
+  res.json({ message: 'success', data: { id: rawId, ...body } });
 });
 
 apiRouter.delete(['/sale/:id', '/sales/:id'], (req: Request, res: Response) => {

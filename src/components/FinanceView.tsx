@@ -43,6 +43,7 @@ import {
   liveSalesBreakdown,
   unitWiseSalesSummary,
 } from '../data/liveSales.ts';
+import { getInitialUrlFilters } from '../utils/urlFilters.ts';
 import {
   StatCard,
   PageHeader,
@@ -86,16 +87,17 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     return financials[0]?.date || getTodayDateStr();
   }, [financials]);
 
+  const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
   const [showModal, setShowModal] = useState(false);
   const [editingTx, setEditingTx] = useState<FinancialRecord | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'Income' | 'Expense'>(defaultType);
-  const [selectedUnit, setSelectedUnit] = useState<string>('all');
-  const [selectedHead, setSelectedHead] = useState<string>('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [preset, setPreset] = useState<DatePreset>('all');
+  const [selectedUnit, setSelectedUnit] = useState<string>(() => initialUrlFilters.unit);
+  const [selectedHead, setSelectedHead] = useState<string>(() => initialUrlFilters.head);
+  const [fromDate, setFromDate] = useState(() => initialUrlFilters.from);
+  const [toDate, setToDate] = useState(() => initialUrlFilters.to);
+  const [preset, setPreset] = useState<DatePreset>(() => (initialUrlFilters.hasDateRange ? 'custom' : 'all'));
   const [showAllHeads, setShowAllHeads] = useState(false);
 
   // Interactive Revenue Graph States (Monthly vs Weekly)
@@ -114,6 +116,16 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   // Synchronize if defaultType changes from navigation
   useEffect(() => {
     setSelectedType(defaultType);
+    const nextTxType = defaultType === 'Expense' ? 'Expense' : 'Income';
+    const defSaleAmt = 40 * 360 * 17.5;
+    setNewRecord((prev) => ({
+      ...prev,
+      type: nextTxType,
+      head: nextTxType === 'Income' ? 'EGG' : 'FEED',
+      amount: nextTxType === 'Income' ? defSaleAmt : 150000,
+      onlineAmount: nextTxType === 'Income' ? defSaleAmt : 0,
+      cashAmount: 0,
+    }));
   }, [defaultType]);
 
   // Reset to first page whenever any filter or search changes
@@ -153,13 +165,21 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   const [showQuickBankModal, setShowQuickBankModal] = useState(false);
 
   const [newRecord, setNewRecord] = useState({
-    type: defaultType === 'Expense' ? ('Expense' as const) : ('Income' as const),
-    head: defaultType === 'Income' ? 'EGG' : 'FEED',
+    date: getTodayDateStr(),
+    type: defaultType === 'Expense' ? ('Expense' as 'Income' | 'Expense') : ('Income' as 'Income' | 'Expense'),
+    head: defaultType === 'Expense' ? 'FEED' : 'EGG',
     flockName: 'Unit 1',
     flockId: 8,
-    amount: defaultType === 'Income' ? 250000 : 150000,
+    cartons: 40,
+    trays: 0,
+    looseEggs: 0,
+    otherQty: 1,
+    unitPrice: 17.5,
+    amount: defaultType === 'Expense' ? 150000 : 40 * 360 * 17.5,
+    partyName: '',
+    vehicleNumber: '',
     paymentMode: 'Online' as 'Online' | 'Cash' | 'Split',
-    onlineAmount: defaultType === 'Income' ? 250000 : 0,
+    onlineAmount: defaultType === 'Expense' ? 0 : 40 * 360 * 17.5,
     cashAmount: 0,
     bankId: '',
     referenceNo: `INV-${Date.now().toString().slice(-4)}`,
@@ -169,15 +189,49 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
   const [attachmentName, setAttachmentName] = useState<string>('');
+  const [formError, setFormError] = useState<string | null>(null);
   const [previewRecord, setPreviewRecord] = useState<FinancialRecord | null>(null);
+
+  const openAddModal = () => {
+    const nextTxType = selectedType === 'Expense' ? 'Expense' : 'Income';
+    const initCartons = 40;
+    const initPrice = 17.5;
+    const defSaleAmt = Math.round(initCartons * 360 * initPrice);
+    setFormError(null);
+    setNewRecord({
+      date: getTodayDateStr(),
+      type: nextTxType,
+      head: nextTxType === 'Income' ? 'EGG' : 'FEED',
+      flockName: 'Unit 1',
+      flockId: 8,
+      cartons: initCartons,
+      trays: 0,
+      looseEggs: 0,
+      otherQty: 1,
+      unitPrice: initPrice,
+      amount: nextTxType === 'Income' ? defSaleAmt : 150000,
+      partyName: '',
+      vehicleNumber: '',
+      paymentMode: 'Online',
+      onlineAmount: nextTxType === 'Income' ? defSaleAmt : 0,
+      cashAmount: 0,
+      bankId: bankAccounts.length > 0 ? bankAccounts[0].id : '',
+      referenceNo: `INV-${Date.now().toString().slice(-4)}`,
+      challanNo: `${Math.floor(100 + Math.random() * 900)}`,
+      description: '',
+    });
+    handleRemoveAttachment();
+    setShowModal(true);
+  };
 
   const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        alert('File size exceeds 10MB limit.');
+        setFormError('File size exceeds 10MB limit.');
         return;
       }
+      setFormError(null);
       setAttachmentName(file.name);
       const reader = new FileReader();
       reader.onload = () => {
@@ -964,14 +1018,32 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     }
   };
 
+  const totalFormEggs = Math.max(
+    0,
+    (Number(newRecord.cartons) || 0) * 360 +
+      (Number(newRecord.trays) || 0) * 30 +
+      (Number(newRecord.looseEggs) || 0)
+  );
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const isSaleEntry = newRecord.type === 'Income';
+    if (!newRecord.amount || Number(newRecord.amount) <= 0) {
+      setFormError('Please enter a valid positive amount.');
+      return;
+    }
+    if (isSaleEntry && newRecord.head === 'EGG' && totalFormEggs <= 0) {
+      setFormError('Please enter at least 1 carton, tray, or egg.');
+      return;
+    }
+    setFormError(null);
+
     const fid = newRecord.flockName === 'Unit 1' ? 8 : newRecord.flockName === 'Unit 2' ? 9 : 10;
     const trackingId = Date.now().toString().slice(-4);
 
     let onlinePayment = 0;
     let cashPayment = 0;
-    if (newRecord.type === 'Income') {
+    if (isSaleEntry) {
       if (newRecord.paymentMode === 'Online') {
         onlinePayment = Number(newRecord.amount);
         cashPayment = 0;
@@ -980,44 +1052,72 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         cashPayment = Number(newRecord.amount);
       } else {
         onlinePayment = Number(newRecord.onlineAmount) || 0;
-        cashPayment = Number(newRecord.cashAmount) || Math.max(0, Number(newRecord.amount) - onlinePayment);
+        cashPayment =
+          Number(newRecord.cashAmount) || Math.max(0, Number(newRecord.amount) - onlinePayment);
       }
     }
 
     const effectiveBankId =
-      newRecord.type === 'Income' && newRecord.paymentMode !== 'Cash'
+      isSaleEntry && newRecord.paymentMode !== 'Cash'
         ? newRecord.bankId || (bankAccounts.length > 0 ? bankAccounts[0].id : '')
         : '';
     const matchedBank = bankAccounts.find((b) => String(b.id) === String(effectiveBankId));
 
-    const record: FinancialRecord & { onlinePayment?: number; cashPayment?: number; quantity?: number; unitPrice?: number } = {
-      id: `${newRecord.type === 'Income' ? 'inc' : 'exp'}-${trackingId}`,
+    const finalQty = isSaleEntry
+      ? newRecord.head === 'EGG'
+        ? totalFormEggs
+        : Number(newRecord.otherQty) || 1
+      : undefined;
+
+    const computedUnitPrice =
+      isSaleEntry && finalQty && finalQty > 0
+        ? Number(newRecord.unitPrice) > 0
+          ? Number(newRecord.unitPrice)
+          : Number((Number(newRecord.amount) / finalQty).toFixed(2))
+        : undefined;
+
+    const record: FinancialRecord = {
+      id: `${isSaleEntry ? 'inc' : 'exp'}-${Date.now()}`,
       trackingId: Number(trackingId),
       type: newRecord.type,
       category: newRecord.head,
       head: newRecord.head,
       amount: Number(newRecord.amount),
-      date: getTodayDateStr(),
+      totalAmount: Number(newRecord.amount),
+      date: newRecord.date || getTodayDateStr(),
       referenceNo: newRecord.referenceNo,
       challanNo: newRecord.challanNo,
       flockId: fid,
       flockName: newRecord.flockName,
-      description: newRecord.description || `${newRecord.head}: Manual entry`,
+      partyName: newRecord.partyName.trim() || undefined,
+      vehicleNumber: newRecord.vehicleNumber.trim() || undefined,
+      description:
+        newRecord.description ||
+        (newRecord.partyName.trim()
+          ? `${newRecord.head} Sale — ${newRecord.partyName.trim()}`
+          : `${newRecord.head}: Manual entry`),
       notes: newRecord.description,
       status: 'Paid',
-      paymentMethod: newRecord.type === 'Income'
-        ? (newRecord.paymentMode === 'Online' ? 'Online / Bank' : newRecord.paymentMode === 'Cash' ? 'Cash Counter' : 'Split (Online/Cash)')
+      paymentMethod: isSaleEntry
+        ? newRecord.paymentMode === 'Online'
+          ? 'Online / Bank'
+          : newRecord.paymentMode === 'Cash'
+          ? 'Cash Counter'
+          : 'Split (Online/Cash)'
         : 'Bank Transfer',
-      onlinePayment: onlinePayment,
-      cashPayment: cashPayment,
+      onlinePayment,
+      cashPayment,
       bankId: matchedBank?.id || undefined,
       bankName: matchedBank?.bankName || undefined,
-      quantity: Math.round(Number(newRecord.amount) / 17.5),
-      unitPrice: 17.5,
+      quantity: finalQty,
+      unitPrice: computedUnitPrice,
+      cartons: isSaleEntry && newRecord.head === 'EGG' ? newRecord.cartons : undefined,
+      trays: isSaleEntry && newRecord.head === 'EGG' ? newRecord.trays : undefined,
+      looseEggs: isSaleEntry && newRecord.head === 'EGG' ? newRecord.looseEggs : undefined,
       attachment: attachmentData || null,
       attachmentName: attachmentName || null,
     };
-    onAddTransaction(record as FinancialRecord);
+    onAddTransaction(record);
     setShowModal(false);
     handleRemoveAttachment();
   };
@@ -1065,9 +1165,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <UIButton
               variant={selectedType === 'Expense' ? 'danger' : 'primary'}
               icon={Plus}
-              onClick={() => setShowModal(true)}
+              onClick={openAddModal}
             >
-              {selectedType === 'Expense' ? 'Record Expense' : 'Record Transaction'}
+              {selectedType === 'Expense'
+                ? 'Record Expense'
+                : selectedType === 'Income'
+                ? 'Add Sale'
+                : 'Record Transaction'}
             </UIButton>
           </div>
         }
@@ -2475,7 +2579,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                           Rs. {fin.amount.toLocaleString(undefined, { maximumFractionDigits: 1 })}
                         </td>
                         <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">
-                          {s.vehicleNumber || 'ABC'} {s.challanNo ? `(#${s.challanNo})` : ''}
+                          <div>
+                            {s.vehicleNumber || 'ABC'} {s.challanNo ? `(#${s.challanNo})` : ''}
+                          </div>
+                          {s.partyName && (
+                            <div className="text-[10px] text-slate-500 font-sans truncate max-w-[140px]">
+                              {s.partyName}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-3 text-center">
                           {fin.attachment || fin.attachmentName ? (
@@ -2725,45 +2836,90 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
       </TableCard>
 
-      {/* Record Transaction Modal */}
+      {/* Record Transaction Modal (Spacious Sales & Expense Form) */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
-                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-                  <DollarSign className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-xs p-3 sm:p-5 overflow-y-auto">
+          <div
+            className={`bg-white rounded-2xl w-full shadow-2xl border border-slate-200/90 animate-in fade-in zoom-in-95 duration-150 my-auto max-h-[92vh] overflow-y-auto ${
+              newRecord.type === 'Income' ? 'max-w-3xl p-6 sm:p-8' : 'max-w-xl p-6 sm:p-7'
+            }`}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center space-x-3">
+                <div
+                  className={`p-2.5 rounded-xl ${
+                    newRecord.type === 'Income'
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : 'bg-rose-50 text-rose-600'
+                  }`}
+                >
+                  <DollarSign className="w-5 h-5" />
                 </div>
-                <h2 className="text-base font-bold text-slate-900">
-                  {newRecord.type === 'Income' ? 'Record Sales & Receipt' : 'Record Voucher / Expense (21 Heads)'}
-                </h2>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                    {newRecord.type === 'Income'
+                      ? 'Record Sales & Receipt'
+                      : 'Record Voucher / Expense (21 Heads)'}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {newRecord.type === 'Income'
+                      ? 'Commercial sales invoice, egg cartons/trays volume, party details & payment channel'
+                      : 'Log operational expense voucher across 21 audited expense heads'}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer p-1.5 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <UISelect
-                  label="Transaction Type"
-                  value={newRecord.type}
-                  onChange={(e) => {
-                    const nextType = e.target.value as 'Expense' | 'Income';
-                    setNewRecord({
-                      ...newRecord,
-                      type: nextType,
-                      head: nextType === 'Income' ? 'EGG' : 'FEED',
-                    });
-                  }}
-                >
-                  <option value="Expense">Expense (Cost)</option>
-                  <option value="Income">Income (Sales)</option>
-                </UISelect>
+            <form onSubmit={handleSubmit} className="mt-6 space-y-6 text-xs">
+              {formError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-semibold flex items-center gap-2">
+                  <Info className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {/* Primary Details (No Transaction Type field on Sales form — defaults to Income/Sales) */}
+              <div
+                className={`grid grid-cols-1 ${
+                  newRecord.type === 'Income'
+                    ? 'sm:grid-cols-3'
+                    : selectedType === 'all'
+                    ? 'sm:grid-cols-3'
+                    : 'sm:grid-cols-2'
+                } gap-4 sm:gap-5`}
+              >
+                <UIInput
+                  label="Date"
+                  type="date"
+                  required
+                  value={newRecord.date}
+                  onChange={(e) => setNewRecord({ ...newRecord, date: e.target.value })}
+                />
+
+                {selectedType === 'all' && newRecord.type !== 'Income' && (
+                  <UISelect
+                    label="Transaction Type"
+                    value={newRecord.type}
+                    onChange={(e) => {
+                      const nextType = e.target.value as 'Expense' | 'Income';
+                      setNewRecord({
+                        ...newRecord,
+                        type: nextType,
+                        head: nextType === 'Income' ? 'EGG' : 'FEED',
+                      });
+                    }}
+                  >
+                    <option value="Expense">Expense (Cost)</option>
+                    <option value="Income">Income (Sales)</option>
+                  </UISelect>
+                )}
 
                 <UISelect
                   label="Unit / Flock"
@@ -2772,7 +2928,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     setNewRecord({
                       ...newRecord,
                       flockName: e.target.value,
-                      flockId: e.target.value === 'Unit 1' ? 8 : e.target.value === 'Unit 2' ? 9 : 10,
+                      flockId:
+                        e.target.value === 'Unit 1' ? 8 : e.target.value === 'Unit 2' ? 9 : 10,
                     })
                   }
                 >
@@ -2780,50 +2937,362 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <option value="Unit 2">Unit 2 (Flock 9)</option>
                   <option value="Unit 3">Unit 3 (Flock 10)</option>
                 </UISelect>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <UISelect
-                  label={newRecord.type === 'Income' ? 'Sales Category / Head' : 'Expense Head (21 Heads)'}
-                  value={newRecord.head}
-                  onChange={(e) => setNewRecord({ ...newRecord, head: e.target.value })}
-                >
-                  {newRecord.type === 'Income' ? (
-                    ['EGG', 'Manure', 'Feed BAGS', 'Cull Birds', 'OTHER'].map((h) => (
+                {newRecord.type === 'Income' && (
+                  <UISelect
+                    label="Sales Category / Head"
+                    value={newRecord.head}
+                    onChange={(e) => {
+                      const nextHead = e.target.value;
+                      if (nextHead === 'EGG') {
+                        const rate =
+                          newRecord.unitPrice > 0 && newRecord.unitPrice < 200
+                            ? newRecord.unitPrice
+                            : 17.5;
+                        const calcAmt = Math.round(totalFormEggs * rate);
+                        setNewRecord({
+                          ...newRecord,
+                          head: nextHead,
+                          unitPrice: rate,
+                          amount: calcAmt,
+                          onlineAmount:
+                            newRecord.paymentMode === 'Online'
+                              ? calcAmt
+                              : newRecord.paymentMode === 'Cash'
+                              ? 0
+                              : Math.round(calcAmt * 0.8),
+                          cashAmount:
+                            newRecord.paymentMode === 'Cash'
+                              ? calcAmt
+                              : newRecord.paymentMode === 'Online'
+                              ? 0
+                              : Math.round(calcAmt * 0.2),
+                        });
+                      } else {
+                        setNewRecord({ ...newRecord, head: nextHead, unitPrice: 0 });
+                      }
+                    }}
+                  >
+                    {['EGG', 'Manure', 'Feed BAGS', 'Cull Birds', 'OTHER'].map((h) => (
                       <option key={h} value={h}>
                         {h}
                       </option>
-                    ))
-                  ) : (
-                    EXPENSE_HEADS_21.map((h) => (
+                    ))}
+                  </UISelect>
+                )}
+              </div>
+
+              {/* Dynamic Egg Counter (shown whenever EGG category is selected in Sales form) */}
+              {newRecord.type === 'Income' && newRecord.head === 'EGG' && (
+                <div className="p-4 sm:p-5 bg-sky-50/50 rounded-2xl border border-sky-200/80 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-sky-900">
+                      Egg Dispatch Counter
+                    </span>
+                    <span className="text-[11px] font-semibold text-sky-700">
+                      1 Carton = 360 Eggs • 1 Tray = 30 Eggs
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-4">
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600 mb-1.5">
+                        Cartons (360)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={newRecord.cartons}
+                        onChange={(e) => {
+                          const c = Math.max(0, parseInt(e.target.value) || 0);
+                          const eggsSum = c * 360 + newRecord.trays * 30 + newRecord.looseEggs;
+                          const nextAmt =
+                            newRecord.unitPrice > 0
+                              ? Math.round(eggsSum * newRecord.unitPrice)
+                              : newRecord.amount;
+                          setNewRecord({
+                            ...newRecord,
+                            cartons: c,
+                            amount: nextAmt,
+                            onlineAmount:
+                              newRecord.paymentMode === 'Online'
+                                ? nextAmt
+                                : newRecord.paymentMode === 'Cash'
+                                ? 0
+                                : Math.round(nextAmt * 0.8),
+                            cashAmount:
+                              newRecord.paymentMode === 'Cash'
+                                ? nextAmt
+                                : newRecord.paymentMode === 'Online'
+                                ? 0
+                                : Math.round(nextAmt * 0.2),
+                          });
+                        }}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-center"
+                      />
+                      <span className="text-[10px] text-slate-500 mt-1 block text-center font-mono">
+                        ={(newRecord.cartons * 360).toLocaleString()} eggs
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600 mb-1.5">
+                        Trays (30)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={newRecord.trays}
+                        onChange={(e) => {
+                          const t = Math.max(0, parseInt(e.target.value) || 0);
+                          const eggsSum = newRecord.cartons * 360 + t * 30 + newRecord.looseEggs;
+                          const nextAmt =
+                            newRecord.unitPrice > 0
+                              ? Math.round(eggsSum * newRecord.unitPrice)
+                              : newRecord.amount;
+                          setNewRecord({
+                            ...newRecord,
+                            trays: t,
+                            amount: nextAmt,
+                            onlineAmount:
+                              newRecord.paymentMode === 'Online'
+                                ? nextAmt
+                                : newRecord.paymentMode === 'Cash'
+                                ? 0
+                                : Math.round(nextAmt * 0.8),
+                            cashAmount:
+                              newRecord.paymentMode === 'Cash'
+                                ? nextAmt
+                                : newRecord.paymentMode === 'Online'
+                                ? 0
+                                : Math.round(nextAmt * 0.2),
+                          });
+                        }}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-center"
+                      />
+                      <span className="text-[10px] text-slate-500 mt-1 block text-center font-mono">
+                        ={(newRecord.trays * 30).toLocaleString()} eggs
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600 mb-1.5">
+                        Eggs (Loose)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={newRecord.looseEggs}
+                        onChange={(e) => {
+                          const l = Math.max(0, parseInt(e.target.value) || 0);
+                          const eggsSum = newRecord.cartons * 360 + newRecord.trays * 30 + l;
+                          const nextAmt =
+                            newRecord.unitPrice > 0
+                              ? Math.round(eggsSum * newRecord.unitPrice)
+                              : newRecord.amount;
+                          setNewRecord({
+                            ...newRecord,
+                            looseEggs: l,
+                            amount: nextAmt,
+                            onlineAmount:
+                              newRecord.paymentMode === 'Online'
+                                ? nextAmt
+                                : newRecord.paymentMode === 'Cash'
+                                ? 0
+                                : Math.round(nextAmt * 0.8),
+                            cashAmount:
+                              newRecord.paymentMode === 'Cash'
+                                ? nextAmt
+                                : newRecord.paymentMode === 'Online'
+                                ? 0
+                                : Math.round(nextAmt * 0.2),
+                          });
+                        }}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-center"
+                      />
+                      <span className="text-[10px] text-slate-500 mt-1 block text-center font-mono">
+                        loose eggs
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-blue-700 mb-1.5">
+                        Total Eggs
+                      </label>
+                      <div className="w-full px-3 py-2.5 bg-sky-100/80 border border-sky-300 rounded-xl font-mono text-base font-black text-sky-950 text-center flex items-center justify-center shadow-2xs">
+                        {totalFormEggs.toLocaleString()}
+                      </div>
+                      <span className="text-[10px] text-blue-700 font-bold mt-1 block text-center font-mono">
+                        {(totalFormEggs / 360).toFixed(1)} Cartons
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pricing & Amount */}
+              {newRecord.type === 'Income' ? (
+                <div
+                  className={`grid grid-cols-1 ${
+                    newRecord.head !== 'EGG' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+                  } gap-4 sm:gap-5`}
+                >
+                  {newRecord.head !== 'EGG' && (
+                    <UIInput
+                      label="Quantity (Bags / Birds / Units)"
+                      type="number"
+                      min="1"
+                      value={newRecord.otherQty}
+                      onChange={(e) => {
+                        const qty = Math.max(0, Number(e.target.value));
+                        const nextAmt =
+                          newRecord.unitPrice > 0
+                            ? Math.round(qty * newRecord.unitPrice)
+                            : newRecord.amount;
+                        setNewRecord({
+                          ...newRecord,
+                          otherQty: qty,
+                          amount: nextAmt,
+                          onlineAmount:
+                            newRecord.paymentMode === 'Online'
+                              ? nextAmt
+                              : newRecord.paymentMode === 'Cash'
+                              ? 0
+                              : Math.round(nextAmt * 0.8),
+                          cashAmount:
+                            newRecord.paymentMode === 'Cash'
+                              ? nextAmt
+                              : newRecord.paymentMode === 'Online'
+                              ? 0
+                              : Math.round(nextAmt * 0.2),
+                        });
+                      }}
+                    />
+                  )}
+
+                  <div>
+                    <UIInput
+                      label={newRecord.head === 'EGG' ? 'Price / Egg (PKR)' : 'Unit Price (PKR)'}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={newRecord.unitPrice}
+                      onChange={(e) => {
+                        const price = Math.max(0, Number(e.target.value));
+                        const qty = newRecord.head === 'EGG' ? totalFormEggs : newRecord.otherQty;
+                        const nextAmt = Math.round(qty * price);
+                        setNewRecord({
+                          ...newRecord,
+                          unitPrice: price,
+                          amount: nextAmt,
+                          onlineAmount:
+                            newRecord.paymentMode === 'Online'
+                              ? nextAmt
+                              : newRecord.paymentMode === 'Cash'
+                              ? 0
+                              : Math.round(nextAmt * 0.8),
+                          cashAmount:
+                            newRecord.paymentMode === 'Cash'
+                              ? nextAmt
+                              : newRecord.paymentMode === 'Online'
+                              ? 0
+                              : Math.round(nextAmt * 0.2),
+                        });
+                      }}
+                    />
+                    {newRecord.head === 'EGG' && (
+                      <span className="text-[10px] text-emerald-700 font-semibold mt-1 block font-mono">
+                        = Rs. {Math.round((Number(newRecord.unitPrice) || 0) * 360).toLocaleString()} / carton
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <UIInput
+                      label="Total Sale Amount (PKR)"
+                      type="number"
+                      min="1"
+                      required
+                      value={newRecord.amount}
+                      onChange={(e) => {
+                        const amt = Number(e.target.value);
+                        setNewRecord({
+                          ...newRecord,
+                          amount: amt,
+                          onlineAmount:
+                            newRecord.paymentMode === 'Online'
+                              ? amt
+                              : newRecord.paymentMode === 'Cash'
+                              ? 0
+                              : Math.round(amt * 0.8),
+                          cashAmount:
+                            newRecord.paymentMode === 'Cash'
+                              ? amt
+                              : newRecord.paymentMode === 'Online'
+                              ? 0
+                              : Math.round(amt * 0.2),
+                        });
+                      }}
+                    />
+                    {newRecord.head === 'EGG' && totalFormEggs > 0 && newRecord.amount > 0 && (
+                      <span className="text-[10px] text-slate-500 mt-1 block font-mono">
+                        Avg: Rs. {(newRecord.amount / totalFormEggs).toFixed(2)}/egg
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                  <UISelect
+                    label="Expense Head (21 Heads)"
+                    value={newRecord.head}
+                    onChange={(e) => setNewRecord({ ...newRecord, head: e.target.value })}
+                  >
+                    {EXPENSE_HEADS_21.map((h) => (
                       <option key={h} value={h}>
                         {h.replace('_', ' ')}
                       </option>
-                    ))
-                  )}
-                </UISelect>
+                    ))}
+                  </UISelect>
 
-                <UIInput
-                  label="Amount (PKR)"
-                  type="number"
-                  min="1"
-                  required
-                  value={newRecord.amount}
-                  onChange={(e) => {
-                    const amt = Number(e.target.value);
-                    setNewRecord({
-                      ...newRecord,
-                      amount: amt,
-                      onlineAmount: newRecord.paymentMode === 'Online' ? amt : newRecord.paymentMode === 'Cash' ? 0 : Math.round(amt * 0.8),
-                      cashAmount: newRecord.paymentMode === 'Cash' ? amt : newRecord.paymentMode === 'Online' ? 0 : Math.round(amt * 0.2),
-                    });
-                  }}
-                />
-              </div>
+                  <UIInput
+                    label="Amount (PKR)"
+                    type="number"
+                    min="1"
+                    required
+                    value={newRecord.amount}
+                    onChange={(e) =>
+                      setNewRecord({ ...newRecord, amount: Number(e.target.value) })
+                    }
+                  />
+                </div>
+              )}
+
+              {/* Party Name & Vehicle Number (Sales) */}
+              {newRecord.type === 'Income' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                  <UIInput
+                    label="Party / Buyer Name"
+                    type="text"
+                    placeholder="e.g. Ahmed Traders / Bismillah Eggs"
+                    value={newRecord.partyName}
+                    onChange={(e) => setNewRecord({ ...newRecord, partyName: e.target.value })}
+                  />
+
+                  <UIInput
+                    label="Vehicle Number"
+                    type="text"
+                    placeholder="e.g. MN-1234 or ABC"
+                    value={newRecord.vehicleNumber}
+                    onChange={(e) =>
+                      setNewRecord({ ...newRecord, vehicleNumber: e.target.value })
+                    }
+                  />
+                </div>
+              )}
 
               {/* Payment Channel Selector for Sales Receipts */}
               {newRecord.type === 'Income' && (
-                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2.5">
+                <div className="p-4 sm:p-5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3.5">
                   <UISelect
                     label="Payment Channel / Receipt Method"
                     value={newRecord.paymentMode}
@@ -2832,8 +3301,18 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                       setNewRecord({
                         ...newRecord,
                         paymentMode: mode,
-                        onlineAmount: mode === 'Online' ? newRecord.amount : mode === 'Cash' ? 0 : Math.round(newRecord.amount * 0.8),
-                        cashAmount: mode === 'Cash' ? newRecord.amount : mode === 'Online' ? 0 : Math.round(newRecord.amount * 0.2),
+                        onlineAmount:
+                          mode === 'Online'
+                            ? newRecord.amount
+                            : mode === 'Cash'
+                            ? 0
+                            : Math.round(newRecord.amount * 0.8),
+                        cashAmount:
+                          mode === 'Cash'
+                            ? newRecord.amount
+                            : mode === 'Online'
+                            ? 0
+                            : Math.round(newRecord.amount * 0.2),
                       });
                     }}
                   >
@@ -2843,7 +3322,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   </UISelect>
 
                   {newRecord.paymentMode === 'Split' && (
-                    <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                       <UIInput
                         label="Online Bank Amount (PKR)"
                         type="number"
@@ -2877,9 +3356,9 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
                   {/* Deposit Bank Selector when Online or Split payment is used */}
                   {newRecord.paymentMode !== 'Cash' && (
-                    <div className="pt-1 space-y-1.5">
+                    <div className="pt-1 space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-700 flex items-center space-x-1">
+                        <label className="text-xs font-bold text-slate-700 flex items-center space-x-1.5">
                           <Landmark className="w-3.5 h-3.5 text-emerald-600" />
                           <span>Deposit Bank Account (Auto-updates Bank Balance)</span>
                         </label>
@@ -2896,7 +3375,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                       <select
                         value={newRecord.bankId || (bankAccounts.length > 0 ? bankAccounts[0].id : '')}
                         onChange={(e) => setNewRecord({ ...newRecord, bankId: e.target.value })}
-                        className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-hidden"
+                        className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-300 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-hidden"
                       >
                         {bankAccounts.length === 0 ? (
                           <option value="">No Bank Accounts Added Yet (Click + Add Bank)</option>
@@ -2917,7 +3396,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                 <UIInput
                   label="Challan / Voucher No"
                   value={newRecord.challanNo}
@@ -2933,24 +3412,28 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
               <UITextarea
                 label="Description & Notes"
-                placeholder="e.g. Cardboard 16 number 30 bundle, feed bags, egg sales etc."
+                placeholder={
+                  newRecord.type === 'Income'
+                    ? 'e.g. Grade A commercial eggs dispatched via refrigerated van'
+                    : 'e.g. Cardboard 16 number 30 bundle, feed bags, generator fuel etc.'
+                }
                 value={newRecord.description}
                 onChange={(e) => setNewRecord({ ...newRecord, description: e.target.value })}
               />
 
               {/* Attachment / Slip Upload Field */}
-              <div className="space-y-1.5 pt-1">
+              <div className="space-y-2 pt-1">
                 <label className="block text-xs font-semibold text-slate-700">
                   Attach Voucher / Receipt / Slip (Image or PDF)
                 </label>
                 {attachmentName ? (
-                  <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
-                    <div className="flex items-center space-x-2 truncate">
+                  <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <div className="flex items-center space-x-2.5 truncate">
                       {attachmentData?.startsWith('data:image') ? (
                         <img
                           src={attachmentData}
                           alt="Slip Preview"
-                          className="w-8 h-8 rounded object-cover border border-emerald-200"
+                          className="w-9 h-9 rounded object-cover border border-emerald-200"
                         />
                       ) : (
                         <FileText className="w-6 h-6 text-emerald-600 flex-shrink-0" />
@@ -2963,21 +3446,21 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     <button
                       type="button"
                       onClick={handleRemoveAttachment}
-                      className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                       title="Remove attachment"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-slate-200 hover:border-emerald-400 rounded-xl cursor-pointer bg-slate-50/70 hover:bg-emerald-50/20 transition-all">
+                  <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 hover:border-emerald-400 rounded-xl cursor-pointer bg-slate-50/70 hover:bg-emerald-50/20 transition-all">
                     <div className="flex items-center space-x-2 text-slate-600">
                       <UploadCloud className="w-4 h-4 text-emerald-600" />
                       <span className="text-xs font-semibold text-slate-700">
                         Upload Challan / Invoice / Bank Slip
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 mt-0.5">
+                    <span className="text-[10px] text-slate-400 mt-1">
                       JPG, PNG, WEBP or PDF file format
                     </span>
                     <input
@@ -2990,7 +3473,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 )}
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">
+              <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
                 <UIButton
                   type="button"
                   variant="secondary"
@@ -3001,7 +3484,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 >
                   Cancel
                 </UIButton>
-                <UIButton type="submit" variant="primary">
+                <UIButton type="submit" variant={newRecord.type === 'Income' ? 'primary' : 'danger'}>
                   {newRecord.type === 'Income' ? 'Save Sale Record' : 'Save Expense Voucher'}
                 </UIButton>
               </div>
@@ -3171,6 +3654,7 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const [unitPrice, setUnitPrice] = useState<number>(s.unitPrice || (s.quantity > 0 ? Number((record.amount / s.quantity).toFixed(2)) : 0));
   const [onlinePayment, setOnlinePayment] = useState<number>(s.onlinePayment || 0);
   const [cashPayment, setCashPayment] = useState<number>(s.cashPayment || (isSale ? Math.max(0, record.amount - (s.onlinePayment || 0)) : 0));
+  const [partyName, setPartyName] = useState<string>(s.partyName || '');
   const [vehicleNumber, setVehicleNumber] = useState<string>(s.vehicleNumber || '');
   const [bankId, setBankId] = useState<string>(s.bankId || '');
 
@@ -3218,6 +3702,7 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
       updated.onlinePayment = Number(onlinePayment) || 0;
       updated.cashPayment = Number(cashPayment) || 0;
       updated.totalAmount = Number(amount) || 0;
+      updated.partyName = partyName.trim() || undefined;
       updated.vehicleNumber = vehicleNumber.trim() || undefined;
       updated.bankId = matchedBank?.id || undefined;
       updated.bankName = matchedBank?.bankName || undefined;
@@ -3314,7 +3799,7 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
 
           {isSale && (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Quantity (Eggs)</label>
                   <input
@@ -3341,6 +3826,19 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
                   <span className="text-[10px] text-slate-400 mt-0.5 block">
                     Rs. {Math.round(unitPrice * 360).toLocaleString()} / ctn
                   </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Party / Buyer Name</label>
+                  <input
+                    type="text"
+                    value={partyName}
+                    onChange={(e) => setPartyName(e.target.value)}
+                    placeholder="e.g. Ahmed Traders"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Vehicle Number</label>
