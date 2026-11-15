@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Pencil, Trash2, X, Building2, ChevronDown } from 'lucide-react';
+import { Eye, Pencil, Trash2, X, Building2, ChevronDown, AlertCircle } from 'lucide-react';
 import { Flock, Farm } from '../types/farm';
 import { getInitialUrlFilters } from '../utils/urlFilters';
+import { RecordDetailModal } from './ui';
 
 interface FlocksViewProps {
   flocks: Flock[];
@@ -28,7 +29,9 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
   const defaultFarmId = farms[0]?.id || 'farm-1';
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingFlock, setEditingFlock] = useState<Flock | null>(null);
+  const [viewingFlock, setViewingFlock] = useState<Flock | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Farm & Unit filter state
   const [selectedFarmFilter, setSelectedFarmFilter] = useState(
@@ -117,11 +120,13 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
       mortality: 0,
     });
     setEditingFlock(null);
+    setFormError(null);
     setShowAddModal(true);
   };
 
   const handleOpenEditModal = (flock: Flock) => {
     setEditingFlock(flock);
+    setFormError(null);
     const matchedFarm = farms.find((f) => f.id === flock.farmId || f.name === flock.farmName) || farms[0];
     setFormData({
       id: flock.id,
@@ -139,7 +144,31 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    setFormError(null);
+    if (!formData.id.trim()) {
+      setFormError('Please enter a Flock ID.');
+      return;
+    }
+    if (!formData.name.trim()) {
+      setFormError('Please enter a Flock Name.');
+      return;
+    }
+    if (!formData.startDate) {
+      setFormError('Please select an Acquired Date.');
+      return;
+    }
+    if (!formData.farmId) {
+      setFormError('Please select a Farm Location.');
+      return;
+    }
+    if (!formData.totalBirds || Number(formData.totalBirds) <= 0) {
+      setFormError('Total Birds must be greater than 0.');
+      return;
+    }
+    if (!formData.ageWeeks || Number(formData.ageWeeks) <= 0) {
+      setFormError('Age (Weeks) must be greater than 0.');
+      return;
+    }
 
     const chosenFarm = farms.find((f) => f.id === formData.farmId);
     const finalFarmName = chosenFarm ? chosenFarm.name : formData.farmName;
@@ -343,32 +372,43 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
                       </td>
                       <td className="py-4 px-6 text-slate-800 font-medium">{flock.mortality || 0}</td>
                       <td className="py-4 px-6 text-right">
-                        {isSuperAdmin ? (
-                          <div className="flex items-center justify-end space-x-3">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(flock)}
-                              aria-label={`Edit ${flock.name}`}
-                              title="Edit Flock"
-                              className="text-slate-600 hover:text-slate-900 transition-colors cursor-pointer p-1"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteConfirmId(flock.id)}
-                              aria-label={`Delete ${flock.name}`}
-                              title="Delete Flock"
-                              className="text-red-500 hover:text-red-700 transition-colors cursor-pointer p-1"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded">
-                            Protected
-                          </span>
-                        )}
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setViewingFlock(flock)}
+                            aria-label={`View ${flock.name}`}
+                            title="View Flock Details"
+                            className="inline-flex items-center p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          {isSuperAdmin ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(flock)}
+                                aria-label={`Edit ${flock.name}`}
+                                title="Edit Flock"
+                                className="inline-flex items-center p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors cursor-pointer"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteConfirmId(flock.id)}
+                                aria-label={`Delete ${flock.name}`}
+                                title="Delete Flock"
+                                className="inline-flex items-center p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded">
+                              Protected
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -396,7 +436,13 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="mt-4 space-y-4">
+            <form onSubmit={handleSave} noValidate className="mt-4 space-y-4">
+              {formError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -574,6 +620,60 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* View Flock Popup Modal */}
+      {viewingFlock && (
+        <RecordDetailModal
+          isOpen={Boolean(viewingFlock)}
+          onClose={() => setViewingFlock(null)}
+          title={`${viewingFlock.name} — Flock Details`}
+          subtitle={`Flock ID #${viewingFlock.id} • ${viewingFlock.shedNumber || 'Layer Shed'}`}
+          badge={{
+            text: viewingFlock.status || 'Active',
+            color: viewingFlock.status === 'Active' ? 'emerald' : 'slate',
+          }}
+          fields={[
+            { label: 'Flock ID', value: `#${viewingFlock.id}`, mono: true },
+            { label: 'Flock / Unit Name', value: viewingFlock.name },
+            {
+              label: 'Farm Complex',
+              value:
+                viewingFlock.farmName ||
+                farms.find((f) => f.id === viewingFlock.farmId)?.name ||
+                'GreenOva',
+            },
+            { label: 'Shed Number', value: viewingFlock.shedNumber || '—' },
+            { label: 'Breed', value: viewingFlock.breed || 'LSL' },
+            { label: 'Acquired Date', value: viewingFlock.startDate || '—', mono: true },
+            {
+              label: 'Current Active Birds',
+              value: (viewingFlock.currentCount || viewingFlock.initialCount || 0).toLocaleString(),
+              mono: true,
+              highlight: true,
+            },
+            {
+              label: 'Initial Bird Count',
+              value: (viewingFlock.initialCount || 0).toLocaleString(),
+              mono: true,
+            },
+            { label: 'Age (Weeks)', value: `${viewingFlock.ageWeeks || 0} weeks`, mono: true },
+            {
+              label: 'Cumulative Mortality',
+              value: `${(viewingFlock.mortality || 0).toLocaleString()} birds`,
+              mono: true,
+            },
+          ]}
+          notes={viewingFlock.notes}
+          onEdit={isSuperAdmin ? () => handleOpenEditModal(viewingFlock) : undefined}
+          onDelete={
+            isSuperAdmin && onDeleteFlock
+              ? () => {
+                  onDeleteFlock(viewingFlock.id);
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );

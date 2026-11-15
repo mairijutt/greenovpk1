@@ -15,6 +15,7 @@ import { EXPENSE_HEADS_21 } from '../data/liveExpenses.ts';
 import { liveStockRecords, StockRecord } from '../data/liveStocks.ts';
 import { BankFormModal } from './BankFormModal.tsx';
 import { UIButton, UIInput, UISelect, UITextarea } from './ui';
+import { apiFetch } from '../services/api.ts';
 
 const getTodayDateStr = () => {
   const now = new Date();
@@ -29,7 +30,7 @@ interface DashboardTransactionModalProps {
   initialType: 'Income' | 'Expense';
   bankAccounts: BankAccount[];
   onClose: () => void;
-  onAddTransaction: (record: FinancialRecord) => void;
+  onAddTransaction: (record: FinancialRecord) => Promise<void> | void;
   onAddBank?: (bank: BankAccount) => void;
   onSuccessToast?: (message: string) => void;
 }
@@ -46,25 +47,26 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
   const isSale = initialType === 'Income';
   const [showQuickBankModal, setShowQuickBankModal] = useState(false);
   const [date, setDate] = useState(getTodayDateStr);
-  const [head, setHead] = useState<string>(isSale ? 'EGG' : 'FEED');
-  const [flockName, setFlockName] = useState<string>('Unit 1');
+  const [head, setHead] = useState<string>(isSale ? 'EGG' : '');
+  const [flockName, setFlockName] = useState<string>('');
 
   // Egg counter fields (shown when Sale Category === 'EGG')
-  const [cartons, setCartons] = useState<number>(40);
-  const [trays, setTrays] = useState<number>(0);
-  const [looseEggs, setLooseEggs] = useState<number>(0);
-  const [otherQty, setOtherQty] = useState<number>(1);
-  const [unitPrice, setUnitPrice] = useState<number>(17.5);
-  const [amount, setAmount] = useState<number>(isSale ? 40 * 360 * 17.5 : 150000);
+  const [cartons, setCartons] = useState<number | ''>(0);
+  const [trays, setTrays] = useState<number | ''>(0);
+  const [looseEggs, setLooseEggs] = useState<number | ''>(0);
+  const [otherQty, setOtherQty] = useState<number | ''>(0);
+  const [unitPrice, setUnitPrice] = useState<number | ''>(0);
+  const [amount, setAmount] = useState<number | ''>(0);
+  const [pricingDriver, setPricingDriver] = useState<'amount' | 'price'>('amount');
 
   // Party & Dispatch Logistics
   const [partyName, setPartyName] = useState<string>('');
   const [vehicleNumber, setVehicleNumber] = useState<string>('');
 
   // Payment fields
-  const [paymentMode, setPaymentMode] = useState<'Online' | 'Cash' | 'Split'>('Online');
-  const [onlineAmount, setOnlineAmount] = useState<number>(isSale ? 40 * 360 * 17.5 : 0);
-  const [cashAmount, setCashAmount] = useState<number>(0);
+  const [paymentMode, setPaymentMode] = useState<'Split' | 'Online' | 'Cash'>('Split');
+  const [onlineAmount, setOnlineAmount] = useState<number | ''>(0);
+  const [cashAmount, setCashAmount] = useState<number | ''>(0);
   const [bankId, setBankId] = useState<string>('');
 
   // Reference & attachments
@@ -74,13 +76,17 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
   const [attachmentName, setAttachmentName] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const totalEggs = Math.max(
     0,
     (Number(cartons) || 0) * 360 + (Number(trays) || 0) * 30 + (Number(looseEggs) || 0)
   );
 
-  const syncPaymentFromTotal = (nextAmt: number, mode: 'Online' | 'Cash' | 'Split' = paymentMode) => {
+  const syncPaymentFromTotal = (
+    nextAmt: number,
+    mode: 'Split' | 'Online' | 'Cash' = paymentMode
+  ) => {
     if (!isSale) return;
     if (mode === 'Online') {
       setOnlineAmount(nextAmt);
@@ -97,27 +103,24 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
 
   useEffect(() => {
     if (isOpen) {
-      const initCartons = 40;
-      const initRate = 17.5;
-      const defSaleAmt = Math.round(initCartons * 360 * initRate);
-      const defAmt = initialType === 'Income' ? defSaleAmt : 150000;
       setDate(getTodayDateStr());
-      setHead(initialType === 'Income' ? 'EGG' : 'FEED');
-      setFlockName('Unit 1');
-      setCartons(initCartons);
+      setHead(initialType === 'Income' ? 'EGG' : '');
+      setFlockName('');
+      setCartons(0);
       setTrays(0);
       setLooseEggs(0);
-      setOtherQty(1);
-      setUnitPrice(initRate);
-      setAmount(defAmt);
+      setOtherQty(0);
+      setUnitPrice(0);
+      setAmount(0);
+      setPricingDriver('amount');
       setPartyName('');
       setVehicleNumber('');
-      setPaymentMode('Online');
-      setOnlineAmount(initialType === 'Income' ? defAmt : 0);
+      setPaymentMode('Split');
+      setOnlineAmount(0);
       setCashAmount(0);
       setBankId(bankAccounts.length > 0 ? bankAccounts[0].id : '');
       setReferenceNo(`INV-${Date.now().toString().slice(-4)}`);
-      setChallanNo(`${Math.floor(100 + Math.random() * 900)}`);
+      setChallanNo('');
       setDescription('');
       setAttachmentData(null);
       setAttachmentName('');
@@ -127,27 +130,39 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
 
   if (!isOpen) return null;
 
-  const handleEggCounterChange = (nextCartons: number, nextTrays: number, nextLoose: number, nextRate: number = unitPrice) => {
-    const c = Math.max(0, nextCartons);
-    const t = Math.max(0, nextTrays);
-    const l = Math.max(0, nextLoose);
-    setCartons(c);
-    setTrays(t);
-    setLooseEggs(l);
-    const eggsSum = c * 360 + t * 30 + l;
-    if (nextRate > 0) {
-      const calcAmt = Math.round(eggsSum * nextRate);
+  const handleEggCounterChange = (
+    nextCartons: number | '',
+    nextTrays: number | '',
+    nextLoose: number | ''
+  ) => {
+    setCartons(nextCartons);
+    setTrays(nextTrays);
+    setLooseEggs(nextLoose);
+    const eggsSum =
+      (Number(nextCartons) || 0) * 360 +
+      (Number(nextTrays) || 0) * 30 +
+      (Number(nextLoose) || 0);
+    const currentRate = Number(unitPrice) || 0;
+    const currentAmt = Number(amount) || 0;
+
+    if (pricingDriver === 'price' && currentRate > 0) {
+      const calcAmt = Math.round(eggsSum * currentRate);
       setAmount(calcAmt);
       syncPaymentFromTotal(calcAmt);
+    } else if (eggsSum > 0 && currentAmt > 0) {
+      setUnitPrice(Number((currentAmt / eggsSum).toFixed(2)));
+    } else if (eggsSum === 0 && pricingDriver === 'amount') {
+      setUnitPrice(0);
     }
   };
 
-  const handlePriceChange = (nextPrice: number) => {
-    const cleanPrice = Math.max(0, nextPrice);
+  const handlePriceChange = (rawPrice: string) => {
+    setPricingDriver('price');
+    const cleanPrice: number | '' = rawPrice === '' ? '' : Math.max(0, Number(rawPrice) || 0);
     setUnitPrice(cleanPrice);
     if (isSale) {
-      const qty = head === 'EGG' ? totalEggs : otherQty;
-      const calcAmt = Math.round(qty * cleanPrice);
+      const qty = head === 'EGG' ? totalEggs : Number(otherQty) || 0;
+      const calcAmt = Math.round(qty * (Number(cleanPrice) || 0));
       setAmount(calcAmt);
       syncPaymentFromTotal(calcAmt);
     }
@@ -156,31 +171,31 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
   const handleOtherQtyChange = (nextQty: number) => {
     const cleanQty = Math.max(0, nextQty);
     setOtherQty(cleanQty);
-    if (isSale && unitPrice > 0) {
-      const calcAmt = Math.round(cleanQty * unitPrice);
-      setAmount(calcAmt);
-      syncPaymentFromTotal(calcAmt);
+    if (isSale) {
+      const currentRate = Number(unitPrice) || 0;
+      const currentAmt = Number(amount) || 0;
+      if (pricingDriver === 'price' && currentRate > 0) {
+        const calcAmt = Math.round(cleanQty * currentRate);
+        setAmount(calcAmt);
+        syncPaymentFromTotal(calcAmt);
+      } else if (cleanQty > 0 && currentAmt > 0) {
+        setUnitPrice(Number((currentAmt / cleanQty).toFixed(2)));
+      }
     }
   };
 
   const handleCategoryChange = (nextHead: string) => {
     setHead(nextHead);
-    if (nextHead === 'EGG') {
-      const r = unitPrice > 0 && unitPrice < 200 ? unitPrice : 17.5;
-      setUnitPrice(r);
-      const calcAmt = Math.round(totalEggs * r);
-      setAmount(calcAmt);
-      syncPaymentFromTotal(calcAmt);
-    } else {
-      setUnitPrice(0);
-    }
+    const amtNum = Number(amount) || 0;
+    const qty = nextHead === 'EGG' ? totalEggs : Number(otherQty) || 0;
+    setUnitPrice(qty > 0 && amtNum > 0 ? Number((amtNum / qty).toFixed(2)) : 0);
   };
 
   const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      setFormError('File size exceeds 10MB limit.');
+    if (file.size > 3 * 1024 * 1024) {
+      setFormError('File size exceeds 3MB limit.');
       return;
     }
     setFormError(null);
@@ -192,16 +207,69 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || amount <= 0) {
-      setFormError('Please enter a valid positive amount.');
+    setFormError(null);
+
+    if (!date) {
+      setFormError('Please select a date.');
       return;
     }
-    if (isSale && head === 'EGG' && totalEggs <= 0) {
-      setFormError('Please enter at least 1 carton, tray, or egg.');
+    if (!flockName) {
+      setFormError('Please select a flock / unit.');
       return;
     }
+    if (!head) {
+      setFormError(isSale ? 'Please select a sales category.' : 'Please select an expense head.');
+      return;
+    }
+    if (isSale) {
+      if (head === 'EGG' && totalEggs <= 0) {
+        setFormError('Please enter egg dispatch volume (at least 1 carton, tray, or egg).');
+        return;
+      }
+      if (head !== 'EGG' && (!otherQty || Number(otherQty) <= 0)) {
+        setFormError('Please enter a valid quantity greater than 0.');
+        return;
+      }
+      if (!unitPrice || Number(unitPrice) <= 0) {
+        setFormError('Please enter a valid unit price greater than 0.');
+        return;
+      }
+      if (!amount || Number(amount) <= 0) {
+        setFormError('Please enter a valid Total Sale Amount (PKR) greater than 0.');
+        return;
+      }
+      if (!partyName.trim()) {
+        setFormError('Please enter the Party / Buyer Name.');
+        return;
+      }
+      if (
+        paymentMode === 'Split' &&
+        Math.abs((Number(onlineAmount) || 0) + (Number(cashAmount) || 0) - Number(amount)) > 1
+      ) {
+        setFormError('Online Bank Amount + Cash Counter Amount must equal Total Sale Amount.');
+        return;
+      }
+      if (!challanNo.trim()) {
+        setFormError('Please enter the Challan / Voucher No.');
+        return;
+      }
+    } else {
+      if (!amount || Number(amount) <= 0) {
+        setFormError('Please enter a valid Expense Amount (PKR) greater than 0.');
+        return;
+      }
+      if (!challanNo.trim()) {
+        setFormError('Please enter the Challan / Voucher No.');
+        return;
+      }
+      if (!description.trim()) {
+        setFormError('Please enter a Description & Notes for this expense voucher.');
+        return;
+      }
+    }
+    setIsSaving(true);
 
     const fid = flockName === 'Unit 1' ? 8 : flockName === 'Unit 2' ? 9 : 10;
     const trackingId = Date.now().toString().slice(-4);
@@ -233,11 +301,12 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
         : Number(otherQty) || 1
       : undefined;
 
+    const numAmt = Number(amount) || 0;
     const computedUnitPrice =
       isSale && finalQty && finalQty > 0
-        ? unitPrice > 0
+        ? Number(unitPrice) > 0
           ? Number(unitPrice)
-          : Number((Number(amount) / finalQty).toFixed(2))
+          : Number((numAmt / finalQty).toFixed(2))
         : undefined;
 
     const record: FinancialRecord = {
@@ -246,8 +315,8 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
       type: initialType,
       category: head,
       head,
-      amount: Number(amount),
-      totalAmount: Number(amount),
+      amount: numAmt,
+      totalAmount: numAmt,
       date: date || getTodayDateStr(),
       referenceNo,
       challanNo,
@@ -273,15 +342,21 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
       bankName: matchedBank?.bankName || undefined,
       quantity: finalQty,
       unitPrice: computedUnitPrice,
-      cartons: isSale && head === 'EGG' ? cartons : undefined,
-      trays: isSale && head === 'EGG' ? trays : undefined,
-      looseEggs: isSale && head === 'EGG' ? looseEggs : undefined,
+      cartons: isSale && head === 'EGG' ? Number(cartons) || 0 : undefined,
+      trays: isSale && head === 'EGG' ? Number(trays) || 0 : undefined,
+      looseEggs: isSale && head === 'EGG' ? Number(looseEggs) || 0 : undefined,
       attachment: attachmentData || null,
       attachmentName: attachmentName || null,
     };
 
-    onAddTransaction(record);
-    onClose();
+    try {
+      await onAddTransaction(record);
+      onClose();
+    } catch (err: any) {
+      setFormError(err?.message || 'Failed to save record to database.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -321,7 +396,7 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-6 text-xs">
+          <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-6 text-xs">
             {formError && (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-semibold flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -336,14 +411,24 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                 type="date"
                 required
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  setFormError(null);
+                }}
               />
 
               <UISelect
                 label="Unit / Flock"
+                required
                 value={flockName}
-                onChange={(e) => setFlockName(e.target.value)}
+                onChange={(e) => {
+                  setFlockName(e.target.value);
+                  setFormError(null);
+                }}
               >
+                <option value="" disabled>
+                  Select flock
+                </option>
                 <option value="Unit 1">Unit 1 (Flock 8)</option>
                 <option value="Unit 2">Unit 2 (Flock 9)</option>
                 <option value="Unit 3">Unit 3 (Flock 10)</option>
@@ -352,8 +437,12 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
               {isSale && (
                 <UISelect
                   label="Sales Category / Head"
+                  required
                   value={head}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  onChange={(e) => {
+                    handleCategoryChange(e.target.value);
+                    setFormError(null);
+                  }}
                 >
                   {['EGG', 'Manure', 'Feed BAGS', 'Cull Birds', 'OTHER'].map((h) => (
                     <option key={h} value={h}>
@@ -384,13 +473,22 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                       type="number"
                       min="0"
                       value={cartons}
-                      onChange={(e) =>
-                        handleEggCounterChange(parseInt(e.target.value) || 0, trays, looseEggs)
-                      }
+                      onFocus={() => {
+                        if (Number(cartons) === 0) setCartons('');
+                      }}
+                      onBlur={() => {
+                        if (cartons === '') setCartons(0);
+                      }}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const cVal: number | '' =
+                          raw === '' ? '' : Math.max(0, parseInt(raw, 10) || 0);
+                        handleEggCounterChange(cVal, trays, looseEggs);
+                      }}
                       className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-center"
                     />
                     <span className="text-[10px] text-slate-500 mt-1 block text-center font-mono">
-                      ={(cartons * 360).toLocaleString()} eggs
+                      ={((Number(cartons) || 0) * 360).toLocaleString()} eggs
                     </span>
                   </div>
 
@@ -402,31 +500,49 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                       type="number"
                       min="0"
                       value={trays}
-                      onChange={(e) =>
-                        handleEggCounterChange(cartons, parseInt(e.target.value) || 0, looseEggs)
-                      }
+                      onFocus={() => {
+                        if (Number(trays) === 0) setTrays('');
+                      }}
+                      onBlur={() => {
+                        if (trays === '') setTrays(0);
+                      }}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const tVal: number | '' =
+                          raw === '' ? '' : Math.max(0, parseInt(raw, 10) || 0);
+                        handleEggCounterChange(cartons, tVal, looseEggs);
+                      }}
                       className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-center"
                     />
                     <span className="text-[10px] text-slate-500 mt-1 block text-center font-mono">
-                      ={(trays * 30).toLocaleString()} eggs
+                      ={((Number(trays) || 0) * 30).toLocaleString()} eggs
                     </span>
                   </div>
 
                   <div>
                     <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600 mb-1.5">
-                      Eggs (Loose)
+                      Eggs
                     </label>
                     <input
                       type="number"
                       min="0"
                       value={looseEggs}
-                      onChange={(e) =>
-                        handleEggCounterChange(cartons, trays, parseInt(e.target.value) || 0)
-                      }
+                      onFocus={() => {
+                        if (Number(looseEggs) === 0) setLooseEggs('');
+                      }}
+                      onBlur={() => {
+                        if (looseEggs === '') setLooseEggs(0);
+                      }}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const lVal: number | '' =
+                          raw === '' ? '' : Math.max(0, parseInt(raw, 10) || 0);
+                        handleEggCounterChange(cartons, trays, lVal);
+                      }}
                       className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-center"
                     />
                     <span className="text-[10px] text-slate-500 mt-1 block text-center font-mono">
-                      loose eggs
+                      ={(Number(looseEggs) || 0).toLocaleString()} eggs
                     </span>
                   </div>
 
@@ -453,8 +569,18 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                     label="Quantity (Bags / Birds / Units)"
                     type="number"
                     min="1"
+                    required
                     value={otherQty}
-                    onChange={(e) => handleOtherQtyChange(Number(e.target.value))}
+                    onFocus={() => {
+                      if (Number(otherQty) === 0) setOtherQty('');
+                    }}
+                    onBlur={() => {
+                      if (otherQty === '') setOtherQty(0);
+                    }}
+                    onChange={(e) => {
+                      handleOtherQtyChange(Number(e.target.value) || 0);
+                      setFormError(null);
+                    }}
                   />
                 )}
 
@@ -464,8 +590,18 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                     type="number"
                     step="0.01"
                     min="0"
+                    required
                     value={unitPrice}
-                    onChange={(e) => handlePriceChange(Number(e.target.value))}
+                    onFocus={() => {
+                      if (Number(unitPrice) === 0) setUnitPrice('');
+                    }}
+                    onBlur={() => {
+                      if (unitPrice === '') setUnitPrice(0);
+                    }}
+                    onChange={(e) => {
+                      handlePriceChange(e.target.value);
+                      setFormError(null);
+                    }}
                   />
                   {head === 'EGG' && (
                     <span className="text-[10px] text-emerald-700 font-semibold mt-1 block font-mono">
@@ -481,15 +617,27 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                     min="1"
                     required
                     value={amount}
+                    onFocus={() => {
+                      if (Number(amount) === 0) setAmount('');
+                    }}
+                    onBlur={() => {
+                      if (amount === '') setAmount(0);
+                    }}
                     onChange={(e) => {
-                      const amt = Number(e.target.value);
-                      setAmount(amt);
-                      syncPaymentFromTotal(amt);
+                      setPricingDriver('amount');
+                      const raw = e.target.value;
+                      const amtVal: number | '' = raw === '' ? '' : Math.max(0, Number(raw) || 0);
+                      const amtNum = Number(amtVal) || 0;
+                      setAmount(amtVal);
+                      const qty = head === 'EGG' ? totalEggs : Number(otherQty) || 0;
+                      setUnitPrice(qty > 0 && amtNum > 0 ? Number((amtNum / qty).toFixed(2)) : 0);
+                      syncPaymentFromTotal(amtNum);
+                      setFormError(null);
                     }}
                   />
-                  {head === 'EGG' && totalEggs > 0 && amount > 0 && (
+                  {head === 'EGG' && totalEggs > 0 && Number(amount) > 0 && (
                     <span className="text-[10px] text-slate-500 mt-1 block font-mono">
-                      Avg: Rs. {(amount / totalEggs).toFixed(2)}/egg
+                      Auto Price: Rs. {(Number(amount) / totalEggs).toFixed(2)}/egg
                     </span>
                   )}
                 </div>
@@ -498,9 +646,16 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                 <UISelect
                   label="Expense Head (21 Heads)"
+                  required
                   value={head}
-                  onChange={(e) => setHead(e.target.value)}
+                  onChange={(e) => {
+                    setHead(e.target.value);
+                    setFormError(null);
+                  }}
                 >
+                  <option value="" disabled>
+                    Select expense head
+                  </option>
                   {EXPENSE_HEADS_21.map((h) => (
                     <option key={h} value={h}>
                       {h.replace('_', ' ')}
@@ -514,7 +669,17 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                   min="1"
                   required
                   value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
+                  onFocus={() => {
+                    if (Number(amount) === 0) setAmount('');
+                  }}
+                  onBlur={() => {
+                    if (amount === '') setAmount(0);
+                  }}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setAmount(raw === '' ? '' : Math.max(0, Number(raw) || 0));
+                    setFormError(null);
+                  }}
                 />
               </div>
             )}
@@ -525,13 +690,17 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                 <UIInput
                   label="Party / Buyer Name"
                   type="text"
+                  required
                   placeholder="e.g. Ahmed Traders / Bismillah Eggs"
                   value={partyName}
-                  onChange={(e) => setPartyName(e.target.value)}
+                  onChange={(e) => {
+                    setPartyName(e.target.value);
+                    setFormError(null);
+                  }}
                 />
 
                 <UIInput
-                  label="Vehicle Number"
+                  label="Vehicle Number (Optional)"
                   type="text"
                   placeholder="e.g. MN-1234 or ABC"
                   value={vehicleNumber}
@@ -547,14 +716,14 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                   label="Payment Channel / Receipt Method"
                   value={paymentMode}
                   onChange={(e) => {
-                    const mode = e.target.value as 'Online' | 'Cash' | 'Split';
+                    const mode = e.target.value as 'Split' | 'Online' | 'Cash';
                     setPaymentMode(mode);
-                    syncPaymentFromTotal(amount, mode);
+                    syncPaymentFromTotal(Number(amount) || 0, mode);
                   }}
                 >
+                  <option value="Split">Split Payment (Online Bank + Cash Counter)</option>
                   <option value="Online">Online / Direct Bank Transfer (100% Online)</option>
                   <option value="Cash">Cash Counter / Direct Cash (100% Cash)</option>
-                  <option value="Split">Split Payment (Online Bank + Cash Counter)</option>
                 </UISelect>
 
                 {paymentMode === 'Split' && (
@@ -564,10 +733,18 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                       type="number"
                       min="0"
                       value={onlineAmount}
+                      onFocus={() => {
+                        if (Number(onlineAmount) === 0) setOnlineAmount('');
+                      }}
+                      onBlur={() => {
+                        if (onlineAmount === '') setOnlineAmount(0);
+                      }}
                       onChange={(e) => {
-                        const online = Number(e.target.value);
-                        setOnlineAmount(online);
-                        setCashAmount(Math.max(0, amount - online));
+                        const raw = e.target.value;
+                        const onlineVal: number | '' =
+                          raw === '' ? '' : Math.max(0, Number(raw) || 0);
+                        setOnlineAmount(onlineVal);
+                        setCashAmount(Math.max(0, (Number(amount) || 0) - (Number(onlineVal) || 0)));
                       }}
                     />
                     <UIInput
@@ -575,10 +752,18 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
                       type="number"
                       min="0"
                       value={cashAmount}
+                      onFocus={() => {
+                        if (Number(cashAmount) === 0) setCashAmount('');
+                      }}
+                      onBlur={() => {
+                        if (cashAmount === '') setCashAmount(0);
+                      }}
                       onChange={(e) => {
-                        const cash = Number(e.target.value);
-                        setCashAmount(cash);
-                        setOnlineAmount(Math.max(0, amount - cash));
+                        const raw = e.target.value;
+                        const cashVal: number | '' =
+                          raw === '' ? '' : Math.max(0, Number(raw) || 0);
+                        setCashAmount(cashVal);
+                        setOnlineAmount(Math.max(0, (Number(amount) || 0) - (Number(cashVal) || 0)));
                       }}
                     />
                   </div>
@@ -629,25 +814,36 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
               <UIInput
                 label="Challan / Voucher No"
+                required
+                placeholder="Enter Challan / Voucher No"
                 value={challanNo}
-                onChange={(e) => setChallanNo(e.target.value)}
+                onChange={(e) => {
+                  setChallanNo(e.target.value);
+                  setFormError(null);
+                }}
               />
               <UIInput
-                label="Invoice / Ref No"
+                label="Invoice / Ref No (Auto-generated)"
                 value={referenceNo}
-                onChange={(e) => setReferenceNo(e.target.value)}
+                readOnly
+                tabIndex={-1}
+                className="bg-slate-100 focus:bg-slate-100 text-slate-600 font-mono cursor-not-allowed select-none"
               />
             </div>
 
             <UITextarea
-              label="Description & Notes"
+              label={isSale ? 'Description & Notes (Optional)' : 'Description & Notes'}
+              required={!isSale}
               placeholder={
                 isSale
                   ? 'e.g. Grade A commercial eggs dispatched via refrigerated van'
                   : 'e.g. Cardboard 16 number 30 bundle, feed bags, generator fuel etc.'
               }
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                setFormError(null);
+              }}
             />
 
             <div className="space-y-2 pt-1">
@@ -708,8 +904,12 @@ export const DashboardTransactionModal: React.FC<DashboardTransactionModalProps>
               <UIButton type="button" variant="secondary" onClick={onClose}>
                 Cancel
               </UIButton>
-              <UIButton type="submit" variant={isSale ? 'primary' : 'danger'}>
-                {isSale ? 'Save Sale Record' : 'Save Expense Voucher'}
+              <UIButton type="submit" variant={isSale ? 'primary' : 'danger'} disabled={isSaving}>
+                {isSaving
+                  ? 'Saving...'
+                  : isSale
+                  ? 'Save Sale Record'
+                  : 'Save Expense Voucher'}
               </UIButton>
             </div>
           </form>
@@ -735,7 +935,7 @@ interface DashboardStockModalProps {
   inventory: InventoryItem[];
   onClose: () => void;
   onRestock?: (id: string, amount: number) => void;
-  onAddTransaction?: (record: FinancialRecord) => void;
+  onAddTransaction?: (record: FinancialRecord) => Promise<void> | void;
   onStockSaved?: () => void;
   onSuccessToast?: (message: string) => void;
 }
@@ -752,24 +952,25 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
   const [formDate, setFormDate] = useState(getTodayDateStr);
   const [formHead, setFormHead] = useState('FEED');
   const [formStockType, setFormStockType] = useState('11');
-  const [formFlock, setFormFlock] = useState('Unit 2');
-  const [formQuantity, setFormQuantity] = useState<number | string>(240);
-  const [formAmount, setFormAmount] = useState<number | string>(500000);
+  const [formFlock, setFormFlock] = useState('');
+  const [formQuantity, setFormQuantity] = useState<number | string>(0);
+  const [formAmount, setFormAmount] = useState<number | string>(0);
   const [formPaymentType, setFormPaymentType] = useState('');
   const [formChallan, setFormChallan] = useState('');
   const [formNotes, setFormNotes] = useState('');
   const [attachmentName, setAttachmentName] = useState('');
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setFormDate(getTodayDateStr());
       setFormHead('FEED');
       setFormStockType('11');
-      setFormFlock('Unit 2');
-      setFormQuantity(240);
-      setFormAmount(500000);
+      setFormFlock('');
+      setFormQuantity(0);
+      setFormAmount(0);
       setFormPaymentType('');
       setFormChallan('');
       setFormNotes('');
@@ -799,6 +1000,11 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
   const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        setFormError('File size exceeds 3MB limit.');
+        return;
+      }
+      setFormError(null);
       setAttachmentName(file.name);
       const reader = new FileReader();
       reader.onload = () => {
@@ -808,8 +1014,34 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
     }
   };
 
-  const handleSaveStockRecord = (e: React.FormEvent) => {
+  const handleSaveStockRecord = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
+    if (!formDate) {
+      setFormError('Please select a stock intake date.');
+      return;
+    }
+    if (!formHead) {
+      setFormError('Please select a stock head.');
+      return;
+    }
+    if (!formStockType) {
+      setFormError('Please select a stock type.');
+      return;
+    }
+    if (!formFlock) {
+      setFormError('Please select a flock / unit.');
+      return;
+    }
+    if (!formQuantity || Number(formQuantity) <= 0) {
+      setFormError('Please enter a valid Quantity greater than 0.');
+      return;
+    }
+    if (!formAmount || Number(formAmount) <= 0) {
+      setFormError('Please enter a valid Amount (PKR) greater than 0.');
+      return;
+    }
     if (!formPaymentType) {
       setFormError('Please select a payment type.');
       return;
@@ -818,7 +1050,7 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
       setFormError('Please enter a challan number.');
       return;
     }
-    setFormError(null);
+    setIsSaving(true);
 
     let existingStocks: StockRecord[] = liveStockRecords;
     try {
@@ -834,105 +1066,113 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
     const costBag = qty > 0 ? Math.round(amt / qty) : 0;
     const maxTracking = existingStocks.reduce((max, r) => Math.max(max, r.trackingId || 0), 0);
     const flockId = formFlock === 'Unit 2' ? '9' : formFlock === 'Unit 3' ? '10' : '8';
+    const clientId = `stk-${Date.now()}`;
 
-    const newRecord: StockRecord = {
-      id: `stk-${Date.now()}`,
-      trackingId: maxTracking + 1,
-      date: formDate,
-      rawDate: formDate,
-      type: formStockType,
-      feedType: formHead === 'FEED' ? `Layer Feed ${formStockType}` : formStockType,
-      flockName: formFlock,
-      flockId,
-      head: formHead,
-      category: formHead,
-      quantity: qty,
-      bags: qty,
-      amount: amt,
-      costPerBag: costBag,
-      paymentType: formPaymentType,
-      challanNo: formChallan.trim(),
-      notes: formNotes || `${qty} bags of ${formStockType} received...`,
-    };
-
-    const updated = [newRecord, ...existingStocks];
     try {
-      localStorage.setItem('greenova_stocks_v2', JSON.stringify(updated));
-    } catch (err) {
-      console.warn('LocalStorage error:', err);
-    }
+      const res = await apiFetch('/api/stocks', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientId,
+          date: formDate,
+          challanNo: formChallan.trim(),
+          Type: formStockType,
+          flockId: Number(flockId),
+          flockName: formFlock,
+          head: formHead,
+          quantity: qty,
+          amount: amt,
+          amountPaid: amt,
+          paymentType: formPaymentType.toUpperCase(),
+          notes: formNotes,
+          attachment: attachmentData || attachmentName || null,
+        }),
+      });
 
-    fetch('/api/stocks', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clientId: newRecord.id,
-        trackingId: newRecord.trackingId,
-        date: formDate,
-        challanNo: formChallan.trim(),
-        Type: formStockType,
-        flockId: Number(flockId),
-        head: formHead,
-        quantity: qty,
-        amount: amt,
-        amountPaid: amt,
-        paymentType: formPaymentType.toUpperCase(),
-        notes: formNotes,
-        attachment: attachmentData || attachmentName || null,
-      }),
-    }).catch((err) => console.warn('Stock backend sync error:', err));
+      const canonicalId = Number(res?.data?.id) || maxTracking + 1;
 
-    if (onAddTransaction) {
-      const expenseRecord: FinancialRecord = {
-        id: `exp-stk-${Date.now()}`,
-        trackingId: newRecord.trackingId,
-        type: 'Expense',
-        category:
-          formHead === 'FEED'
-            ? 'FEED'
-            : formHead === 'MEDICINE'
-            ? 'MEDICINE'
-            : formHead === 'VACCINE'
-            ? 'VACCINE'
-            : formHead,
-        head:
-          formHead === 'FEED'
-            ? 'FEED'
-            : formHead === 'MEDICINE'
-            ? 'MEDICINE'
-            : formHead === 'VACCINE'
-            ? 'VACCINE'
-            : formHead,
-        amount: amt,
+      const newRecord: StockRecord = {
+        id: String(canonicalId),
+        trackingId: canonicalId,
         date: formDate,
-        referenceNo: `STK-${newRecord.trackingId}`,
-        challanNo: formChallan.trim(),
-        flockId: Number(flockId),
+        rawDate: formDate,
+        type: formStockType,
+        feedType: formHead === 'FEED' ? `Layer Feed ${formStockType}` : formStockType,
         flockName: formFlock,
-        description: `Stock Intake: ${qty} ${formHead === 'FEED' ? 'bags' : 'units'} of ${formStockType} (${formHead}) via ${formPaymentType}`,
-        notes: formNotes || `Stock record #${newRecord.trackingId} auto-synced to Farm Expenses ledger.`,
-        status: 'Paid',
-        attachment: attachmentData || null,
-        attachmentName: attachmentName || null,
+        flockId,
+        head: formHead,
+        category: formHead,
+        quantity: qty,
+        bags: qty,
+        amount: amt,
+        costPerBag: costBag,
+        paymentType: formPaymentType.toUpperCase(),
+        challanNo: formChallan.trim(),
+        notes: formNotes || `${qty} bags of ${formStockType} received...`,
       };
-      onAddTransaction(expenseRecord);
-    }
 
-    if (onRestock && qty > 0) {
-      const match = inventory.find(
-        (item) =>
-          item.category.toLowerCase() === formHead.toLowerCase() ||
-          item.name.toLowerCase().includes(formStockType.toLowerCase()) ||
-          (formHead === 'FEED' && item.name.toLowerCase().includes('feed'))
-      );
-      if (match) {
-        onRestock(match.id, qty);
+      const updated = [newRecord, ...existingStocks];
+      try {
+        localStorage.setItem('greenova_stocks_v2', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('LocalStorage error:', err);
       }
-    }
 
-    onStockSaved?.();
-    onClose();
+      if (onRestock && qty > 0) {
+        const match = inventory.find(
+          (item) =>
+            item.category.toLowerCase() === formHead.toLowerCase() ||
+            item.name.toLowerCase().includes(formStockType.toLowerCase()) ||
+            (formHead === 'FEED' && item.name.toLowerCase().includes('feed'))
+        );
+        if (match) {
+          onRestock(match.id, qty);
+        }
+      }
+
+      if (onAddTransaction) {
+        const expenseRecord: FinancialRecord = {
+          id: `exp-stk-${Date.now()}`,
+          trackingId: newRecord.trackingId,
+          type: 'Expense',
+          category:
+            formHead === 'FEED'
+              ? 'FEED'
+              : formHead === 'MEDICINE'
+              ? 'MEDICINE'
+              : formHead === 'VACCINE'
+              ? 'VACCINE'
+              : formHead,
+          head:
+            formHead === 'FEED'
+              ? 'FEED'
+              : formHead === 'MEDICINE'
+              ? 'MEDICINE'
+              : formHead === 'VACCINE'
+              ? 'VACCINE'
+              : formHead,
+          amount: amt,
+          date: formDate,
+          referenceNo: `STK-${newRecord.trackingId}`,
+          challanNo: formChallan.trim(),
+          flockId: Number(flockId),
+          flockName: formFlock,
+          description: `Stock Intake: ${qty} ${formHead === 'FEED' ? 'bags' : 'units'} of ${formStockType} (${formHead}) via ${formPaymentType}`,
+          notes: formNotes || `Stock record #${newRecord.trackingId} auto-synced to Farm Expenses ledger.`,
+          status: 'Paid',
+          attachment: attachmentData || null,
+          attachmentName: attachmentName || null,
+        };
+        await onAddTransaction(expenseRecord);
+      }
+
+      onStockSaved?.();
+      onSuccessToast?.(`Stock record #${newRecord.trackingId} saved successfully.`);
+      onClose();
+    } catch (err: any) {
+      setFormError(err?.message || 'Failed to save stock record to database.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -959,7 +1199,7 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSaveStockRecord} className="mt-4 space-y-4">
+        <form onSubmit={handleSaveStockRecord} noValidate className="mt-4 space-y-4">
           {formError && (
             <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -973,7 +1213,10 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
               <input
                 type="date"
                 value={formDate}
-                onChange={(e) => setFormDate(e.target.value)}
+                onChange={(e) => {
+                  setFormDate(e.target.value);
+                  setFormError(null);
+                }}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 required
               />
@@ -983,7 +1226,10 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
               <label className="block text-xs font-bold text-slate-700 mb-1">Head *</label>
               <select
                 value={formHead}
-                onChange={(e) => handleHeadChange(e.target.value)}
+                onChange={(e) => {
+                  handleHeadChange(e.target.value);
+                  setFormError(null);
+                }}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
                 required
               >
@@ -1001,7 +1247,10 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
               <label className="block text-xs font-bold text-slate-700 mb-1">Stock Type *</label>
               <select
                 value={formStockType}
-                onChange={(e) => setFormStockType(e.target.value)}
+                onChange={(e) => {
+                  setFormStockType(e.target.value);
+                  setFormError(null);
+                }}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
                 required
               >
@@ -1053,12 +1302,20 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
               <label className="block text-xs font-bold text-slate-700 mb-1">Flock *</label>
               <select
                 value={formFlock}
-                onChange={(e) => setFormFlock(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
+                onChange={(e) => {
+                  setFormFlock(e.target.value);
+                  setFormError(null);
+                }}
+                className={`w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer ${
+                  !formFlock ? 'text-slate-500' : 'text-slate-800'
+                }`}
                 required
               >
-                <option value="Unit 2">Unit 2</option>
+                <option value="" disabled>
+                  Select flock
+                </option>
                 <option value="Unit 1">Unit 1</option>
+                <option value="Unit 2">Unit 2</option>
                 <option value="Unit 3">Unit 3</option>
                 <option value="Warehouse">Warehouse / All Units</option>
               </select>
@@ -1072,8 +1329,18 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
                 type="number"
                 min="1"
                 value={formQuantity}
-                onChange={(e) => setFormQuantity(e.target.value)}
-                placeholder="240"
+                onFocus={() => {
+                  if (Number(formQuantity) === 0) setFormQuantity('');
+                }}
+                onBlur={() => {
+                  if (formQuantity === '') setFormQuantity(0);
+                }}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setFormQuantity(raw === '' ? '' : Math.max(0, Number(raw) || 0));
+                  setFormError(null);
+                }}
+                placeholder="0"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 required
               />
@@ -1086,8 +1353,18 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
                 min="0"
                 step="1"
                 value={formAmount}
-                onChange={(e) => setFormAmount(e.target.value)}
-                placeholder="500000"
+                onFocus={() => {
+                  if (Number(formAmount) === 0) setFormAmount('');
+                }}
+                onBlur={() => {
+                  if (formAmount === '') setFormAmount(0);
+                }}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setFormAmount(raw === '' ? '' : Math.max(0, Number(raw) || 0));
+                  setFormError(null);
+                }}
+                placeholder="0"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-black text-emerald-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 required
               />
@@ -1099,11 +1376,16 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
               <label className="block text-xs font-bold text-slate-700 mb-1">Payment Type *</label>
               <select
                 value={formPaymentType}
-                onChange={(e) => setFormPaymentType(e.target.value)}
+                onChange={(e) => {
+                  setFormPaymentType(e.target.value);
+                  setFormError(null);
+                }}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
                 required
               >
-                <option value="">Select payment type</option>
+                <option value="" disabled>
+                  Select payment type
+                </option>
                 <option value="Cash">Cash</option>
                 <option value="Bank Transfer">Bank Transfer</option>
                 <option value="Cheque">Cheque</option>
@@ -1116,7 +1398,10 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
               <input
                 type="text"
                 value={formChallan}
-                onChange={(e) => setFormChallan(e.target.value)}
+                onChange={(e) => {
+                  setFormChallan(e.target.value);
+                  setFormError(null);
+                }}
                 placeholder="e.g. 1445 or CH-8902"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                 required
@@ -1159,8 +1444,8 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
             <UIButton type="button" variant="secondary" onClick={onClose}>
               Cancel
             </UIButton>
-            <UIButton type="submit" variant="primary">
-              Save Stock Record
+            <UIButton type="submit" variant="primary" disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save Stock Record'}
             </UIButton>
           </div>
         </form>

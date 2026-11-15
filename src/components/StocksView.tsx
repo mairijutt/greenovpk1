@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Boxes,
   AlertTriangle,
@@ -20,11 +20,14 @@ import {
   CreditCard,
   Banknote,
   Layers,
+  Eye,
   Edit,
+  Trash2,
   X,
+  AlertCircle,
 } from 'lucide-react';
 import { InventoryItem, FinancialRecord } from '../types/farm.ts';
-import { StatCard, PageHeader, UIButton, TableCard, DateRangePickerBar, DatePreset } from './ui';
+import { StatCard, PageHeader, UIButton, TableCard, DateRangePickerBar, DatePreset, RecordDetailModal } from './ui';
 import {
   STOCK_SUMMARY,
   unitWiseStockSummary,
@@ -32,11 +35,12 @@ import {
   StockRecord,
 } from '../data/liveStocks.ts';
 import { getInitialUrlFilters } from '../utils/urlFilters.ts';
+import { apiFetch } from '../services/api.ts';
 
 interface StocksViewProps {
   inventory: InventoryItem[];
   onRestock: (id: string, amount: number) => void;
-  onAddTransaction?: (record: FinancialRecord) => void;
+  onAddTransaction?: (record: FinancialRecord) => Promise<void> | void;
 }
 
 export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, onAddTransaction }) => {
@@ -74,15 +78,67 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
   const [formDate, setFormDate] = useState<string>(getLocalToday);
   const [formHead, setFormHead] = useState<string>('FEED');
   const [formStockType, setFormStockType] = useState<string>('11');
-  const [formFlock, setFormFlock] = useState<string>('Unit 2');
-  const [formQuantity, setFormQuantity] = useState<number | string>(240);
-  const [formAmount, setFormAmount] = useState<number | string>(500000);
+  const [formFlock, setFormFlock] = useState<string>('');
+  const [formQuantity, setFormQuantity] = useState<number | string>(0);
+  const [formAmount, setFormAmount] = useState<number | string>(0);
   const [formPaymentType, setFormPaymentType] = useState<string>('');
   const [formChallan, setFormChallan] = useState<string>('');
   const [formNotes, setFormNotes] = useState<string>('');
   const [attachmentName, setAttachmentName] = useState<string>('');
   const [attachmentData, setAttachmentData] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [confirmDeleteStockId, setConfirmDeleteStockId] = useState<string | null>(null);
+  const [viewingStock, setViewingStock] = useState<StockRecord | null>(null);
+  const [isSavingStock, setIsSavingStock] = useState(false);
+
+  // Hydrate live Stock records from PostgreSQL on mount
+  useEffect(() => {
+    let active = true;
+    apiFetch('/api/stocks?limit=2000')
+      .then((res) => {
+        const items = res?.data?.items;
+        if (!active || !Array.isArray(items) || items.length === 0) return;
+        const mapped: StockRecord[] = items.map((r: any) => {
+          const fid = String(r.flockId || 8);
+          const fname =
+            r.flock?.flockName || (fid === '9' ? 'Unit 2' : fid === '10' ? 'Unit 3' : 'Unit 1');
+          const dateStr = r.rawDate || (r.date ? String(r.date).slice(0, 10) : '');
+          return {
+            id: String(r.id),
+            trackingId: Number(r.trackingId || r.id) || 0,
+            date: dateStr,
+            rawDate: dateStr,
+            type: String(r.Type || r.type || '13'),
+            feedType:
+              r.feedType ||
+              (r.head === 'FEED'
+                ? `Layer Feed ${r.Type || '13'}`
+                : String(r.Type || r.head || 'Stock')),
+            flockName: fname,
+            flockId: fid,
+            head: String(r.head || 'FEED'),
+            category: String(r.head || 'FEED'),
+            quantity: Number(r.quantity || 0),
+            bags: Number(r.bags ?? r.quantity ?? 0),
+            amount: Number(r.amountPaid ?? r.amount ?? 0),
+            costPerBag: Number(r.costPerBag || 0),
+            paymentType: String(r.paymentType || 'CASH'),
+            challanNo: String(r.challanNo || ''),
+            notes: String(r.notes || ''),
+          };
+        });
+        setAllStockRecords(mapped);
+        try {
+          localStorage.setItem('greenova_stocks_v2', JSON.stringify(mapped));
+        } catch {}
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Edit Stock Record Modal State
   const [editingStock, setEditingStock] = useState<StockRecord | null>(null);
@@ -98,6 +154,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
 
   const openEditStockModal = (record: StockRecord) => {
     setEditingStock(record);
+    setEditError(null);
     setEditDate((record.rawDate || record.date || getLocalToday()).split('T')[0]);
     setEditHead(record.head || 'FEED');
     setEditType(record.type || '13');
@@ -109,11 +166,37 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
     setEditNotes(record.notes || '');
   };
 
-  const handleSaveEditedStock = (e: React.FormEvent) => {
+  const handleSaveEditedStock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStock) return;
+    setEditError(null);
+    if (!editDate) {
+      setEditError('Please select a date.');
+      return;
+    }
+    if (!editFlock) {
+      setEditError('Please select a unit / flock.');
+      return;
+    }
+    if (!editType.trim()) {
+      setEditError('Please enter a stock type.');
+      return;
+    }
     const qty = Math.max(0, Number(editQuantity) || 0);
     const amt = Math.max(0, Number(editAmount) || 0);
+    if (qty <= 0) {
+      setEditError('Quantity must be greater than 0.');
+      return;
+    }
+    if (amt <= 0) {
+      setEditError('Amount (PKR) must be greater than 0.');
+      return;
+    }
+    if (!editChallan.trim()) {
+      setEditError('Please enter a challan number.');
+      return;
+    }
+    setIsSavingStock(true);
     const costBag = qty > 0 ? Math.round(amt / qty) : 0;
     const flockId = editFlock === 'Unit 2' ? '9' : editFlock === 'Unit 3' ? '10' : '8';
 
@@ -136,38 +219,60 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
       notes: editNotes.trim(),
     };
 
-    const nextList = allStockRecords.map((r) => (r.id === updatedRecord.id ? updatedRecord : r));
-    setAllStockRecords(nextList);
-    try {
-      localStorage.setItem('greenova_stocks_v2', JSON.stringify(nextList));
-    } catch (err) {
-      console.warn('LocalStorage error:', err);
-    }
-
     const resolvedId = updatedRecord.trackingId || updatedRecord.id;
-    fetch(`/api/stocks/${resolvedId}`, {
-      method: 'PUT',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clientId: updatedRecord.id,
-        date: editDate,
-        challanNo: updatedRecord.challanNo,
-        Type: editType,
-        flockId: Number(flockId),
-        flockName: editFlock,
-        head: editHead,
-        quantity: qty,
-        amount: amt,
-        amountPaid: amt,
-        paymentType: editPaymentType,
-        notes: updatedRecord.notes,
-      }),
-    }).catch((err) => console.warn('Stock update persistence error:', err));
+    try {
+      await apiFetch(`/api/stocks/${resolvedId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          clientId: updatedRecord.id,
+          date: editDate,
+          challanNo: updatedRecord.challanNo,
+          Type: editType,
+          flockId: Number(flockId),
+          flockName: editFlock,
+          head: editHead,
+          quantity: qty,
+          amount: amt,
+          amountPaid: amt,
+          paymentType: editPaymentType,
+          notes: updatedRecord.notes,
+        }),
+      });
 
-    setEditingStock(null);
-    setToastMessage(`Stock record #${updatedRecord.trackingId} updated successfully.`);
-    setTimeout(() => setToastMessage(null), 3500);
+      const nextList = allStockRecords.map((r) => (r.id === updatedRecord.id ? updatedRecord : r));
+      setAllStockRecords(nextList);
+      try {
+        localStorage.setItem('greenova_stocks_v2', JSON.stringify(nextList));
+      } catch (err) {
+        console.warn('LocalStorage error:', err);
+      }
+
+      setEditingStock(null);
+      setToastMessage(`Stock record #${updatedRecord.trackingId} updated successfully.`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err: any) {
+      setEditError(err?.message || 'Failed to update stock record.');
+    } finally {
+      setIsSavingStock(false);
+    }
+  };
+
+  const handleDeleteStock = async (record: StockRecord) => {
+    const resolvedId = record.trackingId || record.id;
+    try {
+      await apiFetch(`/api/stocks/${resolvedId}`, { method: 'DELETE' });
+      const nextList = allStockRecords.filter((r) => String(r.id) !== String(record.id));
+      setAllStockRecords(nextList);
+      try {
+        localStorage.setItem('greenova_stocks_v2', JSON.stringify(nextList));
+      } catch {}
+      setConfirmDeleteStockId(null);
+      setToastMessage(`Stock record #${record.trackingId} deleted from database.`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err: any) {
+      setToastMessage(err?.message || 'Failed to delete stock record.');
+      setTimeout(() => setToastMessage(null), 4000);
+    }
   };
 
   const handleHeadChange = (newHead: string) => {
@@ -189,19 +294,25 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
     setFormDate(getLocalToday());
     setFormHead('FEED');
     setFormStockType('11');
-    setFormFlock('Unit 2');
-    setFormQuantity(240);
-    setFormAmount(500000);
+    setFormFlock('');
+    setFormQuantity(0);
+    setFormAmount(0);
     setFormPaymentType('');
     setFormChallan('');
     setFormNotes('');
     setAttachmentName('');
     setAttachmentData(null);
+    setFormError(null);
   };
 
   const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        setFormError('Attachment exceeds 3MB size limit.');
+        return;
+      }
+      setFormError(null);
       setAttachmentName(file.name);
       const reader = new FileReader();
       reader.onload = () => {
@@ -211,112 +322,144 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
     }
   };
 
-  const handleSaveStockRecord = (e: React.FormEvent) => {
+  const handleSaveStockRecord = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+    if (!formDate) {
+      setFormError('Please select a stock intake date.');
+      return;
+    }
+    if (!formHead) {
+      setFormError('Please select a stock head.');
+      return;
+    }
+    if (!formStockType) {
+      setFormError('Please select a stock type.');
+      return;
+    }
+    if (!formFlock) {
+      setFormError('Please select a flock / unit.');
+      return;
+    }
+    if (!formQuantity || Number(formQuantity) <= 0) {
+      setFormError('Please enter a valid Quantity greater than 0.');
+      return;
+    }
+    if (!formAmount || Number(formAmount) <= 0) {
+      setFormError('Please enter a valid Amount (PKR) greater than 0.');
+      return;
+    }
     if (!formPaymentType) {
-      alert('Please select a payment type.');
+      setFormError('Please select a payment type.');
       return;
     }
     if (!formChallan.trim()) {
-      alert('Please enter a challan number.');
+      setFormError('Please enter a challan number.');
       return;
     }
+    setIsSavingStock(true);
 
     const qty = Number(formQuantity) || 0;
     const amt = Number(formAmount) || 0;
     const costBag = qty > 0 ? Math.round(amt / qty) : 0;
     const maxTracking = allStockRecords.reduce((max, r) => Math.max(max, r.trackingId || 0), 0);
     const flockId = formFlock === 'Unit 2' ? '9' : formFlock === 'Unit 3' ? '10' : '8';
+    const clientId = `stk-${Date.now()}`;
 
-    const newRecord: StockRecord = {
-      id: `stk-${Date.now()}`,
-      trackingId: maxTracking + 1,
-      date: formDate,
-      rawDate: formDate,
-      type: formStockType,
-      feedType: formHead === 'FEED' ? `Layer Feed ${formStockType}` : formStockType,
-      flockName: formFlock,
-      flockId,
-      head: formHead,
-      category: formHead,
-      quantity: qty,
-      bags: qty,
-      amount: amt,
-      costPerBag: costBag,
-      paymentType: formPaymentType,
-      challanNo: formChallan.trim(),
-      notes: formNotes || `${qty} bags of ${formStockType} received...`,
-    };
-
-    const updated = [newRecord, ...allStockRecords];
-    setAllStockRecords(updated);
     try {
-      localStorage.setItem('greenova_stocks_v2', JSON.stringify(updated));
-    } catch (err) {
-      console.warn('LocalStorage error:', err);
-    }
+      const res = await apiFetch('/api/stocks', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientId,
+          date: formDate,
+          challanNo: formChallan.trim(),
+          Type: formStockType,
+          flockId: Number(flockId),
+          flockName: formFlock,
+          head: formHead,
+          quantity: qty,
+          amount: amt,
+          amountPaid: amt,
+          paymentType: formPaymentType.toUpperCase(),
+          notes: formNotes,
+          attachment: attachmentData || attachmentName || null,
+        }),
+      });
 
-    // Call backend API to persist
-    fetch('/api/stocks', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clientId: newRecord.id,
-        trackingId: newRecord.trackingId,
-        date: formDate,
-        challanNo: formChallan,
-        Type: formStockType,
-        flockId: Number(flockId),
-        head: formHead,
-        quantity: qty,
-        amount: amt,
-        amountPaid: amt,
-        paymentType: formPaymentType.toUpperCase(),
-        notes: formNotes,
-        attachment: attachmentData || attachmentName || null,
-      }),
-    }).catch((e) => console.warn('Stock backend sync error:', e));
+      const canonicalId = Number(res?.data?.id) || maxTracking + 1;
 
-    // Automatically create corresponding Farm Expense transaction so cost reflects dynamically everywhere
-    if (onAddTransaction) {
-      const expenseRecord: FinancialRecord = {
-        id: `exp-stk-${Date.now()}`,
-        trackingId: newRecord.trackingId,
-        type: 'Expense',
-        category: formHead === 'FEED' ? 'FEED' : formHead === 'MEDICINE' ? 'MEDICINE' : formHead === 'VACCINE' ? 'VACCINE' : formHead,
-        head: formHead === 'FEED' ? 'FEED' : formHead === 'MEDICINE' ? 'MEDICINE' : formHead === 'VACCINE' ? 'VACCINE' : formHead,
-        amount: amt,
+      const newRecord: StockRecord = {
+        id: String(canonicalId),
+        trackingId: canonicalId,
         date: formDate,
-        referenceNo: `STK-${newRecord.trackingId}`,
-        challanNo: formChallan.trim(),
-        flockId: Number(flockId),
+        rawDate: formDate,
+        type: formStockType,
+        feedType: formHead === 'FEED' ? `Layer Feed ${formStockType}` : formStockType,
         flockName: formFlock,
-        description: `Stock Intake: ${qty} ${formHead === 'FEED' ? 'bags' : 'units'} of ${formStockType} (${formHead}) via ${formPaymentType}`,
-        notes: formNotes || `Stock record #${newRecord.trackingId} auto-synced to Farm Expenses ledger.`,
-        status: 'Paid',
-        attachment: attachmentData || null,
-        attachmentName: attachmentName || null,
+        flockId,
+        head: formHead,
+        category: formHead,
+        quantity: qty,
+        bags: qty,
+        amount: amt,
+        costPerBag: costBag,
+        paymentType: formPaymentType.toUpperCase(),
+        challanNo: formChallan.trim(),
+        notes: formNotes || `${qty} bags of ${formStockType} received...`,
       };
-      onAddTransaction(expenseRecord);
-    }
 
-    // Auto-restock warehouse inventory item if applicable
-    if (onRestock && qty > 0) {
-      const match = inventory.find(
-        (item) =>
-          item.category.toLowerCase() === formHead.toLowerCase() ||
-          item.name.toLowerCase().includes(formStockType.toLowerCase()) ||
-          (formHead === 'FEED' && item.name.toLowerCase().includes('feed'))
-      );
-      if (match) {
-        onRestock(match.id, qty);
+      const updated = [newRecord, ...allStockRecords];
+      setAllStockRecords(updated);
+      try {
+        localStorage.setItem('greenova_stocks_v2', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('LocalStorage error:', err);
       }
-    }
 
-    handleResetForm();
-    setActiveTab('shipments');
-    setCurrentPage(1);
+      // Auto-restock warehouse inventory item if applicable
+      if (onRestock && qty > 0) {
+        const match = inventory.find(
+          (item) =>
+            item.category.toLowerCase() === formHead.toLowerCase() ||
+            item.name.toLowerCase().includes(formStockType.toLowerCase()) ||
+            (formHead === 'FEED' && item.name.toLowerCase().includes('feed'))
+        );
+        if (match) {
+          onRestock(match.id, qty);
+        }
+      }
+
+      // Automatically create corresponding Farm Expense transaction so cost reflects dynamically everywhere
+      if (onAddTransaction) {
+        const expenseRecord: FinancialRecord = {
+          id: `exp-stk-${Date.now()}`,
+          trackingId: newRecord.trackingId,
+          type: 'Expense',
+          category: formHead === 'FEED' ? 'FEED' : formHead === 'MEDICINE' ? 'MEDICINE' : formHead === 'VACCINE' ? 'VACCINE' : formHead,
+          head: formHead === 'FEED' ? 'FEED' : formHead === 'MEDICINE' ? 'MEDICINE' : formHead === 'VACCINE' ? 'VACCINE' : formHead,
+          amount: amt,
+          date: formDate,
+          referenceNo: `STK-${newRecord.trackingId}`,
+          challanNo: formChallan.trim(),
+          flockId: Number(flockId),
+          flockName: formFlock,
+          description: `Stock Intake: ${qty} ${formHead === 'FEED' ? 'bags' : 'units'} of ${formStockType} (${formHead}) via ${formPaymentType}`,
+          notes: formNotes || `Stock record #${newRecord.trackingId} auto-synced to Farm Expenses ledger.`,
+          status: 'Paid',
+          attachment: attachmentData || null,
+          attachmentName: attachmentName || null,
+        };
+        await onAddTransaction(expenseRecord);
+      }
+
+      handleResetForm();
+      setActiveTab('shipments');
+      setCurrentPage(1);
+    } catch (err: any) {
+      setFormError(err?.message || 'Failed to save stock record to database.');
+    } finally {
+      setIsSavingStock(false);
+    }
   };
 
   // Filtered stock shipments from authentic records
@@ -563,7 +706,13 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
               </p>
             </div>
 
-            <form onSubmit={handleSaveStockRecord} className="space-y-4">
+            <form onSubmit={handleSaveStockRecord} noValidate className="space-y-4">
+              {formError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
               {/* Row 1: Date & Head */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -571,7 +720,10 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                   <input
                     type="date"
                     value={formDate}
-                    onChange={(e) => setFormDate(e.target.value)}
+                    onChange={(e) => {
+                      setFormDate(e.target.value);
+                      setFormError(null);
+                    }}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                     required
                   />
@@ -581,7 +733,10 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                   <label className="block text-xs font-bold text-slate-700 mb-1">Head *</label>
                   <select
                     value={formHead}
-                    onChange={(e) => handleHeadChange(e.target.value)}
+                    onChange={(e) => {
+                      handleHeadChange(e.target.value);
+                      setFormError(null);
+                    }}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
                     required
                   >
@@ -600,7 +755,10 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                   <label className="block text-xs font-bold text-slate-700 mb-1">Stock Type *</label>
                   <select
                     value={formStockType}
-                    onChange={(e) => setFormStockType(e.target.value)}
+                    onChange={(e) => {
+                      setFormStockType(e.target.value);
+                      setFormError(null);
+                    }}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
                     required
                   >
@@ -657,12 +815,20 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                   <label className="block text-xs font-bold text-slate-700 mb-1">Flock *</label>
                   <select
                     value={formFlock}
-                    onChange={(e) => setFormFlock(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
+                    onChange={(e) => {
+                      setFormFlock(e.target.value);
+                      setFormError(null);
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer ${
+                      !formFlock ? 'text-slate-500' : 'text-slate-800'
+                    }`}
                     required
                   >
-                    <option value="Unit 2">Unit 2</option>
+                    <option value="" disabled>
+                      Select flock
+                    </option>
                     <option value="Unit 1">Unit 1</option>
+                    <option value="Unit 2">Unit 2</option>
                     <option value="Unit 3">Unit 3</option>
                     <option value="Warehouse">Warehouse / All Units</option>
                   </select>
@@ -677,8 +843,18 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                     type="number"
                     min="1"
                     value={formQuantity}
-                    onChange={(e) => setFormQuantity(e.target.value)}
-                    placeholder="240"
+                    onFocus={() => {
+                      if (Number(formQuantity) === 0) setFormQuantity('');
+                    }}
+                    onBlur={() => {
+                      if (formQuantity === '') setFormQuantity(0);
+                    }}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setFormQuantity(raw === '' ? '' : Math.max(0, Number(raw) || 0));
+                      setFormError(null);
+                    }}
+                    placeholder="0"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                     required
                   />
@@ -691,8 +867,18 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                     min="0"
                     step="1"
                     value={formAmount}
-                    onChange={(e) => setFormAmount(e.target.value)}
-                    placeholder="500000"
+                    onFocus={() => {
+                      if (Number(formAmount) === 0) setFormAmount('');
+                    }}
+                    onBlur={() => {
+                      if (formAmount === '') setFormAmount(0);
+                    }}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setFormAmount(raw === '' ? '' : Math.max(0, Number(raw) || 0));
+                      setFormError(null);
+                    }}
+                    placeholder="0"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-black text-emerald-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                     required
                   />
@@ -705,11 +891,16 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                   <label className="block text-xs font-bold text-slate-700 mb-1">Payment Type *</label>
                   <select
                     value={formPaymentType}
-                    onChange={(e) => setFormPaymentType(e.target.value)}
+                    onChange={(e) => {
+                      setFormPaymentType(e.target.value);
+                      setFormError(null);
+                    }}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
                     required
                   >
-                    <option value="">Select payment type</option>
+                    <option value="" disabled>
+                      Select payment type
+                    </option>
                     <option value="Cash">Cash</option>
                     <option value="Bank Transfer">Bank Transfer</option>
                     <option value="Cheque">Cheque</option>
@@ -776,9 +967,10 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
 
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-xl bg-emerald-600/80 hover:bg-emerald-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                  disabled={isSavingStock}
+                  className="px-6 py-2 rounded-xl bg-emerald-600/80 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
                 >
-                  Save Stock Record
+                  {isSavingStock ? 'Saving...' : 'Save Stock Record'}
                 </button>
               </div>
 
@@ -1246,15 +1438,55 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                           {record.notes || '-'}
                         </td>
                         <td className="py-3 px-3 text-center whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => openEditStockModal(record)}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                            title={`Edit Stock Record #${record.trackingId}`}
-                          >
-                            <Edit className="w-3 h-3" />
-                            <span>Edit</span>
-                          </button>
+                          <div className="inline-flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setViewingStock(record)}
+                              className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title={`View Stock Record #${record.trackingId}`}
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>View</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openEditStockModal(record)}
+                              className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title={`Edit Stock Record #${record.trackingId}`}
+                            >
+                              <Edit className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                            {confirmDeleteStockId !== record.id && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteStockId(record.id)}
+                                className="inline-flex items-center p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer shadow-2xs"
+                                title={`Delete Stock Record #${record.trackingId}`}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                          {confirmDeleteStockId === record.id && (
+                            <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
+                              <span className="font-bold text-rose-900">Delete?</span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteStock(record)}
+                                className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
+                              >
+                                Yes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteStockId(null)}
+                                className="px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 cursor-pointer"
+                              >
+                                No
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))
@@ -1515,7 +1747,13 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditedStock} className="mt-4 space-y-3.5 text-xs">
+            <form onSubmit={handleSaveEditedStock} noValidate className="mt-4 space-y-3.5 text-xs">
+              {editError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{editError}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Date</label>
@@ -1639,14 +1877,55 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm cursor-pointer"
+                  disabled={isSavingStock}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold shadow-sm cursor-pointer"
                 >
-                  Save Changes
+                  {isSavingStock ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
           </div>
         </div>
+      )}
+      {/* View Stock Record Popup Modal */}
+      {viewingStock && (
+        <RecordDetailModal
+          isOpen={Boolean(viewingStock)}
+          onClose={() => setViewingStock(null)}
+          title={`Stock Intake Record #${viewingStock.trackingId || viewingStock.id}`}
+          subtitle={`${viewingStock.flockName} • ${viewingStock.date}`}
+          badge={{ text: `${viewingStock.head} — ${viewingStock.paymentType}`, color: 'indigo' }}
+          fields={[
+            { label: 'Tracking ID', value: `#${viewingStock.trackingId || viewingStock.id}`, mono: true },
+            { label: 'Intake Date', value: viewingStock.date, mono: true },
+            { label: 'Unit / Flock', value: viewingStock.flockName },
+            { label: 'Head / Category', value: viewingStock.head },
+            { label: 'Stock / Feed Type', value: viewingStock.feedType || viewingStock.type },
+            { label: 'Challan No', value: viewingStock.challanNo ? `CH-${viewingStock.challanNo}` : '—', mono: true },
+            {
+              label: 'Quantity Received',
+              value: `${viewingStock.quantity.toLocaleString()} ${
+                viewingStock.head === 'FEED' ? 'bags' : 'units'
+              }`,
+              mono: true,
+            },
+            {
+              label: 'Rate Per Bag / Unit',
+              value: `Rs. ${(viewingStock.costPerBag || 0).toLocaleString()}`,
+              mono: true,
+            },
+            {
+              label: 'Total Amount Paid',
+              value: `Rs. ${viewingStock.amount.toLocaleString()}`,
+              mono: true,
+              highlight: true,
+            },
+            { label: 'Payment Method', value: viewingStock.paymentType },
+          ]}
+          notes={viewingStock.notes}
+          onEdit={() => openEditStockModal(viewingStock)}
+          onDelete={() => handleDeleteStock(viewingStock)}
+        />
       )}
     </div>
   );

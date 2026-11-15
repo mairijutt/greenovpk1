@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Egg, Wheat, HeartPulse, X } from 'lucide-react';
+import { Egg, Wheat, HeartPulse, X, AlertCircle } from 'lucide-react';
 import { Flock, EggProduction, FeedConsumption, MortalityLog } from '../types/farm';
 import { UIInput, UISelect, UITextarea, UIButton } from './ui';
 
@@ -25,43 +25,61 @@ export const RecordModal: React.FC<RecordModalProps> = ({
   onNavigateTab,
 }) => {
   const [flockId, setFlockId] = useState('');
-  const [recordDate, setRecordDate] = useState('2026-11-12');
+  const [recordDate, setRecordDate] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Egg fields matching user screenshot & comprehensive poultry options
-  const [cartons, setCartons] = useState<number>(56);
-  const [trays, setTrays] = useState<number>(11);
-  const [looseEggs, setLooseEggs] = useState<number>(18);
-  const [damaged, setDamaged] = useState<number>(25);
-  const [avgWeightGrams, setAvgWeightGrams] = useState<number>(62.5);
-  const [eggGrade, setEggGrade] = useState<string>('Standard');
+  const [cartons, setCartons] = useState<number | ''>(0);
+  const [trays, setTrays] = useState<number | ''>(0);
+  const [looseEggs, setLooseEggs] = useState<number | ''>(0);
+  const [damaged, setDamaged] = useState<number | ''>(0);
+  const [avgWeightGrams, setAvgWeightGrams] = useState<number | ''>(0);
+  const [eggGrade, setEggGrade] = useState<string>('');
   const [collectionShift, setCollectionShift] = useState<'All-Day' | 'Morning' | 'Evening'>('All-Day');
-  const [morning, setMorning] = useState<number>(12650);
-  const [evening, setEvening] = useState<number>(7858);
+  const [morning, setMorning] = useState<number>(0);
+  const [evening, setEvening] = useState<number>(0);
   const [eggNotes, setEggNotes] = useState<string>('');
 
   // Feed fields
-  const [feedType, setFeedType] = useState('Layer Phase-2 Mash (Feed 13)');
-  const [feedQuantity, setFeedQuantity] = useState(2500);
-  const [waterLiters, setWaterLiters] = useState(0);
+  const [feedType, setFeedType] = useState('');
+  const [feedQuantity, setFeedQuantity] = useState<number | ''>(0);
+  const [waterLiters, setWaterLiters] = useState<number | ''>(0);
 
   // Mortality fields
-  const [deaths, setDeaths] = useState(4);
-  const [cause, setCause] = useState('Heat stress tolerance / natural');
+  const [deaths, setDeaths] = useState<number | ''>(0);
+  const [cause, setCause] = useState('');
   const [symptoms, setSymptoms] = useState('');
 
-  // Ensure valid flock selected when modal opens
+  // Ensure flock resets to placeholder and form fields reset cleanly when modal opens
   useEffect(() => {
     if (isOpen) {
-      if (flocks.length > 0) {
-        if (!flockId || !flocks.some((f) => f.id === flockId)) {
-          setFlockId(flocks[0].id);
-        }
+      setFlockId('');
+      setFormError(null);
+      const now = new Date();
+      const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      setRecordDate(todayIso);
+      if (type === 'egg') {
+        setCartons(0);
+        setTrays(0);
+        setLooseEggs(0);
+        setDamaged(0);
+        setAvgWeightGrams(0);
+        setEggGrade('');
+        setCollectionShift('All-Day');
+        setMorning(0);
+        setEvening(0);
+        setEggNotes('');
+      } else if (type === 'feed') {
+        setFeedType('');
+        setFeedQuantity(0);
+        setWaterLiters(0);
+      } else if (type === 'mortality') {
+        setDeaths(0);
+        setCause('');
+        setSymptoms('');
       }
-      // Dynamic operational date
-      const todayIso = new Date().toISOString().split('T')[0];
-      setRecordDate(todayIso >= '2026-11-09' ? todayIso : '2026-11-12');
     }
-  }, [isOpen, flocks]);
+  }, [isOpen, type]);
 
   // Egg live calculations
   const totalEggs = Math.max(
@@ -87,7 +105,8 @@ export const RecordModal: React.FC<RecordModalProps> = ({
 
   if (!isOpen || !type) return null;
 
-  const selectedFlock = flocks.find((f) => f.id === flockId) || flocks[0] || {
+  const matchedFlock = flocks.find((f) => String(f.id) === String(flockId));
+  const selectedFlock = matchedFlock || flocks[0] || {
     id: '8',
     name: 'Unit 1',
     currentCount: 24786,
@@ -97,22 +116,50 @@ export const RecordModal: React.FC<RecordModalProps> = ({
   const cleanEggs = Math.max(0, totalEggs - (Number(damaged) || 0));
   const cleanTrays = Math.floor(cleanEggs / 30);
   const cleanCartons = (cleanTrays / 12).toFixed(1);
-  const birdCount = selectedFlock.currentCount || 25000;
-  const layingRate = birdCount > 0 ? ((totalEggs / birdCount) * 100).toFixed(1) : '0.0';
+  const birdCount = matchedFlock ? matchedFlock.currentCount || 25000 : selectedFlock.currentCount || 25000;
+  const layingRate = matchedFlock && birdCount > 0 ? ((totalEggs / birdCount) * 100).toFixed(1) : '0.0';
   const brokenRate = totalEggs > 0 ? (((Number(damaged) || 0) / totalEggs) * 100).toFixed(2) : '0.00';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const now = new Date();
-    const fallbackToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const today = recordDate || fallbackToday;
+    setFormError(null);
+
+    if (!recordDate) {
+      setFormError('Please select a record date.');
+      return;
+    }
+    if (!flockId || !matchedFlock) {
+      setFormError('Please select a flock before saving.');
+      return;
+    }
 
     if (type === 'egg') {
+      if (totalEggs <= 0) {
+        setFormError('Please enter egg production (at least 1 carton, tray, or egg). Zero production cannot be saved.');
+        return;
+      }
+      if (damaged === '' || Number(damaged) < 0) {
+        setFormError('Please enter Broken/Damaged Eggs count (enter 0 if none).');
+        return;
+      }
+      if (Number(damaged) > totalEggs) {
+        setFormError('Broken/Damaged Eggs cannot exceed Total Produced eggs.');
+        return;
+      }
+      if (!avgWeightGrams || Number(avgWeightGrams) <= 0) {
+        setFormError('Please enter Avg. Egg Weight (g) greater than 0.');
+        return;
+      }
+      if (!eggGrade) {
+        setFormError('Please select an Egg Grade.');
+        return;
+      }
+
       const newEggRecord: EggProduction = {
         id: `egg-${Date.now()}`,
-        flockId: selectedFlock.id,
-        flockName: selectedFlock.name,
-        date: today,
+        flockId: matchedFlock.id,
+        flockName: matchedFlock.name,
+        date: recordDate,
         morningEggs: morning,
         eveningEggs: evening,
         totalEggs,
@@ -122,36 +169,59 @@ export const RecordModal: React.FC<RecordModalProps> = ({
         cartons: Number(cartons) || Math.floor(totalEggs / 360),
         looseEggs: Number(looseEggs) || 0,
         eggGrade,
-        avgWeightGrams: Number(avgWeightGrams) || 60,
+        avgWeightGrams: Number(avgWeightGrams),
         notes: eggNotes.trim() || undefined,
       };
 
       onAddEgg(newEggRecord);
     } else if (type === 'feed') {
-      const birdCount = selectedFlock.currentCount || 25000;
-      const gramsPerBird = Number(((Number(feedQuantity) * 1000) / birdCount).toFixed(1));
-      const bags = Math.round((Number(feedQuantity) || 0) / 50);
+      if (!feedType.trim()) {
+        setFormError('Please enter the Feed Formulation / Brand.');
+        return;
+      }
+      if (!feedQuantity || Number(feedQuantity) <= 0) {
+        setFormError('Please enter Feed Weight (Kg) greater than 0.');
+        return;
+      }
+      if (waterLiters === '' || Number(waterLiters) <= 0) {
+        setFormError('Please enter Water Intake (Liters) greater than 0.');
+        return;
+      }
+
+      const fBirdCount = matchedFlock.currentCount || 25000;
+      const qtyKg = Number(feedQuantity);
+      const gramsPerBird = Number(((qtyKg * 1000) / fBirdCount).toFixed(1));
+      const bags = Math.round(qtyKg / 50);
       onAddFeed({
         id: `feed-${Date.now()}`,
-        flockId: selectedFlock.id,
-        flockName: selectedFlock.name,
-        date: today,
-        feedType,
-        feedQuantityKg: Number(feedQuantity) || 0,
+        flockId: matchedFlock.id,
+        flockName: matchedFlock.name,
+        date: recordDate,
+        feedType: feedType.trim(),
+        feedQuantityKg: qtyKg,
         bags,
         gramsPerBird: isNaN(gramsPerBird) ? 118 : gramsPerBird,
-        waterIntakeLiters: Number(waterLiters) || 0,
+        waterIntakeLiters: Number(waterLiters),
         fcrEstimate: 1.95,
       });
     } else if (type === 'mortality') {
+      if (!deaths || Number(deaths) < 1) {
+        setFormError('Please enter Number of Deaths (at least 1).');
+        return;
+      }
+      if (!cause.trim()) {
+        setFormError('Please enter the Cause of Death / Finding.');
+        return;
+      }
+
       onAddMortality({
         id: `mort-${Date.now()}`,
-        flockId: selectedFlock.id,
-        flockName: selectedFlock.name,
-        date: today,
-        count: Number(deaths) || 0,
-        cause,
-        symptoms,
+        flockId: matchedFlock.id,
+        flockName: matchedFlock.name,
+        date: recordDate,
+        count: Number(deaths),
+        cause: cause.trim(),
+        symptoms: symptoms.trim(),
         recordedBy: 'Shift Supervisor',
       });
     }
@@ -193,7 +263,14 @@ export const RecordModal: React.FC<RecordModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-5 text-xs">
+        <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-5 text-xs">
+            {formError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+
             {/* EGG PRODUCTION DETAILS FORM (WIDER & ALL OPTIONS) */}
             {type === 'egg' && (
               <>
@@ -207,7 +284,10 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                       type="date"
                       required
                       value={recordDate}
-                      onChange={(e) => setRecordDate(e.target.value)}
+                      onChange={(e) => {
+                        setRecordDate(e.target.value);
+                        setFormError(null);
+                      }}
                       className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all font-mono"
                     />
                   </div>
@@ -219,15 +299,18 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                     <select
                       required
                       value={flockId}
-                      onChange={(e) => setFlockId(e.target.value)}
+                      onChange={(e) => {
+                        setFlockId(e.target.value);
+                        setFormError(null);
+                      }}
                       className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-xs sm:text-sm font-semibold transition-all focus:outline-none focus:ring-2 cursor-pointer ${
                         !flockId
-                          ? 'border-rose-400 focus:ring-rose-500/20 text-rose-700'
+                          ? 'border-slate-300 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-500'
                           : 'border-slate-200 focus:ring-emerald-500/20 focus:border-emerald-600 text-slate-900'
                       }`}
                     >
                       <option value="" disabled>
-                        Select a flock
+                        Select flock
                       </option>
                       {flocks.map((f) => (
                         <option key={f.id} value={f.id}>
@@ -249,11 +332,21 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                         type="number"
                         min="0"
                         value={cartons}
-                        onChange={(e) => setCartons(Math.max(0, parseInt(e.target.value) || 0))}
+                        onFocus={() => {
+                          if (Number(cartons) === 0) setCartons('');
+                        }}
+                        onBlur={() => {
+                          if (cartons === '') setCartons(0);
+                        }}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setCartons(raw === '' ? '' : Math.max(0, parseInt(raw, 10) || 0));
+                          setFormError(null);
+                        }}
                         className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-center"
                       />
                       <span className="text-[10px] text-slate-400 mt-1 block text-center font-mono">
-                        ={(cartons * 360).toLocaleString()} eggs
+                        ={((Number(cartons) || 0) * 360).toLocaleString()} eggs
                       </span>
                     </div>
 
@@ -265,11 +358,21 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                         type="number"
                         min="0"
                         value={trays}
-                        onChange={(e) => setTrays(Math.max(0, parseInt(e.target.value) || 0))}
+                        onFocus={() => {
+                          if (Number(trays) === 0) setTrays('');
+                        }}
+                        onBlur={() => {
+                          if (trays === '') setTrays(0);
+                        }}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setTrays(raw === '' ? '' : Math.max(0, parseInt(raw, 10) || 0));
+                          setFormError(null);
+                        }}
                         className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-center"
                       />
                       <span className="text-[10px] text-slate-400 mt-1 block text-center font-mono">
-                        ={(trays * 30).toLocaleString()} eggs
+                        ={((Number(trays) || 0) * 30).toLocaleString()} eggs
                       </span>
                     </div>
 
@@ -281,11 +384,21 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                         type="number"
                         min="0"
                         value={looseEggs}
-                        onChange={(e) => setLooseEggs(Math.max(0, parseInt(e.target.value) || 0))}
+                        onFocus={() => {
+                          if (Number(looseEggs) === 0) setLooseEggs('');
+                        }}
+                        onBlur={() => {
+                          if (looseEggs === '') setLooseEggs(0);
+                        }}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setLooseEggs(raw === '' ? '' : Math.max(0, parseInt(raw, 10) || 0));
+                          setFormError(null);
+                        }}
                         className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl font-mono text-sm font-bold text-slate-900 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 text-center"
                       />
                       <span className="text-[10px] text-slate-400 mt-1 block text-center font-mono">
-                        loose eggs
+                        ={(Number(looseEggs) || 0).toLocaleString()} eggs
                       </span>
                     </div>
 
@@ -342,7 +455,17 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                       min="0"
                       required
                       value={damaged}
-                      onChange={(e) => setDamaged(Math.max(0, parseInt(e.target.value) || 0))}
+                      onFocus={() => {
+                        if (Number(damaged) === 0) setDamaged('');
+                      }}
+                      onBlur={() => {
+                        if (damaged === '') setDamaged(0);
+                      }}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setDamaged(raw === '' ? '' : Math.max(0, parseInt(raw, 10) || 0));
+                        setFormError(null);
+                      }}
                       className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all font-mono"
                     />
                     <span className="text-[10px] text-slate-400 mt-1 block">
@@ -360,7 +483,17 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                       min="0"
                       required
                       value={avgWeightGrams}
-                      onChange={(e) => setAvgWeightGrams(Math.max(0, parseFloat(e.target.value) || 0))}
+                      onFocus={() => {
+                        if (Number(avgWeightGrams) === 0) setAvgWeightGrams('');
+                      }}
+                      onBlur={() => {
+                        if (avgWeightGrams === '') setAvgWeightGrams(0);
+                      }}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setAvgWeightGrams(raw === '' ? '' : Math.max(0, parseFloat(raw) || 0));
+                        setFormError(null);
+                      }}
                       className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all font-mono"
                     />
                     <span className="text-[10px] text-slate-400 mt-1 block">
@@ -376,10 +509,21 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                       Egg Grade <span className="text-rose-500">*</span>
                     </label>
                     <select
+                      required
                       value={eggGrade}
-                      onChange={(e) => setEggGrade(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all cursor-pointer"
+                      onChange={(e) => {
+                        setEggGrade(e.target.value);
+                        setFormError(null);
+                      }}
+                      className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 transition-all cursor-pointer ${
+                        !eggGrade
+                          ? 'border-slate-300 text-slate-500 focus:ring-emerald-500/20 focus:border-emerald-600'
+                          : 'border-slate-200 text-slate-900 focus:ring-emerald-500/20 focus:border-emerald-600'
+                      }`}
                     >
+                      <option value="" disabled>
+                        Select egg grade
+                      </option>
                       <option value="Starter">Starter</option>
                       <option value="Medium">Medium</option>
                       <option value="Standard">Standard</option>
@@ -418,7 +562,7 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                   <div className="p-2 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
                     <span className="text-[10px] text-slate-500 font-semibold block uppercase">Breakage Rate</span>
                     <span className="font-mono font-bold text-rose-600 text-sm">
-                      {damaged} ({brokenRate}%)
+                      {Number(damaged) || 0} ({brokenRate}%)
                     </span>
                   </div>
                   <div className="p-2 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
@@ -467,9 +611,16 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <UISelect
                     label="Target Unit / Shed"
+                    required
                     value={flockId}
-                    onChange={(e) => setFlockId(e.target.value)}
+                    onChange={(e) => {
+                      setFlockId(e.target.value);
+                      setFormError(null);
+                    }}
                   >
+                    <option value="" disabled>
+                      Select flock
+                    </option>
                     {flocks.map((f) => (
                       <option key={f.id} value={f.id}>
                         {f.farmName ? `${f.farmName} — ` : ''}{f.name} ({f.shedNumber || `Shed ${f.id}`}) — {(f.currentCount || f.initialCount || 25000).toLocaleString()} Birds
@@ -482,16 +633,23 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                     type="date"
                     required
                     value={recordDate}
-                    onChange={(e) => setRecordDate(e.target.value)}
+                    onChange={(e) => {
+                      setRecordDate(e.target.value);
+                      setFormError(null);
+                    }}
                   />
                 </div>
 
                 <UIInput
                   label="Feed Formulation / Brand"
                   type="text"
+                  required
                   value={feedType}
-                  onChange={(e) => setFeedType(e.target.value)}
-                  placeholder="e.g. Layer Phase-2 Mash"
+                  onChange={(e) => {
+                    setFeedType(e.target.value);
+                    setFormError(null);
+                  }}
+                  placeholder="e.g. Layer Phase-2 Mash (Feed 13)"
                 />
 
                 <div className="grid grid-cols-2 gap-3">
@@ -501,7 +659,17 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                     min="0"
                     required
                     value={feedQuantity}
-                    onChange={(e) => setFeedQuantity(Number(e.target.value))}
+                    onFocus={() => {
+                      if (Number(feedQuantity) === 0) setFeedQuantity('');
+                    }}
+                    onBlur={() => {
+                      if (feedQuantity === '') setFeedQuantity(0);
+                    }}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setFeedQuantity(raw === '' ? '' : Math.max(0, Number(raw) || 0));
+                      setFormError(null);
+                    }}
                   />
                   <UIInput
                     label="Water Intake (Liters)"
@@ -509,7 +677,17 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                     min="0"
                     required
                     value={waterLiters}
-                    onChange={(e) => setWaterLiters(Number(e.target.value))}
+                    onFocus={() => {
+                      if (Number(waterLiters) === 0) setWaterLiters('');
+                    }}
+                    onBlur={() => {
+                      if (waterLiters === '') setWaterLiters(0);
+                    }}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setWaterLiters(raw === '' ? '' : Math.max(0, Number(raw) || 0));
+                      setFormError(null);
+                    }}
                   />
                 </div>
 
@@ -530,9 +708,16 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <UISelect
                     label="Target Unit / Shed"
+                    required
                     value={flockId}
-                    onChange={(e) => setFlockId(e.target.value)}
+                    onChange={(e) => {
+                      setFlockId(e.target.value);
+                      setFormError(null);
+                    }}
                   >
+                    <option value="" disabled>
+                      Select flock
+                    </option>
                     {flocks.map((f) => (
                       <option key={f.id} value={f.id}>
                         {f.farmName ? `${f.farmName} — ` : ''}{f.name} ({f.shedNumber || `Shed ${f.id}`}) — {(f.currentCount || f.initialCount || 25000).toLocaleString()} Birds
@@ -545,7 +730,10 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                     type="date"
                     required
                     value={recordDate}
-                    onChange={(e) => setRecordDate(e.target.value)}
+                    onChange={(e) => {
+                      setRecordDate(e.target.value);
+                      setFormError(null);
+                    }}
                   />
                 </div>
 
@@ -555,7 +743,17 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                   min="1"
                   required
                   value={deaths}
-                  onChange={(e) => setDeaths(Number(e.target.value))}
+                  onFocus={() => {
+                    if (Number(deaths) === 0) setDeaths('');
+                  }}
+                  onBlur={() => {
+                    if (deaths === '') setDeaths(0);
+                  }}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setDeaths(raw === '' ? '' : Math.max(0, parseInt(raw, 10) || 0));
+                    setFormError(null);
+                  }}
                 />
 
                 <UIInput
@@ -563,12 +761,15 @@ export const RecordModal: React.FC<RecordModalProps> = ({
                   type="text"
                   required
                   value={cause}
-                  onChange={(e) => setCause(e.target.value)}
+                  onChange={(e) => {
+                    setCause(e.target.value);
+                    setFormError(null);
+                  }}
                   placeholder="e.g. Heat stress tolerance / natural"
                 />
 
                 <UITextarea
-                  label="Clinical Symptoms / Notes"
+                  label="Clinical Symptoms / Notes (Optional)"
                   rows={2}
                   value={symptoms}
                   onChange={(e) => setSymptoms(e.target.value)}

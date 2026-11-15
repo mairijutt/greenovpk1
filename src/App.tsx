@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { Header, HealthNotification } from './components/Header';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
@@ -16,6 +16,7 @@ import { FarmsView } from './components/FarmsView';
 import { UserManagementView } from './components/UserManagementView';
 import { LoginView } from './components/LoginView';
 import { RecordModal } from './components/RecordModal';
+import { apiFetch } from './services/api';
 
 import {
   initialFarms,
@@ -179,6 +180,15 @@ export default function App() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [recordModalType, setRecordModalType] = useState<'egg' | 'mortality' | 'feed' | null>(null);
   const [savedBanner, setSavedBanner] = useState<{ title: string; detail?: string } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const reportError = (err: unknown, fallback: string) => {
+    const msg = err instanceof Error ? err.message : fallback;
+    setActionError(msg);
+    setTimeout(() => {
+      setActionError((prev) => (prev === msg ? null : prev));
+    }, 6000);
+  };
 
   const triggerSavedRefresh = (detail?: string) => {
     setSavedBanner({
@@ -187,7 +197,7 @@ export default function App() {
     });
     setTimeout(() => {
       window.location.reload();
-    }, 1100);
+    }, 900);
   };
 
   // Domain State
@@ -440,377 +450,522 @@ export default function App() {
     return () => window.removeEventListener('storage', handleStorageSync);
   }, []);
 
-  // Initial flock & mortality sync from backend if reachable
+  // Listen for 401 unauthorized events from apiFetch and clear stale sessions
   useEffect(() => {
-    fetch('/api/flocks')
-      .then((res) => res.json())
-      .then((res) => {
-        if (res?.data?.items && Array.isArray(res.data.items) && res.data.items.length > 0) {
-          const apiFlocks: Flock[] = res.data.items.map((item: any) => {
-            const idStr = String(item.id);
-            const defaultMort = idStr === '8' ? 5 : idStr === '9' ? 7 : idStr === '10' ? 3 : 0;
-            const shedNum = idStr === '8' ? 'Shed 1' : idStr === '9' ? 'Shed 2' : idStr === '10' ? 'Shed 3' : `Shed ${idStr}`;
-            return {
-              id: idStr,
-              farmId: String(item.farmId || 9),
-              farmName: item.farm?.name || item.farmName || 'GreenOva',
-              name: item.flockName || item.name || `Unit ${idStr}`,
-              shedNumber: item.shedNumber || shedNum,
-              breed: item.breed || 'LSL Classic',
-              purpose: 'Layers',
-              initialCount: Number(item.originalTotalBirds || item.totalBirds || 25000),
-              currentCount: Number(item.totalBirds ?? 25000),
-              startDate: item.acquiredDate ? String(item.acquiredDate).split('T')[0] : '2026-02-25',
-              ageWeeks: Number(item.ageWeeks || item.ageInWeeks || 38),
-              status: item.isActive !== false ? 'Active' : 'Inactive',
-              mortality: item.mortality !== undefined ? Number(item.mortality) : defaultMort,
-              targetFCR: Number(item.targetFCR || 1.48),
-              cost: Number(item.cost || 7500000),
-              notes: item.notes || '',
-              updatedAt: item.updatedAt,
-            };
-          });
-
-          setFlocks((prevLocal) => {
-            const merged = apiFlocks.map((apiF) => {
-              const localMatch = prevLocal.find((l) => String(l.id) === String(apiF.id));
-              if (localMatch?.updatedAt) {
-                const localTs = new Date(localMatch.updatedAt).getTime();
-                const apiTs = apiF.updatedAt ? new Date(apiF.updatedAt).getTime() : 0;
-                if (!isNaN(localTs) && localTs > apiTs) {
-                  // Keep newer local edit and push it to backend in case previous save was interrupted
-                  fetch(`/api/flock/${localMatch.id}`, {
-                    method: 'PUT',
-                    keepalive: true,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      flockName: localMatch.name,
-                      farmName: localMatch.farmName,
-                      totalBirds: localMatch.currentCount,
-                      originalTotalBirds: localMatch.initialCount,
-                      ageWeeks: localMatch.ageWeeks,
-                      isActive: localMatch.status === 'Active',
-                      acquiredDate: localMatch.startDate,
-                      mortality: localMatch.mortality || 0,
-                      notes: localMatch.notes || '',
-                    }),
-                  }).catch(() => {});
-                  return localMatch;
-                }
-              }
-              return apiF;
-            });
-            // Preserve any locally created flocks not yet returned by backend
-            for (const localF of prevLocal) {
-              if (!merged.some((m) => String(m.id) === String(localF.id))) {
-                merged.push(localF);
-              }
-            }
-            try {
-              localStorage.setItem('greenova_flocks', JSON.stringify(merged));
-            } catch (e) {}
-            return merged;
-          });
-        }
-      })
-      .catch((e) => console.warn('Backend sync:', e));
-
-    // Also pull any backend user-added mortality logs not yet in localStorage (e.g. fresh browser/tab)
-    fetch('/api/bird-health?limit=200')
-      .then((res) => res.json())
-      .then((res) => {
-        const items = res?.data?.items;
-        if (!Array.isArray(items)) return;
-        const userHealthLogs = items.filter((h: any) => h.isUserAdded && (Number(h.mortality) || 0) > 0);
-        if (userHealthLogs.length === 0) return;
-        setMortalityLogs((prev) => {
-          const existingIds = new Set(prev.map((m) => String(m.id)));
-          const additions: MortalityLog[] = [];
-          for (const h of userHealthLogs) {
-            const clientOrServerId = String(h.clientId || `srv-mort-${h.id}`);
-            const dateStr = h.date ? String(h.date).split('T')[0] : '';
-            const fidStr = String(h.flockId || 8);
-            const alreadyMatched =
-              existingIds.has(clientOrServerId) ||
-              prev.some(
-                (m) =>
-                  String(m.flockId) === fidStr &&
-                  m.date === dateStr &&
-                  Number(m.count) === Number(h.mortality)
-              );
-            if (!alreadyMatched) {
-              additions.push({
-                id: clientOrServerId,
-                flockId: fidStr,
-                flockName: h.flock?.flockName || (fidStr === '9' ? 'Unit 2' : fidStr === '10' ? 'Unit 3' : 'Unit 1'),
-                date: dateStr,
-                count: Number(h.mortality) || 0,
-                cause: h.cause || h.notes || 'Daily Mortality',
-                symptoms: h.notes || '',
-                recordedBy: h.recordedBy || 'Farm Admin',
-              });
-            }
-          }
-          if (additions.length === 0) return prev;
-          const next = [...additions, ...prev];
-          try {
-            localStorage.setItem('greenova_mortality_v2', JSON.stringify(next));
-          } catch (e) {}
-          return next;
-        });
-      })
-      .catch(() => {});
-
-    // Sync farms with backend while respecting deleted farm IDs
-    fetch('/api/farms')
-      .then((res) => res.json())
-      .then((res) => {
-        const items = res?.data?.items;
-        if (!Array.isArray(items) || items.length === 0) return;
-
-        let deletedIds: string[] = [];
-        try {
-          const rawDeleted = localStorage.getItem('greenova_deleted_farm_ids');
-          if (rawDeleted) {
-            const parsed = JSON.parse(rawDeleted);
-            if (Array.isArray(parsed)) deletedIds = parsed.map(String);
-          }
-        } catch {}
-
-        let localIds: Set<string> | null = null;
-        try {
-          const savedRaw = localStorage.getItem('greenova_farm_records');
-          if (savedRaw) {
-            const parsedLocal = JSON.parse(savedRaw);
-            if (Array.isArray(parsedLocal) && parsedLocal.length > 0) {
-              localIds = new Set(parsedLocal.map((lf: any) => String(lf.id)));
-            }
-          }
-        } catch {}
-
-        const deletedSet = new Set(deletedIds);
-        const filteredRemote: Farm[] = items
-          .filter((item: any) => {
-            const sid = String(item.id);
-            if (deletedSet.has(sid)) return false;
-            // If user had already removed a farm locally before backend delete was wired, honor local removal
-            if (localIds && !localIds.has(sid) && !item.isUserAdded) {
-              fetch(`/api/farms/${sid}`, { method: 'DELETE', keepalive: true }).catch(() => {});
-              return false;
-            }
-            return true;
-          })
-          .map((item: any) => {
-            const localDefaults = liveFarms.find((lf) => String(lf.id) === String(item.id));
-            return {
-              id: String(item.id),
-              name: item.name,
-              code: item.code || localDefaults?.code || `GVF-${item.id}`,
-              location: item.location || localDefaults?.location || 'Multan, Punjab',
-              description: item.description || localDefaults?.description || 'Main Processing Facility',
-              capacity: Number(item.capacity ?? localDefaults?.capacity ?? 50000),
-              currentBirds: Number(item.currentBirds ?? localDefaults?.currentBirds ?? 0),
-              shedsCount: Number(item.shedsCount ?? localDefaults?.shedsCount ?? 1),
-              manager: item.manager || localDefaults?.manager || 'Farm Supervisor',
-              temperature: Number(item.temperature ?? localDefaults?.temperature ?? 25),
-              humidity: Number(item.humidity ?? localDefaults?.humidity ?? 56),
-            };
-          });
-
-        if (filteredRemote.length > 0) {
-          setFarms((prevLocal) => {
-            const merged = [...filteredRemote];
-            for (const lf of prevLocal) {
-              if (
-                String(lf.id).startsWith('farm-') &&
-                !deletedSet.has(String(lf.id)) &&
-                !merged.some((rf) => String(rf.id) === String(lf.id))
-              ) {
-                merged.push(lf);
-              }
-            }
-            try {
-              localStorage.setItem('greenova_farm_records', JSON.stringify(merged));
-            } catch {}
-            return merged;
-          });
-        }
-      })
-      .catch(() => {});
-
-    // Sync bank accounts with backend while respecting deleted bank IDs
-    fetch('/api/banks')
-      .then((res) => res.json())
-      .then((res) => {
-        const items = res?.data?.items;
-        if (!Array.isArray(items) || items.length === 0) return;
-
-        let deletedIds: string[] = [];
-        try {
-          const rawDeleted = localStorage.getItem('greenova_deleted_bank_ids');
-          if (rawDeleted) {
-            const parsed = JSON.parse(rawDeleted);
-            if (Array.isArray(parsed)) deletedIds = parsed.map(String);
-          }
-        } catch {}
-
-        const deletedSet = new Set(deletedIds);
-        const filteredRemote: BankAccount[] = items.filter((b: any) => !deletedSet.has(String(b.id)));
-        if (filteredRemote.length === 0) return;
-
-        setBankAccounts((prev) => {
-          const merged = [...prev];
-          for (const rb of filteredRemote) {
-            if (!merged.some((lb) => String(lb.id) === String(rb.id))) {
-              merged.push(rb);
-            }
-          }
-          try {
-            localStorage.setItem('greenova_banks_v1', JSON.stringify(merged));
-          } catch {}
-          return merged;
-        });
-      })
-      .catch(() => {});
+    const onUnauthorized = () => {
+      try {
+        localStorage.removeItem('greenova_user');
+      } catch {}
+      setCurrentUser(null);
+    };
+    window.addEventListener('greenova:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('greenova:unauthorized', onUnauthorized);
   }, []);
 
-  // Action handlers
-  const handleAddEgg = (newEgg: EggProduction) => {
-    // Generate next sequential numeric ID matching PDF series (e.g. #414, #415)
-    const numericIds = eggProductions
-      .map((e) => Number(e.id))
-      .filter((n) => !isNaN(n) && n > 0);
-    const nextNumericId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 414;
-    const finalEgg: EggProduction = {
-      ...newEgg,
-      id: String(nextNumericId),
-    };
+  // Verify live session and hydrate ALL domain entities from PostgreSQL
+  useEffect(() => {
+    if (!currentUser?.token) return;
+    let active = true;
 
-    setEggProductions((prev) => [finalEgg, ...prev]);
-
-    // Immediate localStorage sync
-    try {
-      const stored = localStorage.getItem('greenova_eggs_v3') || localStorage.getItem('greenova_eggs_v2');
-      const parsed = stored ? JSON.parse(stored) : [];
-      localStorage.setItem('greenova_eggs_v3', JSON.stringify([finalEgg, ...(Array.isArray(parsed) ? parsed : [])]));
-    } catch (e) {
-      console.warn('LocalStorage error:', e);
-    }
-
-    const numFid =
-      Number(finalEgg.flockId) ||
-      (finalEgg.flockName?.includes('2') ? 9 : finalEgg.flockName?.includes('3') ? 10 : 8);
-
-    fetch('/api/egg-production', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        date: finalEgg.date,
-        flockId: numFid,
-        totalEggs: finalEgg.totalEggs,
-        morningEggs: finalEgg.morningEggs,
-        eveningEggs: finalEgg.eveningEggs,
-        brokenEggs: finalEgg.damagedEggs,
-        cartons: finalEgg.cartons ?? Math.floor(finalEgg.totalEggs / 360),
-        trays: finalEgg.cleanTrays,
-        averageWeight: finalEgg.avgWeightGrams ?? 60,
-        grade: finalEgg.eggGrade ?? 'standard',
-        notes: finalEgg.notes || `Morning: ${finalEgg.morningEggs}, Evening: ${finalEgg.eveningEggs}`,
-      }),
-    })
-      .then((res) => res.json())
-      .then((res) => {
-        if (res?.data?.id) {
-          setEggProductions((prev) => {
-            const next = prev.map((e) => (e.id === finalEgg.id ? { ...e, id: String(res.data.id) } : e));
+    const hydrateAllFromDb = async () => {
+      try {
+        const meRes = await apiFetch('/api/auth/me');
+        if (!active) return;
+        const verifiedUser = meRes?.data?.user;
+        if (verifiedUser) {
+          setCurrentUser((prev) => {
+            if (!prev) return prev;
+            const updated = {
+              ...prev,
+              name: verifiedUser.name || prev.name,
+              email: verifiedUser.email || prev.email,
+              role: verifiedUser.role || prev.role,
+              isSuperAdmin: Boolean(verifiedUser.isSuperAdmin || verifiedUser.role === 'super_admin'),
+            };
             try {
-              localStorage.setItem('greenova_eggs_v3', JSON.stringify(next));
+              localStorage.setItem('greenova_user', JSON.stringify(updated));
             } catch {}
-            return next;
+            return updated;
           });
         }
-      })
-      .catch((e) => console.warn('Egg persistence error:', e));
+      } catch {
+        // 401 handler signs out expired/legacy sessions automatically
+        return;
+      }
 
-    triggerSavedRefresh(
-      `${finalEgg.totalEggs.toLocaleString()} eggs logged for ${finalEgg.flockName}. Refreshing page...`
-    );
+      const [
+        flocksRes,
+        farmsRes,
+        banksRes,
+        eggsRes,
+        consumptionsRes,
+        healthRes,
+        vaccinesRes,
+        salesRes,
+        expensesRes,
+        salariesRes,
+        workersRes,
+      ] = await Promise.allSettled([
+        apiFetch('/api/flocks'),
+        apiFetch('/api/farms'),
+        apiFetch('/api/banks'),
+        apiFetch('/api/egg-productions?limit=5000'),
+        apiFetch('/api/daily-consumptions?limit=5000'),
+        apiFetch('/api/bird-health?limit=5000'),
+        apiFetch('/api/vaccines'),
+        apiFetch('/api/sales?limit=5000'),
+        apiFetch('/api/expenses?limit=5000'),
+        apiFetch('/api/salaries?limit=5000'),
+        apiFetch('/api/workers'),
+      ]);
+
+      if (!active) return;
+
+      // 1. Flocks
+      if (flocksRes.status === 'fulfilled' && Array.isArray(flocksRes.value?.data?.items) && flocksRes.value.data.items.length > 0) {
+        const mappedFlocks: Flock[] = flocksRes.value.data.items.map((item: any) => {
+          const idStr = String(item.id);
+          const shedNum =
+            item.shedNumber ||
+            (idStr === '8' ? 'Shed 1' : idStr === '9' ? 'Shed 2' : idStr === '10' ? 'Shed 3' : `Shed ${idStr}`);
+          return {
+            id: idStr,
+            farmId: String(item.farmId || 9),
+            farmName: item.farm?.name || item.farmName || 'GreenOva',
+            name: item.flockName || item.name || `Unit ${idStr}`,
+            shedNumber: shedNum,
+            breed: item.breed || 'LSL Classic',
+            purpose: 'Layers',
+            initialCount: Number(item.originalTotalBirds || item.totalBirds || 25000),
+            currentCount: Number(item.totalBirds ?? 25000),
+            startDate: item.acquiredDate ? String(item.acquiredDate).split('T')[0] : '2026-02-25',
+            ageWeeks: Number(item.ageWeeks || item.ageInWeeks || 38),
+            status: item.isActive !== false ? 'Active' : 'Inactive',
+            mortality: Number(item.mortality ?? 0),
+            targetFCR: Number(item.targetFCR || 1.48),
+            cost: Number(item.cost || 7500000),
+            notes: item.notes || '',
+            updatedAt: item.updatedAt,
+          };
+        });
+        setFlocks(mappedFlocks);
+        try {
+          localStorage.setItem('greenova_flocks', JSON.stringify(mappedFlocks));
+        } catch {}
+      }
+
+      // 2. Farms
+      if (farmsRes.status === 'fulfilled' && Array.isArray(farmsRes.value?.data?.items)) {
+        const mappedFarms: Farm[] = farmsRes.value.data.items.map((item: any) => ({
+          id: String(item.id),
+          name: item.name,
+          code: item.code || `GVF-${item.id}`,
+          location: item.location || 'Multan, Punjab',
+          description: item.description || 'Main Processing Facility',
+          capacity: Number(item.capacity ?? 50000),
+          currentBirds: Number(item.currentBirds ?? 0),
+          shedsCount: Number(item.shedsCount ?? 1),
+          manager: item.manager || 'Farm Supervisor',
+          temperature: Number(item.temperature ?? 25),
+          humidity: Number(item.humidity ?? 56),
+        }));
+        setFarms(mappedFarms);
+        try {
+          localStorage.setItem('greenova_farm_records', JSON.stringify(mappedFarms));
+        } catch {}
+      }
+
+      // 3. Bank Accounts
+      if (banksRes.status === 'fulfilled' && Array.isArray(banksRes.value?.data?.items)) {
+        const remoteBanks: BankAccount[] = banksRes.value.data.items;
+        setBankAccounts(remoteBanks);
+        try {
+          localStorage.setItem('greenova_banks_v1', JSON.stringify(remoteBanks));
+        } catch {}
+      }
+
+      // 4. Egg Productions
+      if (eggsRes.status === 'fulfilled' && Array.isArray(eggsRes.value?.data?.items) && eggsRes.value.data.items.length > 0) {
+        const mappedEggs: EggProduction[] = eggsRes.value.data.items.map((r: any) => {
+          const fid = String(r.flockId || 8);
+          const totalEggs = Number(r.totalEggs || 0);
+          const birds = Number(r.birds || (fid === '8' ? 24786 : fid === '9' ? 31739 : 25189));
+          return {
+            id: String(r.id),
+            flockId: fid,
+            flockName: r.flock?.flockName || (fid === '9' ? 'Unit 2' : fid === '10' ? 'Unit 3' : 'Unit 1'),
+            date: String(r.date).split('T')[0],
+            morningEggs: Number(r.morningEggs ?? Math.round(totalEggs * 0.55)),
+            eveningEggs: Number(r.eveningEggs ?? Math.max(0, totalEggs - Math.round(totalEggs * 0.55))),
+            totalEggs,
+            damagedEggs: Number(r.damagedEggs ?? r.brokenEggs ?? 0),
+            cleanTrays: Number(r.cleanTrays ?? r.trays ?? Math.floor(totalEggs / 30)),
+            layingRatePercent: birds > 0 ? Number(((totalEggs / birds) * 100).toFixed(1)) : 82,
+            cartons: r.cartons !== undefined ? Number(r.cartons) : Math.floor(totalEggs / 360),
+            looseEggs: r.looseEggs !== undefined ? Number(r.looseEggs) : totalEggs % 30,
+            eggGrade: r.eggGrade || r.grade || 'standard',
+            avgWeightGrams: Number(r.avgWeightGrams ?? r.averageWeight ?? 60),
+            notes: r.notes || '',
+          };
+        });
+        setEggProductions(mappedEggs);
+        try {
+          localStorage.setItem('greenova_eggs_v3', JSON.stringify(mappedEggs));
+        } catch {}
+      }
+
+      // 5. Daily Feed & Water Consumptions
+      if (consumptionsRes.status === 'fulfilled' && Array.isArray(consumptionsRes.value?.data?.items) && consumptionsRes.value.data.items.length > 0) {
+        const mappedFeed: FeedConsumption[] = consumptionsRes.value.data.items.map((r: any) => {
+          const fid = String(r.flockId || 8);
+          const bags = Number(r.bags ?? r.feedConsumed ?? 0);
+          const kg = Number(r.feedQuantityKg ?? bags * 50);
+          return {
+            id: r.clientId || String(r.id),
+            trackingId: Number(r.trackingId || r.id) || undefined,
+            flockId: fid,
+            flockName: r.flock?.flockName || (fid === '9' ? 'Unit 2' : fid === '10' ? 'Unit 3' : 'Unit 1'),
+            date: String(r.date).split('T')[0],
+            feedType: r.feedType || 'Layer Feed 13',
+            feedQuantityKg: kg,
+            bags,
+            gramsPerBird: Number(r.gramsPerBird || 0),
+            waterIntakeLiters: Number(r.waterIntakeLiters ?? r.waterConsumed ?? 0),
+            fcrEstimate: 1.95,
+            challanNo: r.challanNo || '',
+            notes: r.notes || '',
+          };
+        });
+        setConsumptionLogs(mappedFeed);
+        try {
+          localStorage.setItem('greenova_feed_v4', JSON.stringify(mappedFeed));
+        } catch {}
+      }
+
+      // 6. Bird Health (Mortality)
+      if (healthRes.status === 'fulfilled' && Array.isArray(healthRes.value?.data?.items)) {
+        const mappedMort: MortalityLog[] = healthRes.value.data.items.map((r: any) => {
+          const fid = String(r.flockId || 8);
+          return {
+            id: r.clientId || String(r.id),
+            flockId: fid,
+            flockName: r.flock?.flockName || (fid === '9' ? 'Unit 2' : fid === '10' ? 'Unit 3' : 'Unit 1'),
+            date: String(r.date).split('T')[0],
+            count: Number(r.mortality ?? 0),
+            cause: r.cause || r.notes || 'Daily Mortality',
+            symptoms: r.symptoms || r.notes || '',
+            recordedBy: r.recordedBy || 'Farm Admin',
+          };
+        });
+        setMortalityLogs(mappedMort);
+        try {
+          localStorage.setItem('greenova_mortality_v2', JSON.stringify(mappedMort));
+        } catch {}
+      }
+
+      // 7. Vaccines
+      if (vaccinesRes.status === 'fulfilled' && Array.isArray(vaccinesRes.value?.data?.items)) {
+        const mappedVaccines: VaccineLog[] = vaccinesRes.value.data.items.map((r: any) => ({
+          id: String(r.id),
+          flockId: String(r.flockId),
+          flockName:
+            r.flockName ||
+            (String(r.flockId) === '9' ? 'Unit 2' : String(r.flockId) === '10' ? 'Unit 3' : 'Unit 1'),
+          vaccineName: r.vaccineName,
+          scheduledWeek: Number(r.scheduledWeek || 0),
+          scheduledDate: r.scheduledDate || '',
+          administeredDate: r.administeredDate || undefined,
+          status: (r.status as any) || 'Scheduled',
+          method: r.method || 'Drinking Water',
+          dosage: r.dosage || '',
+          batchNumber: r.batchNumber || '',
+          vetNotes: r.vetNotes || '',
+        }));
+        setVaccines(mappedVaccines);
+        try {
+          localStorage.setItem('greenova_vaccines_v2', JSON.stringify(mappedVaccines));
+        } catch {}
+      }
+
+      // 8. Financials (Sales + Expenses merged)
+      const salesItems =
+        salesRes.status === 'fulfilled' && Array.isArray(salesRes.value?.data?.items)
+          ? salesRes.value.data.items
+          : null;
+      const expenseItems =
+        expensesRes.status === 'fulfilled' && Array.isArray(expensesRes.value?.data?.items)
+          ? expensesRes.value.data.items
+          : null;
+
+      if (salesItems && expenseItems) {
+        const mappedSales: FinancialRecord[] = salesItems.map((s: any) => {
+          const fid = Number(s.flockId) || 8;
+          const dateStr = String(s.saleDate || s.date).split('T')[0];
+          const cashAmt = Number(s.cashPayment || 0);
+          const onlineAmt = Number(s.onlinePayment || 0);
+          return {
+            id: s.clientId || `sale-${s.id}`,
+            trackingId: Number(s.id),
+            type: 'Income',
+            category: s.head || 'EGG',
+            head: s.head || 'EGG',
+            amount: Number(s.totalAmount ?? s.amount ?? 0),
+            totalAmount: Number(s.totalAmount ?? s.amount ?? 0),
+            date: dateStr,
+            rawDate: dateStr,
+            referenceNo: s.challanNo ? `CH-${s.challanNo}` : `INV-${s.id}`,
+            challanNo: s.challanNo || String(s.id),
+            flockId: fid,
+            flockName: s.flock?.flockName || (fid === 9 ? 'Unit 2' : fid === 10 ? 'Unit 3' : 'Unit 1'),
+            partyName: s.partyName || 'Market',
+            vehicleNumber: s.vehicleNumber || 'Direct',
+            description: s.notes || s.description || `${s.head || 'EGG'} Sale`,
+            notes: s.notes || '',
+            status: 'Paid',
+            paymentMethod:
+              s.paymentMethod ||
+              (onlineAmt > 0 && cashAmt > 0
+                ? 'Split (Online/Cash)'
+                : cashAmt > 0
+                ? 'Cash Counter'
+                : 'Online / Bank'),
+            onlinePayment: onlineAmt,
+            cashPayment: cashAmt,
+            quantity: Number(s.itemsSold ?? s.quantity ?? 0),
+            unitPrice: Number(s.rate ?? s.unitPrice ?? 0),
+            cartons: s.cartons ?? undefined,
+            trays: s.trays ?? undefined,
+            looseEggs: s.looseEggs ?? undefined,
+            bankId: s.bankId || undefined,
+            bankName: s.bankName || undefined,
+            attachment: s.attachment || null,
+          };
+        });
+
+        const mappedExpenses: FinancialRecord[] = expenseItems.map((e: any) => {
+          const fid = Number(e.flockId) || 8;
+          const dateStr = String(e.expenseDate || e.date).split('T')[0];
+          return {
+            id: e.clientId || `exp-${e.id}`,
+            trackingId: Number(e.id),
+            type: 'Expense',
+            category: e.head || 'OTHER',
+            head: e.head || 'OTHER',
+            amount: Number(e.expenseCost ?? e.amount ?? 0),
+            expenseCost: Number(e.expenseCost ?? e.amount ?? 0),
+            date: dateStr,
+            rawDate: dateStr,
+            referenceNo: e.challanNo ? `CH-${e.challanNo}` : `EXP-${e.id}`,
+            challanNo: e.challanNo || String(e.id),
+            flockId: fid,
+            flockName: e.flock?.flockName || (fid === 9 ? 'Unit 2' : fid === 10 ? 'Unit 3' : 'Unit 1'),
+            description: e.notes || e.description || e.head || 'Expense',
+            notes: e.notes || '',
+            status: 'Paid',
+            attachment: e.attachment || null,
+          };
+        });
+
+        const mergedFin = [...mappedSales, ...mappedExpenses].sort((a, b) => {
+          const cmp = String(b.date).localeCompare(String(a.date));
+          if (cmp !== 0) return cmp;
+          return (Number(b.trackingId) || 0) - (Number(a.trackingId) || 0);
+        });
+        setFinancials(mergedFin);
+        try {
+          localStorage.setItem('greenova_financials_v3', JSON.stringify(mergedFin));
+        } catch {}
+      }
+
+      // 9. Salaries & Advances
+      if (salariesRes.status === 'fulfilled' && Array.isArray(salariesRes.value?.data?.items)) {
+        const allSal = salariesRes.value.data.items;
+        const mappedAdv: AdvanceSalaryRecord[] = allSal
+          .filter((s: any) => s.recordType === 'advance')
+          .map((s: any) => ({
+            id: String(s.id),
+            employeeName: s.employeeName,
+            designation: s.designation || 'Farm Staff',
+            flockId: String(s.flockId || 9),
+            flockName: s.flockName || 'Unit 2',
+            advanceAmount: Number(s.advanceAmount ?? s.advance ?? 0),
+            date: s.date || s.paymentDate || '',
+            challanNo: s.challanNo || '',
+            repaymentStatus: (s.repaymentStatus as any) || 'Pending',
+            deductedAmount: Number(s.deductedAmount ?? s.deduction ?? 0),
+            remainingBalance: Number(s.remainingBalance ?? 0),
+            remarks: s.remarks || '',
+          }));
+
+        const mappedDisbursals: SalaryDisbursal[] = allSal
+          .filter((s: any) => s.recordType !== 'advance' && (s.recordType === 'salary_disbursal' || Number(s.netSalaryPaid || s.salaryAmount || 0) > 0))
+          .map((s: any) => ({
+            id: String(s.id),
+            employeeName: s.employeeName,
+            designation: s.designation || 'Farm Staff',
+            flockId: String(s.flockId || 9),
+            flockName: s.flockName || 'Unit 2',
+            basicSalary: Number(s.basicSalary ?? s.salaryAmount ?? 0),
+            advanceDeducted: Number(s.advanceDeducted ?? s.advance ?? 0),
+            allowanceBonus: 0,
+            penaltyDeduction: Number(s.deduction ?? 0),
+            netSalaryPaid: Number(s.netSalaryPaid ?? s.salaryAmount ?? 0),
+            totalSalary: Number(s.totalSalary ?? s.total ?? s.salaryAmount ?? 0),
+            paymentDate: s.paymentDate || s.date || '',
+            paymentMethod: (s.paymentMethod as any) || 'Cash',
+            status: s.status === 'Pending' ? 'Pending' : 'Paid',
+            remarks: s.remarks || '',
+            challanNo: s.challanNo || '',
+            month: s.month || '',
+          }));
+
+        if (mappedDisbursals.length > 0) {
+          setSalaryDisbursals(mappedDisbursals);
+          try {
+            localStorage.setItem('greenova_salaries_v3', JSON.stringify(mappedDisbursals));
+          } catch {}
+        }
+        if (mappedAdv.length > 0) {
+          setAdvanceRecords(mappedAdv);
+          try {
+            localStorage.setItem('greenova_advances_v3', JSON.stringify(mappedAdv));
+          } catch {}
+        }
+      }
+
+      // 10. Staff Workers
+      if (workersRes.status === 'fulfilled' && Array.isArray(workersRes.value?.data?.items) && workersRes.value.data.items.length > 0) {
+        const mappedWorkers: Worker[] = workersRes.value.data.items;
+        setWorkers(mappedWorkers);
+        try {
+          localStorage.setItem('greenova_staff_v2', JSON.stringify(mappedWorkers));
+        } catch {}
+      }
+    };
+
+    hydrateAllFromDb();
+    return () => {
+      active = false;
+    };
+  }, [currentUser?.token]);
+
+  // Action handlers (awaited against PostgreSQL before UI confirmation / reload)
+  const handleAddEgg = async (newEgg: EggProduction) => {
+    const numFid =
+      Number(newEgg.flockId) ||
+      (newEgg.flockName?.includes('2') ? 9 : newEgg.flockName?.includes('3') ? 10 : 8);
+    try {
+      const res = await apiFetch('/api/egg-production', {
+        method: 'POST',
+        body: JSON.stringify({
+          date: newEgg.date,
+          flockId: numFid,
+          totalEggs: newEgg.totalEggs,
+          morningEggs: newEgg.morningEggs,
+          eveningEggs: newEgg.eveningEggs,
+          brokenEggs: newEgg.damagedEggs,
+          cartons: newEgg.cartons ?? Math.floor(newEgg.totalEggs / 360),
+          trays: newEgg.cleanTrays,
+          eggs: newEgg.looseEggs ?? newEgg.totalEggs % 30,
+          averageWeight: newEgg.avgWeightGrams ?? 60,
+          grade: newEgg.eggGrade ?? 'standard',
+          notes: newEgg.notes || `Morning: ${newEgg.morningEggs}, Evening: ${newEgg.eveningEggs}`,
+        }),
+      });
+
+      const canonicalId = String(res?.data?.id || newEgg.id);
+      const finalEgg: EggProduction = { ...newEgg, id: canonicalId };
+      setEggProductions((prev) => {
+        const next = [finalEgg, ...prev];
+        try {
+          localStorage.setItem('greenova_eggs_v3', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      triggerSavedRefresh(
+        `${finalEgg.totalEggs.toLocaleString()} eggs logged for ${finalEgg.flockName}. Refreshing page...`
+      );
+    } catch (err) {
+      reportError(err, 'Failed to save egg production record.');
+    }
   };
 
-  const handleAddFeed = (newFeed: FeedConsumption) => {
-    const nextLogs = [newFeed, ...consumptionLogs];
-    setConsumptionLogs(nextLogs);
-    try {
-      localStorage.setItem('greenova_feed_v4', JSON.stringify(nextLogs));
-    } catch (e) {}
-
+  const handleAddFeed = async (newFeed: FeedConsumption) => {
     const numFid =
       Number(newFeed.flockId) ||
       (newFeed.flockName?.includes('2') ? 9 : newFeed.flockName?.includes('3') ? 10 : 8);
-    fetch('/api/daily-consumption', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clientId: newFeed.id,
-        trackingId: newFeed.trackingId,
-        challanNo: newFeed.challanNo,
-        date: newFeed.date,
-        flockId: numFid,
-        feedConsumed: newFeed.bags || Math.round((newFeed.feedQuantityKg || 0) / 50),
-        waterConsumption: newFeed.waterIntakeLiters || 0,
-        feedType: newFeed.feedType,
-        notes: newFeed.notes || '',
-      }),
-    }).catch((e) => console.warn('Feed persistence error:', e));
-
-    triggerSavedRefresh(`Feed & water record logged for ${newFeed.flockName}. Refreshing page...`);
+    try {
+      const res = await apiFetch('/api/daily-consumption', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientId: newFeed.id,
+          trackingId: newFeed.trackingId,
+          challanNo: newFeed.challanNo,
+          date: newFeed.date,
+          flockId: numFid,
+          bags: newFeed.bags || Math.round((newFeed.feedQuantityKg || 0) / 50),
+          feedConsumed: newFeed.bags || Math.round((newFeed.feedQuantityKg || 0) / 50),
+          feedQuantityKg: newFeed.feedQuantityKg,
+          gramsPerBird: newFeed.gramsPerBird,
+          waterIntakeLiters: newFeed.waterIntakeLiters || 0,
+          waterConsumption: newFeed.waterIntakeLiters || 0,
+          feedType: newFeed.feedType,
+          notes: newFeed.notes || '',
+        }),
+      });
+      const canonicalFeed: FeedConsumption = {
+        ...newFeed,
+        trackingId: Number(res?.data?.id) || newFeed.trackingId,
+      };
+      const nextLogs = [canonicalFeed, ...consumptionLogs];
+      setConsumptionLogs(nextLogs);
+      try {
+        localStorage.setItem('greenova_feed_v4', JSON.stringify(nextLogs));
+      } catch {}
+      triggerSavedRefresh(`Feed & water record logged for ${newFeed.flockName}. Refreshing page...`);
+    } catch (err) {
+      reportError(err, 'Failed to save daily feed consumption record.');
+    }
   };
 
-  const handleEditFeed = (updatedFeed: FeedConsumption) => {
-    setConsumptionLogs((prev) => {
-      const next = prev.map((c) => (String(c.id) === String(updatedFeed.id) ? updatedFeed : c));
-      try {
-        localStorage.setItem('greenova_feed_v4', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-
+  const handleEditFeed = async (updatedFeed: FeedConsumption) => {
     const numFid =
       Number(updatedFeed.flockId) ||
       (updatedFeed.flockName?.includes('2') ? 9 : updatedFeed.flockName?.includes('3') ? 10 : 8);
     const resolvedId = updatedFeed.trackingId || updatedFeed.id;
 
-    fetch(`/api/daily-consumption/${resolvedId}`, {
-      method: 'PUT',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: updatedFeed.id,
-        date: updatedFeed.date,
-        flockId: numFid,
-        flockName: updatedFeed.flockName,
-        feedType: updatedFeed.feedType,
-        bags: updatedFeed.bags,
-        feedConsumed: updatedFeed.bags || Math.round((updatedFeed.feedQuantityKg || 0) / 50),
-        feedQuantityKg: updatedFeed.feedQuantityKg,
-        gramsPerBird: updatedFeed.gramsPerBird,
-        waterIntakeLiters: updatedFeed.waterIntakeLiters,
-        waterConsumed: updatedFeed.waterIntakeLiters,
-        challanNo: updatedFeed.challanNo,
-        notes: updatedFeed.notes || '',
-      }),
-    }).catch((e) => console.warn('Feed update error:', e));
+    try {
+      await apiFetch(`/api/daily-consumption/${resolvedId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          id: updatedFeed.id,
+          date: updatedFeed.date,
+          flockId: numFid,
+          flockName: updatedFeed.flockName,
+          feedType: updatedFeed.feedType,
+          bags: updatedFeed.bags,
+          feedConsumed: updatedFeed.bags || Math.round((updatedFeed.feedQuantityKg || 0) / 50),
+          feedQuantityKg: updatedFeed.feedQuantityKg,
+          gramsPerBird: updatedFeed.gramsPerBird,
+          waterIntakeLiters: updatedFeed.waterIntakeLiters,
+          waterConsumed: updatedFeed.waterIntakeLiters,
+          challanNo: updatedFeed.challanNo,
+          notes: updatedFeed.notes || '',
+        }),
+      });
+      setConsumptionLogs((prev) => {
+        const next = prev.map((c) => (String(c.id) === String(updatedFeed.id) ? updatedFeed : c));
+        try {
+          localStorage.setItem('greenova_feed_v4', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to update feed consumption record.');
+    }
   };
 
-  const handleAddMortality = (newMort: MortalityLog) => {
-    const updatedMortLogs = [newMort, ...mortalityLogs];
-    setMortalityLogs(updatedMortLogs);
-    try {
-      localStorage.setItem('greenova_mortality_v2', JSON.stringify(updatedMortLogs));
-    } catch (e) {}
-
+  const handleAddMortality = async (newMort: MortalityLog) => {
     const isFlockMatchMort = (f: Flock) =>
       String(f.id) === String(newMort.flockId) ||
       (newMort.flockName && f.name.toLowerCase().includes(newMort.flockName.toLowerCase())) ||
@@ -830,58 +985,48 @@ export default function App() {
       }
       return f;
     });
-
     const matchedFlock = updatedFlocks.find(isFlockMatchMort);
+    const numFid =
+      Number(matchedFlock?.id || newMort.flockId) ||
+      (newMort.flockId === '8' ? 8 : newMort.flockId === '9' ? 9 : 10);
 
-    setFlocks(updatedFlocks);
     try {
-      localStorage.setItem('greenova_flocks', JSON.stringify(updatedFlocks));
-    } catch (e) {}
-
-    const numFid = Number(matchedFlock?.id || newMort.flockId) || (newMort.flockId === '8' ? 8 : newMort.flockId === '9' ? 9 : 10);
-    fetch('/api/bird-health', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clientId: newMort.id,
-        date: newMort.date,
-        flockId: numFid,
-        mortality: newMort.count,
-        notes: newMort.cause,
-        cause: newMort.cause,
-        recordedBy: newMort.recordedBy || 'Farm Admin',
-        flockTotalBirds: matchedFlock?.currentCount,
-        flockMortality: matchedFlock?.mortality,
-      }),
-    }).catch((e) => console.warn('Mortality persistence error:', e));
-
-    if (matchedFlock) {
-      fetch(`/api/flock/${matchedFlock.id}`, {
-        method: 'PUT',
-        keepalive: true,
-        headers: { 'Content-Type': 'application/json' },
+      const res = await apiFetch('/api/bird-health', {
+        method: 'POST',
         body: JSON.stringify({
-          flockName: matchedFlock.name,
-          totalBirds: matchedFlock.currentCount,
-          originalTotalBirds: matchedFlock.initialCount,
-          mortality: matchedFlock.mortality || 0,
-          isActive: matchedFlock.status === 'Active',
+          clientId: newMort.id,
+          date: newMort.date,
+          flockId: numFid,
+          mortality: newMort.count,
+          notes: newMort.symptoms || newMort.cause,
+          cause: newMort.cause,
+          symptoms: newMort.symptoms || '',
+          recordedBy: newMort.recordedBy || 'Farm Admin',
+          flockTotalBirds: matchedFlock?.currentCount,
+          flockMortality: matchedFlock?.mortality,
         }),
-      }).catch((e) => console.warn('Flock mortality sync error:', e));
-    }
+      });
 
-    triggerSavedRefresh(`Mortality record logged for ${newMort.flockName}. Refreshing page...`);
+      const canonicalMort: MortalityLog = {
+        ...newMort,
+        id: res?.data?.clientId || (res?.data?.id ? String(res.data.id) : newMort.id),
+      };
+      const updatedMortLogs = [canonicalMort, ...mortalityLogs];
+      setMortalityLogs(updatedMortLogs);
+      setFlocks(updatedFlocks);
+      try {
+        localStorage.setItem('greenova_mortality_v2', JSON.stringify(updatedMortLogs));
+        localStorage.setItem('greenova_flocks', JSON.stringify(updatedFlocks));
+      } catch {}
+
+      triggerSavedRefresh(`Mortality record logged for ${newMort.flockName}. Refreshing page...`);
+    } catch (err) {
+      reportError(err, 'Failed to save mortality record.');
+    }
   };
 
-  const handleEditMortality = (updatedMort: MortalityLog) => {
+  const handleEditMortality = async (updatedMort: MortalityLog) => {
     const prevMort = mortalityLogs.find((m) => String(m.id) === String(updatedMort.id));
-    const nextLogs = mortalityLogs.map((m) => (String(m.id) === String(updatedMort.id) ? updatedMort : m));
-    setMortalityLogs(nextLogs);
-    try {
-      localStorage.setItem('greenova_mortality_v2', JSON.stringify(nextLogs));
-    } catch (e) {}
-
     const prevCount = Number(prevMort?.count) || 0;
     const newCount = Number(updatedMort.count) || 0;
     const isMatch = (f: Flock, fid?: string, fname?: string) =>
@@ -917,7 +1062,6 @@ export default function App() {
         return f;
       }
 
-      // Moved mortality record from one flock to another
       if (isMatch(f, oldFlockId, oldFlockName)) {
         const nextF = {
           ...f,
@@ -941,317 +1085,481 @@ export default function App() {
       return f;
     });
 
-    if (touchedFlocks.length > 0) {
-      setFlocks(updatedFlocks);
-      try {
-        localStorage.setItem('greenova_flocks', JSON.stringify(updatedFlocks));
-      } catch (e) {}
-
-      touchedFlocks.forEach((mf) => {
-        fetch(`/api/flock/${mf.id}`, {
-          method: 'PUT',
-          keepalive: true,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            flockName: mf.name,
-            totalBirds: mf.currentCount,
-            originalTotalBirds: mf.initialCount,
-            mortality: mf.mortality || 0,
-            isActive: mf.status === 'Active',
-          }),
-        }).catch((e) => console.warn('Flock mortality sync error:', e));
-      });
-    }
-
     const numFid =
       Number(updatedMort.flockId) ||
       (updatedMort.flockName?.includes('2') ? 9 : updatedMort.flockName?.includes('3') ? 10 : 8);
-    fetch(`/api/bird-health/${updatedMort.id}`, {
-      method: 'PUT',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: updatedMort.id,
-        date: updatedMort.date,
-        flockId: numFid,
-        flockName: updatedMort.flockName,
-        mortality: newCount,
-        count: newCount,
-        cause: updatedMort.cause,
-        symptoms: updatedMort.symptoms || '',
-        notes: updatedMort.symptoms || updatedMort.cause,
-        recordedBy: updatedMort.recordedBy || 'Farm Admin',
-      }),
-    }).catch((e) => console.warn('Mortality update error:', e));
+
+    try {
+      await apiFetch(`/api/bird-health/${updatedMort.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          id: updatedMort.id,
+          date: updatedMort.date,
+          flockId: numFid,
+          flockName: updatedMort.flockName,
+          mortality: newCount,
+          count: newCount,
+          cause: updatedMort.cause,
+          symptoms: updatedMort.symptoms || '',
+          notes: updatedMort.symptoms || updatedMort.cause,
+          recordedBy: updatedMort.recordedBy || 'Farm Admin',
+        }),
+      });
+
+      if (touchedFlocks.length > 0) {
+        await Promise.all(
+          touchedFlocks.map((mf) =>
+            apiFetch(`/api/flock/${mf.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                flockName: mf.name,
+                totalBirds: mf.currentCount,
+                originalTotalBirds: mf.initialCount,
+                mortality: mf.mortality || 0,
+                isActive: mf.status === 'Active',
+              }),
+            })
+          )
+        );
+        setFlocks(updatedFlocks);
+        try {
+          localStorage.setItem('greenova_flocks', JSON.stringify(updatedFlocks));
+        } catch {}
+      }
+
+      const nextLogs = mortalityLogs.map((m) =>
+        String(m.id) === String(updatedMort.id) ? updatedMort : m
+      );
+      setMortalityLogs(nextLogs);
+      try {
+        localStorage.setItem('greenova_mortality_v2', JSON.stringify(nextLogs));
+      } catch {}
+    } catch (err) {
+      reportError(err, 'Failed to update mortality record.');
+    }
   };
 
-  const handleEditEgg = (updatedEgg: EggProduction) => {
-    setEggProductions((prev) => {
-      const next = prev.map((e) => (String(e.id) === String(updatedEgg.id) ? updatedEgg : e));
-      try {
-        localStorage.setItem('greenova_eggs_v3', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-
-    const resolvedId = Number((updatedEgg as any).trackingId || String(updatedEgg.id).replace(/\D/g, '')) || updatedEgg.id;
-    fetch(`/api/egg-production/${resolvedId}`, {
-      method: 'PUT',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedEgg),
-    }).catch((e) => console.warn('Egg update error:', e));
+  const handleEditEgg = async (updatedEgg: EggProduction) => {
+    const resolvedId =
+      Number((updatedEgg as any).trackingId || String(updatedEgg.id).replace(/\D/g, '')) ||
+      updatedEgg.id;
+    try {
+      await apiFetch(`/api/egg-production/${resolvedId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedEgg),
+      });
+      setEggProductions((prev) => {
+        const next = prev.map((e) => (String(e.id) === String(updatedEgg.id) ? updatedEgg : e));
+        try {
+          localStorage.setItem('greenova_eggs_v3', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to update egg production record.');
+    }
   };
 
-  const handleEditTransaction = (updatedTx: FinancialRecord) => {
-    setFinancials((prev) => {
-      const next = prev.map((f) => (String(f.id) === String(updatedTx.id) ? updatedTx : f));
-      try {
-        localStorage.setItem('greenova_financials_v3', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
+  const handleDeleteEgg = async (id: string) => {
+    const resolvedId = Number(String(id).replace(/\D/g, '')) || id;
+    try {
+      await apiFetch(`/api/egg-production/${resolvedId}`, { method: 'DELETE' });
+      setEggProductions((prev) => {
+        const next = prev.filter((e) => String(e.id) !== String(id));
+        try {
+          localStorage.setItem('greenova_eggs_v3', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to delete egg production record.');
+    }
+  };
 
+  const handleDeleteFeed = async (log: FeedConsumption) => {
+    const resolvedId = log.trackingId || log.id;
+    try {
+      await apiFetch(`/api/daily-consumption/${resolvedId}`, { method: 'DELETE' });
+      setConsumptionLogs((prev) => {
+        const next = prev.filter((c) => String(c.id) !== String(log.id));
+        try {
+          localStorage.setItem('greenova_feed_v4', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to delete daily consumption record.');
+    }
+  };
+
+  const handleDeleteMortality = async (log: MortalityLog) => {
+    const isMatch = (f: Flock) =>
+      String(f.id) === String(log.flockId) ||
+      (log.flockName && f.name.toLowerCase().includes(log.flockName.toLowerCase())) ||
+      (String(log.flockId) === '8' && (f.name.includes('Unit 1') || f.shedNumber === 'Shed 1')) ||
+      (String(log.flockId) === '9' && (f.name.includes('Unit 2') || f.shedNumber === 'Shed 2')) ||
+      (String(log.flockId) === '10' && (f.name.includes('Unit 3') || f.shedNumber === 'Shed 3'));
+    try {
+      await apiFetch(`/api/bird-health/${log.id}`, { method: 'DELETE' });
+      const countToRestore = Number(log.count) || 0;
+      if (countToRestore > 0) {
+        const matched = flocks.find(isMatch);
+        if (matched) {
+          const restoredFlock: Flock = {
+            ...matched,
+            currentCount: (matched.currentCount || 0) + countToRestore,
+            mortality: Math.max(0, (matched.mortality || 0) - countToRestore),
+            updatedAt: new Date().toISOString(),
+          };
+          await apiFetch(`/api/flock/${restoredFlock.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              flockName: restoredFlock.name,
+              totalBirds: restoredFlock.currentCount,
+              originalTotalBirds: restoredFlock.initialCount,
+              mortality: restoredFlock.mortality,
+              isActive: restoredFlock.status === 'Active',
+            }),
+          });
+          setFlocks((prev) => {
+            const nextF = prev.map((f) => (f.id === restoredFlock.id ? restoredFlock : f));
+            try {
+              localStorage.setItem('greenova_flocks', JSON.stringify(nextF));
+            } catch {}
+            return nextF;
+          });
+        }
+      }
+      setMortalityLogs((prev) => {
+        const next = prev.filter((m) => String(m.id) !== String(log.id));
+        try {
+          localStorage.setItem('greenova_mortality_v2', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to delete mortality record.');
+    }
+  };
+
+  const handleEditTransaction = async (updatedTx: FinancialRecord) => {
     const isSale = updatedTx.type === 'Income';
     const resolvedId = (updatedTx as any).trackingId || updatedTx.id;
-    const endpoint = isSale
-      ? `/api/sales/${resolvedId}`
-      : `/api/expenses/${resolvedId}`;
+    const endpoint = isSale ? `/api/sales/${resolvedId}` : `/api/expenses/${resolvedId}`;
 
-    fetch(endpoint, {
-      method: 'PUT',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedTx),
-    }).catch((e) => console.warn('Transaction update error:', e));
-  };
-
-  const handleAddVaccine = (newVaccine: VaccineLog) => {
-    setVaccines((prev) => {
-      const next = [newVaccine, ...prev];
-      try {
-        localStorage.setItem('greenova_vaccines_v2', JSON.stringify(next));
-      } catch (e) {
-        console.warn('LocalStorage error:', e);
-      }
-      return next;
-    });
-
-    // Trigger immediate prompt on Bell icon in Header
-    const isMed =
-      newVaccine.vaccineName.toLowerCase().includes('medicin') ||
-      newVaccine.vaccineName.toLowerCase().includes('antibiotic') ||
-      newVaccine.vaccineName.toLowerCase().includes('vitamin') ||
-      newVaccine.vaccineName.toLowerCase().includes('tonic') ||
-      newVaccine.vaccineName.toLowerCase().includes('powder') ||
-      newVaccine.vaccineName.toLowerCase().includes('dewormer');
-
-    const promptNotification: HealthNotification = {
-      id: newVaccine.id,
-      title: newVaccine.vaccineName,
-      message: `${newVaccine.flockName || 'Layer Shed'} • ${newVaccine.method || 'Standard'} • ${newVaccine.dosage || ''}`,
-      date: newVaccine.scheduledDate || new Date().toISOString().split('T')[0],
-      flockName: newVaccine.flockName || 'Unit 1',
-      status: newVaccine.status as any,
-      method: newVaccine.method,
-      dosage: newVaccine.dosage,
-      type: isMed ? 'medicine' : 'vaccine',
-      isNew: true,
-    };
-    setLatestHealthPrompt(promptNotification);
-    triggerSavedRefresh(`${newVaccine.vaccineName} scheduled for ${newVaccine.flockName}. Refreshing page...`);
-  };
-
-  const handleEditVaccine = (updatedVaccine: VaccineLog) => {
-    setVaccines((prev) => {
-      const next = prev.map((v) => (v.id === updatedVaccine.id ? updatedVaccine : v));
-      try {
-        localStorage.setItem('greenova_vaccines_v2', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-    if (latestHealthPrompt?.id === updatedVaccine.id) {
-      setLatestHealthPrompt(null);
-    }
-  };
-
-  const handleDeleteVaccine = (id: string) => {
-    setVaccines((prev) => {
-      const next = prev.filter((v) => v.id !== id);
-      try {
-        localStorage.setItem('greenova_vaccines_v2', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-    if (latestHealthPrompt?.id === id) {
-      setLatestHealthPrompt(null);
-    }
-  };
-
-  const handleAddFlock = (flock: Flock) => {
-    const stampedFlock: Flock = { ...flock, updatedAt: new Date().toISOString() };
-    const nextFlocks = [...flocks, stampedFlock];
-    setFlocks(nextFlocks);
     try {
-      localStorage.setItem('greenova_flocks', JSON.stringify(nextFlocks));
-    } catch (e) {}
+      await apiFetch(endpoint, {
+        method: 'PUT',
+        body: JSON.stringify(updatedTx),
+      });
+      setFinancials((prev) => {
+        const next = prev.map((f) => (String(f.id) === String(updatedTx.id) ? updatedTx : f));
+        try {
+          localStorage.setItem('greenova_financials_v3', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to update financial transaction.');
+    }
+  };
 
-    if (flock.mortality && flock.mortality > 0) {
-      const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const mortEntry: MortalityLog = {
-        id: `mort-flock-${Date.now()}`,
-        flockId: flock.id,
-        flockName: flock.name,
-        date: todayStr,
-        count: flock.mortality,
-        cause: 'Initial Flock Mortality Entry',
-        symptoms: 'Recorded when creating flock',
-        recordedBy: currentUser?.name || 'Farm Admin',
+  const handleDeleteTransaction = async (record: FinancialRecord) => {
+    const isSale = record.type === 'Income';
+    const resolvedId = (record as any).trackingId || record.id;
+    const endpoint = isSale ? `/api/sales/${resolvedId}` : `/api/expenses/${resolvedId}`;
+
+    try {
+      await apiFetch(endpoint, { method: 'DELETE' });
+      setFinancials((prev) => {
+        const next = prev.filter((f) => String(f.id) !== String(record.id));
+        try {
+          localStorage.setItem('greenova_financials_v3', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to delete financial transaction.');
+    }
+  };
+
+  const handleAddVaccine = async (newVaccine: VaccineLog) => {
+    try {
+      const res = await apiFetch('/api/vaccines', {
+        method: 'POST',
+        body: JSON.stringify({ ...newVaccine, clientId: newVaccine.id }),
+      });
+      const canonicalVaccine: VaccineLog = {
+        ...newVaccine,
+        id: res?.data?.clientId || (res?.data?.id ? String(res.data.id) : newVaccine.id),
       };
-      const nextMorts = [mortEntry, ...mortalityLogs];
-      setMortalityLogs(nextMorts);
-      try {
-        localStorage.setItem('greenova_mortality_v2', JSON.stringify(nextMorts));
-      } catch (e) {}
+      setVaccines((prev) => {
+        const next = [canonicalVaccine, ...prev];
+        try {
+          localStorage.setItem('greenova_vaccines_v2', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      const isMed =
+        canonicalVaccine.vaccineName.toLowerCase().includes('medicin') ||
+        canonicalVaccine.vaccineName.toLowerCase().includes('antibiotic') ||
+        canonicalVaccine.vaccineName.toLowerCase().includes('vitamin') ||
+        canonicalVaccine.vaccineName.toLowerCase().includes('tonic') ||
+        canonicalVaccine.vaccineName.toLowerCase().includes('powder') ||
+        canonicalVaccine.vaccineName.toLowerCase().includes('dewormer');
+
+      setLatestHealthPrompt({
+        id: canonicalVaccine.id,
+        title: canonicalVaccine.vaccineName,
+        message: `${canonicalVaccine.flockName || 'Layer Shed'} • ${canonicalVaccine.method || 'Standard'} • ${canonicalVaccine.dosage || ''}`,
+        date: canonicalVaccine.scheduledDate || new Date().toISOString().split('T')[0],
+        flockName: canonicalVaccine.flockName || 'Unit 1',
+        status: canonicalVaccine.status as any,
+        method: canonicalVaccine.method,
+        dosage: canonicalVaccine.dosage,
+        type: isMed ? 'medicine' : 'vaccine',
+        isNew: true,
+      });
+      triggerSavedRefresh(
+        `${canonicalVaccine.vaccineName} scheduled for ${canonicalVaccine.flockName}. Refreshing page...`
+      );
+    } catch (err) {
+      reportError(err, 'Failed to save vaccine schedule.');
     }
-
-    fetch('/api/flock', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: Number(flock.id) || undefined,
-        flockName: flock.name,
-        breed: flock.breed,
-        totalBirds: flock.currentCount || flock.initialCount,
-        originalTotalBirds: flock.initialCount,
-        mortality: flock.mortality || 0,
-        ageWeeks: flock.ageWeeks,
-        isActive: flock.status === 'Active',
-        cost: flock.cost || 7500000,
-        acquiredDate: flock.startDate,
-      }),
-    }).catch((e) => console.warn('Flock persistence error:', e));
-
-    triggerSavedRefresh(`Flock "${flock.name}" added. Refreshing page...`);
   };
 
-  const handleEditFlock = (updatedFlock: Flock) => {
-    const prevFlock = flocks.find((f) => String(f.id) === String(updatedFlock.id));
-    const stampedFlock: Flock = { ...updatedFlock, updatedAt: new Date().toISOString() };
-    const nextFlocks = flocks.map((f) => (String(f.id) === String(updatedFlock.id) ? stampedFlock : f));
-    setFlocks(nextFlocks);
+  const handleEditVaccine = async (updatedVaccine: VaccineLog) => {
     try {
-      localStorage.setItem('greenova_flocks', JSON.stringify(nextFlocks));
-    } catch (e) {}
+      await apiFetch(`/api/vaccines/${updatedVaccine.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedVaccine),
+      });
+      setVaccines((prev) => {
+        const next = prev.map((v) => (v.id === updatedVaccine.id ? updatedVaccine : v));
+        try {
+          localStorage.setItem('greenova_vaccines_v2', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      if (latestHealthPrompt?.id === updatedVaccine.id) {
+        setLatestHealthPrompt(null);
+      }
+    } catch (err) {
+      reportError(err, 'Failed to update vaccine schedule.');
+    }
+  };
 
+  const handleDeleteVaccine = async (id: string) => {
+    try {
+      await apiFetch(`/api/vaccines/${id}`, { method: 'DELETE' });
+      setVaccines((prev) => {
+        const next = prev.filter((v) => v.id !== id);
+        try {
+          localStorage.setItem('greenova_vaccines_v2', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      if (latestHealthPrompt?.id === id) {
+        setLatestHealthPrompt(null);
+      }
+    } catch (err) {
+      reportError(err, 'Failed to delete vaccine schedule.');
+    }
+  };
+
+  const handleAddFlock = async (flock: Flock) => {
+    try {
+      const res = await apiFetch('/api/flock', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: Number(flock.id) || undefined,
+          flockName: flock.name,
+          breed: flock.breed,
+          shedNumber: flock.shedNumber,
+          totalBirds: flock.currentCount || flock.initialCount,
+          originalTotalBirds: flock.initialCount,
+          mortality: flock.mortality || 0,
+          ageWeeks: flock.ageWeeks,
+          isActive: flock.status === 'Active',
+          acquiredDate: flock.startDate,
+          cost: flock.cost || 7500000,
+          notes: flock.notes || '',
+        }),
+      });
+      const canonicalId = String(res?.data?.id || flock.id);
+      const stampedFlock: Flock = {
+        ...flock,
+        id: canonicalId,
+        updatedAt: new Date().toISOString(),
+      };
+      const nextFlocks = [...flocks, stampedFlock];
+      setFlocks(nextFlocks);
+      try {
+        localStorage.setItem('greenova_flocks', JSON.stringify(nextFlocks));
+      } catch {}
+
+      if (flock.mortality && flock.mortality > 0) {
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const mortEntry: MortalityLog = {
+          id: `mort-flock-${Date.now()}`,
+          flockId: canonicalId,
+          flockName: flock.name,
+          date: todayStr,
+          count: flock.mortality,
+          cause: 'Initial Flock Mortality Entry',
+          symptoms: 'Recorded when creating flock',
+          recordedBy: currentUser?.name || 'Farm Admin',
+        };
+        await apiFetch('/api/bird-health', {
+          method: 'POST',
+          body: JSON.stringify({
+            clientId: mortEntry.id,
+            date: todayStr,
+            flockId: Number(canonicalId) || 8,
+            mortality: flock.mortality,
+            cause: mortEntry.cause,
+            symptoms: mortEntry.symptoms,
+            recordedBy: mortEntry.recordedBy,
+            skipFlockAdjust: true,
+          }),
+        });
+        const nextMorts = [mortEntry, ...mortalityLogs];
+        setMortalityLogs(nextMorts);
+        try {
+          localStorage.setItem('greenova_mortality_v2', JSON.stringify(nextMorts));
+        } catch {}
+      }
+
+      triggerSavedRefresh(`Flock "${flock.name}" added. Refreshing page...`);
+    } catch (err) {
+      reportError(err, 'Failed to create flock.');
+    }
+  };
+
+  const handleEditFlock = async (updatedFlock: Flock) => {
+    const prevFlock = flocks.find((f) => String(f.id) === String(updatedFlock.id));
     const prevMort = prevFlock?.mortality || 0;
     const newMort = updatedFlock.mortality || 0;
     const mortDelta = newMort - prevMort;
 
-    if (mortDelta > 0) {
-      const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const newLog: MortalityLog = {
-        id: `mort-flock-${Date.now()}`,
-        flockId: updatedFlock.id,
-        flockName: updatedFlock.name,
-        date: todayStr,
-        count: mortDelta,
-        cause: 'Recorded in Flock Management',
-        symptoms: `Flock mortality updated (${prevMort} -> ${newMort})`,
-        recordedBy: currentUser?.name || 'Farm Admin',
-      };
-      const nextMorts = [newLog, ...mortalityLogs];
-      setMortalityLogs(nextMorts);
-      try {
-        localStorage.setItem('greenova_mortality_v2', JSON.stringify(nextMorts));
-      } catch (e) {}
-
-      fetch('/api/bird-health', {
-        method: 'POST',
-        keepalive: true,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: newLog.id,
-          date: todayStr,
-          flockId: Number(updatedFlock.id) || 8,
-          mortality: mortDelta,
-          notes: newLog.cause,
-          cause: newLog.cause,
-          recordedBy: newLog.recordedBy,
-          skipFlockAdjust: true,
-        }),
-      }).catch((e) => console.warn('Mortality log persistence error:', e));
-    } else if (mortDelta < 0) {
-      let toReduce = Math.abs(mortDelta);
-      const nextMorts = mortalityLogs
-        .map((m) => {
-          if (
-            toReduce > 0 &&
-            (String(m.flockId) === String(updatedFlock.id) || m.flockName === updatedFlock.name)
-          ) {
-            const deduct = Math.min(m.count || 0, toReduce);
-            toReduce -= deduct;
-            return { ...m, count: Math.max(0, (m.count || 0) - deduct) };
-          }
-          return m;
-        })
-        .filter((m) => (m.count || 0) > 0);
-      setMortalityLogs(nextMorts);
-      try {
-        localStorage.setItem('greenova_mortality_v2', JSON.stringify(nextMorts));
-      } catch (e) {}
-    }
-
-    fetch(`/api/flock/${updatedFlock.id}`, {
-      method: 'PUT',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        flockName: updatedFlock.name,
-        farmName: updatedFlock.farmName,
-        totalBirds: updatedFlock.currentCount,
-        originalTotalBirds: updatedFlock.initialCount,
-        ageWeeks: updatedFlock.ageWeeks,
-        isActive: updatedFlock.status === 'Active',
-        acquiredDate: updatedFlock.startDate,
-        mortality: updatedFlock.mortality || 0,
-        notes: updatedFlock.notes || '',
-      }),
-    }).catch((e) => console.warn('Flock edit error:', e));
-  };
-
-  const handleDeleteFlock = (id: string) => {
-    const nextFlocks = flocks.filter((f) => f.id !== id);
-    setFlocks(nextFlocks);
     try {
-      localStorage.setItem('greenova_flocks', JSON.stringify(nextFlocks));
-    } catch (e) {}
-    fetch(`/api/flock/${id}`, {
-      method: 'DELETE',
-      keepalive: true,
-    }).catch((e) => console.warn('Flock delete error:', e));
+      await apiFetch(`/api/flock/${updatedFlock.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          flockName: updatedFlock.name,
+          farmName: updatedFlock.farmName,
+          shedNumber: updatedFlock.shedNumber,
+          breed: updatedFlock.breed,
+          totalBirds: updatedFlock.currentCount,
+          originalTotalBirds: updatedFlock.initialCount,
+          ageWeeks: updatedFlock.ageWeeks,
+          isActive: updatedFlock.status === 'Active',
+          acquiredDate: updatedFlock.startDate,
+          mortality: updatedFlock.mortality || 0,
+          notes: updatedFlock.notes || '',
+        }),
+      });
+
+      const stampedFlock: Flock = { ...updatedFlock, updatedAt: new Date().toISOString() };
+      const nextFlocks = flocks.map((f) =>
+        String(f.id) === String(updatedFlock.id) ? stampedFlock : f
+      );
+      setFlocks(nextFlocks);
+      try {
+        localStorage.setItem('greenova_flocks', JSON.stringify(nextFlocks));
+      } catch {}
+
+      if (mortDelta !== 0) {
+        try {
+          const freshHealth = await apiFetch('/api/bird-health');
+          if (Array.isArray(freshHealth?.data?.items)) {
+            const mappedMort: MortalityLog[] = freshHealth.data.items.map((r: any) => {
+              const fid = String(r.flockId || 8);
+              return {
+                id: r.clientId || String(r.id),
+                flockId: fid,
+                flockName:
+                  r.flock?.flockName ||
+                  (fid === '9' ? 'Unit 2' : fid === '10' ? 'Unit 3' : 'Unit 1'),
+                date: String(r.date).split('T')[0],
+                count: Number(r.mortality ?? 0),
+                cause: r.cause || r.notes || 'Daily Mortality',
+                symptoms: r.symptoms || r.notes || '',
+                recordedBy: r.recordedBy || 'Farm Admin',
+              };
+            });
+            setMortalityLogs(mappedMort);
+            try {
+              localStorage.setItem('greenova_mortality_v2', JSON.stringify(mappedMort));
+            } catch {}
+          }
+        } catch {
+          // Offline fallback reconciliation
+          if (mortDelta > 0) {
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const newLog: MortalityLog = {
+              id: `mort-flock-${Date.now()}`,
+              flockId: updatedFlock.id,
+              flockName: updatedFlock.name,
+              date: todayStr,
+              count: mortDelta,
+              cause: 'Recorded in Flock Management',
+              symptoms: `Flock mortality updated (${prevMort} -> ${newMort})`,
+              recordedBy: currentUser?.name || 'Farm Admin',
+            };
+            const nextMorts = [newLog, ...mortalityLogs];
+            setMortalityLogs(nextMorts);
+            try {
+              localStorage.setItem('greenova_mortality_v2', JSON.stringify(nextMorts));
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      reportError(err, 'Failed to update flock details.');
+    }
   };
 
-  const handleToggleVaccine = (id: string) => {
-    setVaccines((prev) => {
-      const updated = prev.map((v) =>
-        v.id === id
-          ? {
-              ...v,
-              status: (v.status === 'Completed' ? 'Scheduled' : 'Completed') as any,
-              administeredDate:
-                v.status === 'Completed' ? undefined : new Date().toISOString().split('T')[0],
-            }
-          : v
-      );
+  const handleDeleteFlock = async (id: string) => {
+    try {
+      await apiFetch(`/api/flock/${id}`, { method: 'DELETE' });
+      const nextFlocks = flocks.filter((f) => f.id !== id);
+      setFlocks(nextFlocks);
       try {
-        localStorage.setItem('greenova_vaccines_v2', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
+        localStorage.setItem('greenova_flocks', JSON.stringify(nextFlocks));
+      } catch {}
+    } catch (err) {
+      reportError(err, 'Failed to delete flock.');
+    }
+  };
+
+  const handleToggleVaccine = async (id: string) => {
+    const target = vaccines.find((v) => v.id === id);
+    if (!target) return;
+    const updatedVaccine: VaccineLog = {
+      ...target,
+      status: (target.status === 'Completed' ? 'Scheduled' : 'Completed') as any,
+      administeredDate:
+        target.status === 'Completed' ? undefined : new Date().toISOString().split('T')[0],
+    };
+    try {
+      await apiFetch(`/api/vaccines/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedVaccine),
+      });
+      setVaccines((prev) => {
+        const updated = prev.map((v) => (v.id === id ? updatedVaccine : v));
+        try {
+          localStorage.setItem('greenova_vaccines_v2', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to update vaccine status.');
+    }
   };
 
   const handleRestock = (id: string, amount: number) => {
@@ -1261,281 +1569,468 @@ export default function App() {
     setInventory(nextInv);
     try {
       localStorage.setItem('greenova_inventory', JSON.stringify(nextInv));
-    } catch (e) {}
+    } catch {}
   };
 
-  const handleAddTransaction = (record: FinancialRecord) => {
-    const nextFinancials = [record, ...financials];
-    setFinancials(nextFinancials);
-    try {
-      localStorage.setItem('greenova_financials_v3', JSON.stringify(nextFinancials));
-    } catch (e) {}
-
+  const handleAddTransaction = async (record: FinancialRecord) => {
     const isExp = record.type === 'Expense';
     const numFid =
       Number(record.flockId) ||
       (record.flockName?.includes('2') ? 9 : record.flockName?.includes('3') ? 10 : 8);
-    fetch(isExp ? '/api/expense' : '/api/sale', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clientId: record.id,
-        trackingId: record.trackingId,
-        amount: record.amount,
-        expenseCost: record.amount,
-        totalAmount: record.amount,
-        head: isExp
-          ? (record.head || record.category || 'OTHER').toUpperCase().replace(/\s+/g, '_')
-          : record.head || record.category || 'EGG',
-        notes: record.notes || record.description || '',
-        flockId: numFid,
-        challanNo: record.challanNo || record.referenceNo || '0',
-        cashPayment: record.cashPayment || 0,
-        onlinePayment: record.onlinePayment || 0,
-        itemsSold: record.quantity || 0,
-        rate: record.unitPrice || 17.5,
-        unitPrice: record.unitPrice || 17.5,
-        partyName: record.partyName || '',
-        vehicleNumber: record.vehicleNumber || 'Direct',
-        cartons: record.cartons,
-        trays: record.trays,
-        looseEggs: record.looseEggs,
-        bankId: record.bankId || undefined,
-        bankName: record.bankName || undefined,
-        date: record.date,
-      }),
-    }).catch((e) => console.warn('Transaction persistence error:', e));
 
-    triggerSavedRefresh(
-      `${isExp ? 'Expense record' : 'Sale record'} (Rs. ${Number(record.amount).toLocaleString()}) saved. Refreshing page...`
-    );
+    try {
+      const res = await apiFetch(isExp ? '/api/expense' : '/api/sale', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientId: record.id,
+          amount: record.amount,
+          expenseCost: record.amount,
+          totalAmount: record.amount,
+          head: isExp
+            ? (record.head || record.category || 'OTHER').toUpperCase().replace(/\s+/g, '_')
+            : record.head || record.category || 'EGG',
+          notes: record.notes || record.description || '',
+          flockId: numFid,
+          flockName: record.flockName,
+          challanNo: record.challanNo || record.referenceNo || '0',
+          cashPayment: record.cashPayment || 0,
+          onlinePayment: record.onlinePayment || 0,
+          itemsSold: record.quantity || 0,
+          rate: record.unitPrice || 17.5,
+          unitPrice: record.unitPrice || 17.5,
+          partyName: record.partyName || '',
+          vehicleNumber: record.vehicleNumber || 'Direct',
+          cartons: record.cartons,
+          trays: record.trays,
+          looseEggs: record.looseEggs,
+          bankId: record.bankId || undefined,
+          bankName: record.bankName || undefined,
+          paymentMethod: record.paymentMethod || undefined,
+          attachment: record.attachment || null,
+          date: record.date,
+        }),
+      });
+
+      const canonicalTrackingId = Number(res?.data?.id) || record.trackingId;
+      const savedRecord: FinancialRecord = {
+        ...record,
+        trackingId: canonicalTrackingId,
+      };
+      const nextFinancials = [savedRecord, ...financials];
+      setFinancials(nextFinancials);
+      try {
+        localStorage.setItem('greenova_financials_v3', JSON.stringify(nextFinancials));
+      } catch {}
+
+      triggerSavedRefresh(
+        `${isExp ? 'Expense record' : 'Sale record'} (Rs. ${Number(record.amount).toLocaleString()}) saved. Refreshing page...`
+      );
+    } catch (err) {
+      reportError(err, `Failed to save ${isExp ? 'expense' : 'sale'} record.`);
+      throw err;
+    }
   };
 
-  const handleAddSalaryDisbursal = (newSalary: SalaryDisbursal) => {
-    const nextSalaries = [newSalary, ...salaryDisbursals];
-    setSalaryDisbursals(nextSalaries);
+  const handleAddSalaryDisbursal = async (newSalary: SalaryDisbursal) => {
     try {
-      localStorage.setItem('greenova_salaries_v3', JSON.stringify(nextSalaries));
-    } catch (e) {}
+      const res = await apiFetch('/api/salaries', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientId: newSalary.id,
+          recordType: 'salary_disbursal',
+          employeeName: newSalary.employeeName,
+          designation: newSalary.designation,
+          flockId: Number(newSalary.flockId) || 9,
+          flockName: newSalary.flockName,
+          basicSalary: newSalary.basicSalary,
+          salaryAmount: newSalary.netSalaryPaid,
+          netSalaryPaid: newSalary.netSalaryPaid,
+          total: newSalary.totalSalary,
+          totalSalary: newSalary.totalSalary,
+          advance: newSalary.advanceDeducted,
+          deduction: newSalary.penaltyDeduction || 0,
+          date: newSalary.paymentDate,
+          paymentDate: newSalary.paymentDate,
+          month: newSalary.month,
+          challanNo: newSalary.challanNo,
+          paymentMethod: newSalary.paymentMethod,
+          status: newSalary.status,
+          remarks: newSalary.remarks || '',
+        }),
+      });
 
-    // If advance was deducted, update worker's advance balance and advance logs
-    if (newSalary.advanceDeducted > 0) {
+      const savedSalary: SalaryDisbursal = {
+        ...newSalary,
+        id: res?.data?.clientId || (res?.data?.id ? String(res.data.id) : newSalary.id),
+      };
+      const nextSalaries = [savedSalary, ...salaryDisbursals];
+      setSalaryDisbursals(nextSalaries);
+      try {
+        localStorage.setItem('greenova_salaries_v3', JSON.stringify(nextSalaries));
+      } catch {}
+
+      if (newSalary.advanceDeducted > 0) {
+        const matchedWorker = workers.find(
+          (w) => w.name.toLowerCase() === newSalary.employeeName.toLowerCase()
+        );
+        if (matchedWorker) {
+          const updatedWorker: Worker = {
+            ...matchedWorker,
+            advanceBalance: Math.max(
+              0,
+              (matchedWorker.advanceBalance || 0) - newSalary.advanceDeducted
+            ),
+          };
+          await apiFetch(`/api/workers/${updatedWorker.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(updatedWorker),
+          });
+          setWorkers((prev) => {
+            const nextWorkers = prev.map((w) => (w.id === updatedWorker.id ? updatedWorker : w));
+            try {
+              localStorage.setItem('greenova_staff_v2', JSON.stringify(nextWorkers));
+            } catch {}
+            return nextWorkers;
+          });
+        }
+      }
+
+      triggerSavedRefresh(
+        `Salary disbursal for ${newSalary.employeeName} saved. Refreshing page...`
+      );
+    } catch (err) {
+      reportError(err, 'Failed to save salary disbursal.');
+    }
+  };
+
+  const handleAddAdvanceRecord = async (newAdvance: AdvanceSalaryRecord) => {
+    try {
+      const res = await apiFetch('/api/salaries', {
+        method: 'POST',
+        body: JSON.stringify({
+          clientId: newAdvance.id,
+          recordType: 'advance',
+          employeeName: newAdvance.employeeName,
+          designation: newAdvance.designation,
+          flockId: Number(newAdvance.flockId) || 9,
+          flockName: newAdvance.flockName,
+          salaryAmount: 0,
+          advance: newAdvance.advanceAmount,
+          advanceAmount: newAdvance.advanceAmount,
+          deduction: newAdvance.deductedAmount || 0,
+          remainingBalance: newAdvance.remainingBalance,
+          total: newAdvance.advanceAmount,
+          date: newAdvance.date,
+          challanNo: newAdvance.challanNo || '',
+          repaymentStatus: newAdvance.repaymentStatus,
+          remarks: newAdvance.remarks || '',
+        }),
+      });
+
+      const savedAdv: AdvanceSalaryRecord = {
+        ...newAdvance,
+        id: res?.data?.clientId || (res?.data?.id ? String(res.data.id) : newAdvance.id),
+      };
+      const nextAdv = [savedAdv, ...advanceRecords];
+      setAdvanceRecords(nextAdv);
+      try {
+        localStorage.setItem('greenova_advances_v3', JSON.stringify(nextAdv));
+      } catch {}
+
+      const matchedWorker = workers.find(
+        (w) => w.name.toLowerCase() === newAdvance.employeeName.toLowerCase()
+      );
+      if (matchedWorker) {
+        const updatedWorker: Worker = {
+          ...matchedWorker,
+          advanceBalance: (matchedWorker.advanceBalance || 0) + newAdvance.advanceAmount,
+        };
+        await apiFetch(`/api/workers/${updatedWorker.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(updatedWorker),
+        });
+        setWorkers((prev) => {
+          const nextWorkers = prev.map((w) => (w.id === updatedWorker.id ? updatedWorker : w));
+          try {
+            localStorage.setItem('greenova_staff_v2', JSON.stringify(nextWorkers));
+          } catch {}
+          return nextWorkers;
+        });
+      }
+
+      triggerSavedRefresh(`Advance record for ${newAdvance.employeeName} saved. Refreshing page...`);
+    } catch (err) {
+      reportError(err, 'Failed to save salary advance record.');
+    }
+  };
+
+  const handleAddWorker = async (newWorker: Worker) => {
+    try {
+      await apiFetch('/api/workers', {
+        method: 'POST',
+        body: JSON.stringify(newWorker),
+      });
       setWorkers((prev) => {
-        const nextWorkers = prev.map((w) =>
-          w.name.toLowerCase() === newSalary.employeeName.toLowerCase()
-            ? {
-                ...w,
-                advanceBalance: Math.max(0, (w.advanceBalance || 0) - newSalary.advanceDeducted),
-              }
-            : w
+        const next = [newWorker, ...prev];
+        try {
+          localStorage.setItem('greenova_staff_v2', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      triggerSavedRefresh(`Staff member "${newWorker.name}" added. Refreshing page...`);
+    } catch (err) {
+      reportError(err, 'Failed to register staff member.');
+    }
+  };
+
+  const handleUpdateWorker = async (updatedWorker: Worker) => {
+    try {
+      await apiFetch(`/api/workers/${updatedWorker.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedWorker),
+      });
+      setWorkers((prev) => {
+        const next = prev.map((w) => (w.id === updatedWorker.id ? updatedWorker : w));
+        try {
+          localStorage.setItem('greenova_staff_v2', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to update staff record.');
+    }
+  };
+
+  const handleDeleteWorker = async (id: string) => {
+    try {
+      await apiFetch(`/api/workers/${id}`, { method: 'DELETE' });
+      setWorkers((prev) => {
+        const next = prev.filter((w) => String(w.id) !== String(id));
+        try {
+          localStorage.setItem('greenova_staff_v2', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to delete staff member.');
+    }
+  };
+
+  const handleEditSalaryDisbursal = async (updatedSalary: SalaryDisbursal) => {
+    try {
+      await apiFetch(`/api/salaries/${updatedSalary.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          recordType: 'salary_disbursal',
+          employeeName: updatedSalary.employeeName,
+          designation: updatedSalary.designation,
+          flockId: Number(updatedSalary.flockId) || 9,
+          flockName: updatedSalary.flockName,
+          basicSalary: updatedSalary.basicSalary,
+          salaryAmount: updatedSalary.netSalaryPaid,
+          netSalaryPaid: updatedSalary.netSalaryPaid,
+          total: updatedSalary.totalSalary,
+          totalSalary: updatedSalary.totalSalary,
+          advance: updatedSalary.advanceDeducted,
+          advanceDeducted: updatedSalary.advanceDeducted,
+          allowanceBonus: updatedSalary.allowanceBonus || 0,
+          penaltyDeduction: updatedSalary.penaltyDeduction || 0,
+          deduction: updatedSalary.penaltyDeduction || 0,
+          date: updatedSalary.paymentDate,
+          paymentDate: updatedSalary.paymentDate,
+          month: updatedSalary.month,
+          challanNo: updatedSalary.challanNo,
+          paymentMethod: updatedSalary.paymentMethod,
+          status: updatedSalary.status,
+          remarks: updatedSalary.remarks || '',
+        }),
+      });
+      setSalaryDisbursals((prev) => {
+        const next = prev.map((s) =>
+          String(s.id) === String(updatedSalary.id) ? updatedSalary : s
         );
         try {
-          localStorage.setItem('greenova_staff_v2', JSON.stringify(nextWorkers));
-        } catch (e) {}
-        return nextWorkers;
+          localStorage.setItem('greenova_salaries_v3', JSON.stringify(next));
+        } catch {}
+        return next;
       });
-
-      let remainingToDeduct = newSalary.advanceDeducted;
-      setAdvanceRecords((prev) => {
-        const nextAdv = prev.map((adv) => {
-          if (
-            remainingToDeduct > 0 &&
-            adv.employeeName.toLowerCase() === newSalary.employeeName.toLowerCase() &&
-            adv.repaymentStatus !== 'Deducted'
-          ) {
-            const deduct = Math.min(adv.remainingBalance, remainingToDeduct);
-            remainingToDeduct -= deduct;
-            const newBal = adv.remainingBalance - deduct;
-            return {
-              ...adv,
-              deductedAmount: adv.deductedAmount + deduct,
-              remainingBalance: newBal,
-              repaymentStatus: (newBal <= 0 ? 'Deducted' : 'Partially Deducted') as 'Deducted' | 'Partially Deducted',
-            };
-          }
-          return adv;
-        });
-        try {
-          localStorage.setItem('greenova_advances_v3', JSON.stringify(nextAdv));
-        } catch (e) {}
-        return nextAdv;
-      });
+    } catch (err) {
+      reportError(err, 'Failed to update salary disbursal.');
+      throw err;
     }
-
-    // Post to backend
-    fetch('/api/salaries', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        employeeName: newSalary.employeeName,
-        designation: newSalary.designation,
-        flockId: Number(newSalary.flockId) || 9,
-        basicSalary: newSalary.basicSalary,
-        salaryAmount: newSalary.netSalaryPaid,
-        total: newSalary.totalSalary,
-        advance: newSalary.advanceDeducted,
-        remarks: `${newSalary.challanNo} - ${newSalary.remarks || ''}`,
-      }),
-    }).catch((e) => console.warn('Salary persistence error:', e));
-
-    triggerSavedRefresh(`Salary disbursal for ${newSalary.employeeName} saved. Refreshing page...`);
   };
 
-  const handleAddAdvanceRecord = (newAdvance: AdvanceSalaryRecord) => {
-    const nextAdv = [newAdvance, ...advanceRecords];
-    setAdvanceRecords(nextAdv);
+  const handleDeleteSalaryDisbursal = async (id: string) => {
     try {
-      localStorage.setItem('greenova_advances_v3', JSON.stringify(nextAdv));
-    } catch (e) {}
+      await apiFetch(`/api/salaries/${id}`, { method: 'DELETE' });
+      setSalaryDisbursals((prev) => {
+        const next = prev.filter((s) => String(s.id) !== String(id));
+        try {
+          localStorage.setItem('greenova_salaries_v3', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to delete salary disbursal.');
+    }
+  };
 
-    // Increase worker's advance balance
-    setWorkers((prev) => {
-      const nextWorkers = prev.map((w) =>
-        w.name.toLowerCase() === newAdvance.employeeName.toLowerCase()
-          ? { ...w, advanceBalance: (w.advanceBalance || 0) + newAdvance.advanceAmount }
-          : w
+  const handleEditAdvanceRecord = async (updatedAdvance: AdvanceSalaryRecord) => {
+    try {
+      await apiFetch(`/api/salaries/${updatedAdvance.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          recordType: 'advance',
+          employeeName: updatedAdvance.employeeName,
+          designation: updatedAdvance.designation,
+          flockId: Number(updatedAdvance.flockId) || 9,
+          flockName: updatedAdvance.flockName,
+          salaryAmount: 0,
+          advance: updatedAdvance.advanceAmount,
+          advanceAmount: updatedAdvance.advanceAmount,
+          deductedAmount: updatedAdvance.deductedAmount || 0,
+          deduction: updatedAdvance.deductedAmount || 0,
+          remainingBalance: updatedAdvance.remainingBalance,
+          total: updatedAdvance.advanceAmount,
+          date: updatedAdvance.date,
+          challanNo: updatedAdvance.challanNo || '',
+          repaymentStatus: updatedAdvance.repaymentStatus,
+          remarks: updatedAdvance.remarks || '',
+        }),
+      });
+      setAdvanceRecords((prev) => {
+        const next = prev.map((a) =>
+          String(a.id) === String(updatedAdvance.id) ? updatedAdvance : a
+        );
+        try {
+          localStorage.setItem('greenova_advances_v3', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to update advance salary record.');
+      throw err;
+    }
+  };
+
+  const handleDeleteAdvanceRecord = async (id: string) => {
+    try {
+      await apiFetch(`/api/salaries/${id}`, { method: 'DELETE' });
+      setAdvanceRecords((prev) => {
+        const next = prev.filter((a) => String(a.id) !== String(id));
+        try {
+          localStorage.setItem('greenova_advances_v3', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      reportError(err, 'Failed to delete advance salary record.');
+    }
+  };
+
+  // Farm Records CRUD handlers (persisted directly to PostgreSQL /api/farms)
+  const handleAddFarm = async (newFarm: Farm) => {
+    try {
+      const res = await apiFetch('/api/farms', {
+        method: 'POST',
+        body: JSON.stringify(newFarm),
+      });
+      const canonicalFarm: Farm = {
+        ...newFarm,
+        id: res?.data?.id ? String(res.data.id) : newFarm.id,
+      };
+      const nextFarms = [...farms, canonicalFarm];
+      setFarms(nextFarms);
+      try {
+        localStorage.setItem('greenova_farm_records', JSON.stringify(nextFarms));
+      } catch {}
+      triggerSavedRefresh(`Farm "${canonicalFarm.name}" added. Refreshing page...`);
+    } catch (err) {
+      reportError(err, 'Failed to add farm record.');
+    }
+  };
+
+  const handleEditFarm = async (updatedFarm: Farm) => {
+    try {
+      await apiFetch(`/api/farms/${updatedFarm.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedFarm),
+      });
+      const nextFarms = farms.map((f) =>
+        String(f.id) === String(updatedFarm.id) ? updatedFarm : f
       );
+      setFarms(nextFarms);
       try {
-        localStorage.setItem('greenova_staff_v2', JSON.stringify(nextWorkers));
-      } catch (e) {}
-      return nextWorkers;
-    });
-
-    // Post to backend
-    fetch('/api/salaries', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        employeeName: newAdvance.employeeName,
-        designation: newAdvance.designation,
-        flockId: Number(newAdvance.flockId) || 9,
-        salaryAmount: 0,
-        advance: newAdvance.advanceAmount,
-        total: newAdvance.advanceAmount,
-        remarks: `${newAdvance.challanNo} - ${newAdvance.remarks || ''}`,
-      }),
-    }).catch((e) => console.warn('Advance persistence error:', e));
-
-    triggerSavedRefresh(`Advance record for ${newAdvance.employeeName} saved. Refreshing page...`);
+        localStorage.setItem('greenova_farm_records', JSON.stringify(nextFarms));
+      } catch {}
+    } catch (err) {
+      reportError(err, 'Failed to update farm record.');
+    }
   };
 
-  const handleAddWorker = (newWorker: Worker) => {
-    setWorkers((prev) => {
-      const next = [newWorker, ...prev];
+  const handleDeleteFarm = async (id: string) => {
+    try {
+      await apiFetch(`/api/farms/${id}`, { method: 'DELETE' });
+      const nextFarms = farms.filter((f) => String(f.id) !== String(id));
+      setFarms(nextFarms);
       try {
-        localStorage.setItem('greenova_staff_v2', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-    triggerSavedRefresh(`Staff member "${newWorker.name}" added. Refreshing page...`);
+        localStorage.setItem('greenova_farm_records', JSON.stringify(nextFarms));
+      } catch {}
+    } catch (err) {
+      reportError(err, 'Failed to delete farm record.');
+    }
   };
 
-  const handleUpdateWorker = (updatedWorker: Worker) => {
-    setWorkers((prev) => {
-      const next = prev.map((w) => (w.id === updatedWorker.id ? updatedWorker : w));
+  // Bank Accounts CRUD handlers (persisted directly to PostgreSQL /api/banks)
+  const handleAddBank = async (newBank: BankAccount) => {
+    try {
+      const res = await apiFetch('/api/banks', {
+        method: 'POST',
+        body: JSON.stringify(newBank),
+      });
+      const canonicalBank: BankAccount = {
+        ...newBank,
+        id: res?.data?.id || newBank.id,
+      };
+      const nextBanks = [...bankAccounts, canonicalBank];
+      setBankAccounts(nextBanks);
       try {
-        localStorage.setItem('greenova_staff_v2', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
+        localStorage.setItem('greenova_banks_v1', JSON.stringify(nextBanks));
+      } catch {}
+    } catch (err) {
+      reportError(err, 'Failed to add bank account.');
+    }
   };
 
-  // Farm Records CRUD handlers (persisted to localStorage + /api/farms)
-  const handleAddFarm = (newFarm: Farm) => {
-    const nextFarms = [...farms, newFarm];
-    setFarms(nextFarms);
+  const handleEditBank = async (updatedBank: BankAccount) => {
     try {
-      localStorage.setItem('greenova_farm_records', JSON.stringify(nextFarms));
-    } catch {}
-    fetch('/api/farms', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newFarm),
-    }).catch((e) => console.warn('Farm add persistence error:', e));
-    triggerSavedRefresh(`Farm "${newFarm.name}" added. Refreshing page...`);
+      await apiFetch(`/api/banks/${updatedBank.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedBank),
+      });
+      const nextBanks = bankAccounts.map((b) =>
+        String(b.id) === String(updatedBank.id) ? updatedBank : b
+      );
+      setBankAccounts(nextBanks);
+      try {
+        localStorage.setItem('greenova_banks_v1', JSON.stringify(nextBanks));
+      } catch {}
+    } catch (err) {
+      reportError(err, 'Failed to update bank account.');
+    }
   };
 
-  const handleEditFarm = (updatedFarm: Farm) => {
-    const nextFarms = farms.map((f) => (String(f.id) === String(updatedFarm.id) ? updatedFarm : f));
-    setFarms(nextFarms);
+  const handleDeleteBank = async (id: string) => {
     try {
-      localStorage.setItem('greenova_farm_records', JSON.stringify(nextFarms));
-    } catch {}
-    fetch(`/api/farms/${updatedFarm.id}`, {
-      method: 'PUT',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedFarm),
-    }).catch((e) => console.warn('Farm update persistence error:', e));
-  };
-
-  const handleDeleteFarm = (id: string) => {
-    const nextFarms = farms.filter((f) => String(f.id) !== String(id));
-    setFarms(nextFarms);
-    try {
-      localStorage.setItem('greenova_farm_records', JSON.stringify(nextFarms));
-      const rawDeleted = localStorage.getItem('greenova_deleted_farm_ids');
-      const existingDeleted: string[] = rawDeleted ? JSON.parse(rawDeleted) : [];
-      if (!existingDeleted.includes(String(id))) {
-        localStorage.setItem('greenova_deleted_farm_ids', JSON.stringify([...existingDeleted, String(id)]));
-      }
-    } catch {}
-    fetch(`/api/farms/${id}`, {
-      method: 'DELETE',
-      keepalive: true,
-    }).catch((e) => console.warn('Farm delete persistence error:', e));
-  };
-
-  // Bank Accounts CRUD handlers (persisted to localStorage + /api/banks)
-  const handleAddBank = (newBank: BankAccount) => {
-    const nextBanks = [...bankAccounts, newBank];
-    setBankAccounts(nextBanks);
-    try {
-      localStorage.setItem('greenova_banks_v1', JSON.stringify(nextBanks));
-    } catch {}
-    fetch('/api/banks', {
-      method: 'POST',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newBank),
-    }).catch((e) => console.warn('Bank add persistence error:', e));
-  };
-
-  const handleEditBank = (updatedBank: BankAccount) => {
-    const nextBanks = bankAccounts.map((b) =>
-      String(b.id) === String(updatedBank.id) ? updatedBank : b
-    );
-    setBankAccounts(nextBanks);
-    try {
-      localStorage.setItem('greenova_banks_v1', JSON.stringify(nextBanks));
-    } catch {}
-    fetch(`/api/banks/${updatedBank.id}`, {
-      method: 'PUT',
-      keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedBank),
-    }).catch((e) => console.warn('Bank update persistence error:', e));
-  };
-
-  const handleDeleteBank = (id: string) => {
-    const nextBanks = bankAccounts.filter((b) => String(b.id) !== String(id));
-    setBankAccounts(nextBanks);
-    try {
-      localStorage.setItem('greenova_banks_v1', JSON.stringify(nextBanks));
-      const rawDeleted = localStorage.getItem('greenova_deleted_bank_ids');
-      const existingDeleted: string[] = rawDeleted ? JSON.parse(rawDeleted) : [];
-      if (!existingDeleted.includes(String(id))) {
-        localStorage.setItem('greenova_deleted_bank_ids', JSON.stringify([...existingDeleted, String(id)]));
-      }
-    } catch {}
-    fetch(`/api/banks/${id}`, {
-      method: 'DELETE',
-      keepalive: true,
-    }).catch((e) => console.warn('Bank delete persistence error:', e));
+      await apiFetch(`/api/banks/${id}`, { method: 'DELETE' });
+      const nextBanks = bankAccounts.filter((b) => String(b.id) !== String(id));
+      setBankAccounts(nextBanks);
+      try {
+        localStorage.setItem('greenova_banks_v1', JSON.stringify(nextBanks));
+      } catch {}
+    } catch (err) {
+      reportError(err, 'Failed to delete bank account.');
+    }
   };
 
   // Sign out handler - explicitly removes session and redirects to /login
@@ -1618,7 +2113,7 @@ export default function App() {
           const profile = {
             name: user.name || (isSuper ? 'Ahsan Nawaz' : 'Farm Supervisor'),
             email: user.email,
-            token: user.token || 'auth-prod-' + Date.now(),
+            token: user.token,
             phone: isSuper ? '+92 300 8645210' : '+92 301 7654321',
             role: user.role || (isSuper ? 'super_admin' : 'supervisor'),
             isSuperAdmin: isSuper,
@@ -1711,6 +2206,7 @@ export default function App() {
               flocks={flocks}
               onOpenRecordModal={() => setRecordModalType('egg')}
               onEditEgg={handleEditEgg}
+              onDeleteEgg={handleDeleteEgg}
             />
           )}
 
@@ -1721,6 +2217,7 @@ export default function App() {
               mortalityLogs={mortalityLogs}
               onOpenRecordModal={() => setRecordModalType('feed')}
               onEditConsumption={handleEditFeed}
+              onDeleteConsumption={handleDeleteFeed}
             />
           )}
 
@@ -1735,6 +2232,7 @@ export default function App() {
               onEditVaccine={handleEditVaccine}
               onDeleteVaccine={handleDeleteVaccine}
               onEditMortality={handleEditMortality}
+              onDeleteMortality={handleDeleteMortality}
             />
           )}
 
@@ -1743,6 +2241,7 @@ export default function App() {
               financials={financials}
               onAddTransaction={handleAddTransaction}
               onEditTransaction={handleEditTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
               defaultType="Income"
               bankAccounts={bankAccounts}
               onAddBank={handleAddBank}
@@ -1754,6 +2253,7 @@ export default function App() {
               financials={financials}
               onAddTransaction={handleAddTransaction}
               onEditTransaction={handleEditTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
               defaultType="Expense"
               bankAccounts={bankAccounts}
               onAddBank={handleAddBank}
@@ -1778,6 +2278,11 @@ export default function App() {
               onAddAdvanceRecord={handleAddAdvanceRecord}
               onAddWorker={handleAddWorker}
               onUpdateWorker={handleUpdateWorker}
+              onDeleteWorker={handleDeleteWorker}
+              onEditSalaryDisbursal={handleEditSalaryDisbursal}
+              onDeleteSalaryDisbursal={handleDeleteSalaryDisbursal}
+              onEditAdvanceRecord={handleEditAdvanceRecord}
+              onDeleteAdvanceRecord={handleDeleteAdvanceRecord}
             />
           )}
 
@@ -1825,13 +2330,16 @@ export default function App() {
                 const profile = {
                   name: user.name || (isSuper ? 'Ahsan Nawaz' : 'Farm Supervisor'),
                   email: user.email,
-                  token: user.token || 'auth-prod-' + Date.now(),
+                  token: user.token,
                   phone: isSuper ? '+92 300 8645210' : '+92 301 7654321',
                   role: user.role || (isSuper ? 'super_admin' : 'supervisor'),
                   isSuperAdmin: isSuper,
                   initials: isSuper ? 'AN' : 'FS',
                   emailVerified: true,
                 };
+                try {
+                  localStorage.setItem('greenova_user', JSON.stringify(profile));
+                } catch {}
                 setCurrentUser(profile);
                 setShowLoginModal(false);
               }}
@@ -1873,6 +2381,25 @@ export default function App() {
               <span>Refreshing page...</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Database / API Mutation Error Banner */}
+      {actionError && (
+        <div className="fixed bottom-6 right-6 z-[110] max-w-md bg-rose-950 text-white px-4 py-3 rounded-xl shadow-2xl border border-rose-700 flex items-start gap-2.5 text-xs">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="font-bold">Database Save Error</div>
+            <div className="text-rose-200 mt-0.5">{actionError}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="text-rose-300 hover:text-white cursor-pointer p-0.5"
+            aria-label="Dismiss error"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>

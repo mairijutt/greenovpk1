@@ -17,9 +17,12 @@ import {
   Users,
   AlertTriangle,
   ChevronDown,
+  Eye,
   Edit,
+  Trash2,
   X,
   CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { FeedConsumption, Flock, MortalityLog, Farm } from '../types/farm';
 import { getInitialUrlFilters } from '../utils/urlFilters';
@@ -35,6 +38,7 @@ import {
   UIInput,
   UISelect,
   UITextarea,
+  RecordDetailModal,
 } from './ui';
 
 interface ConsumptionViewProps {
@@ -42,7 +46,8 @@ interface ConsumptionViewProps {
   flocks: Flock[];
   mortalityLogs?: MortalityLog[];
   onOpenRecordModal: (type: 'feed') => void;
-  onEditConsumption?: (log: FeedConsumption) => void;
+  onEditConsumption?: (log: FeedConsumption) => Promise<void> | void;
+  onDeleteConsumption?: (log: FeedConsumption) => Promise<void> | void;
   farms?: Farm[];
   selectedFarmId?: string;
   onSelectFarm?: (farmId: string) => void;
@@ -57,6 +62,7 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
   mortalityLogs = [],
   onOpenRecordModal,
   onEditConsumption,
+  onDeleteConsumption,
   farms = [],
   selectedFarmId = 'farm-1',
   onSelectFarm,
@@ -67,6 +73,7 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
 
   // Edit Consumption Record Modal State
   const [editingLog, setEditingLog] = useState<FeedConsumption | null>(null);
+  const [viewingLog, setViewingLog] = useState<FeedConsumption | null>(null);
   const [editDate, setEditDate] = useState('');
   const [editFlockId, setEditFlockId] = useState('8');
   const [editChallanNo, setEditChallanNo] = useState('');
@@ -75,10 +82,13 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
   const [editFeedKg, setEditFeedKg] = useState<number>(0);
   const [editWaterL, setEditWaterL] = useState<number>(0);
   const [editNotes, setEditNotes] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [editFormError, setEditFormError] = useState<string | null>(null);
 
   const openEditModal = (log: FeedConsumption) => {
     const bags = log.bags || Math.round((log.feedQuantityKg || 0) / 50);
+    setEditFormError(null);
     setEditingLog(log);
     setEditDate(log.date ? log.date.split('T')[0] : getTodayDateStr());
     setEditFlockId(String(log.flockId || '8'));
@@ -93,6 +103,23 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingLog) return;
+    setEditFormError(null);
+    if (!editDate) {
+      setEditFormError('Please select a date.');
+      return;
+    }
+    if (!editFlockId) {
+      setEditFormError('Please select a flock / shed.');
+      return;
+    }
+    if (!editFeedType.trim()) {
+      setEditFormError('Please enter a feed formulation.');
+      return;
+    }
+    if (!editFeedKg || Number(editFeedKg) <= 0) {
+      setEditFormError('Total feed weight (Kg) must be greater than 0.');
+      return;
+    }
     const matchedFlock =
       flocks.find((f) => String(f.id) === String(editFlockId)) ||
       flocks.find((f) => f.name === editingLog.flockName);
@@ -1429,15 +1456,60 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
                         {log.notes || '—'}
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(log)}
-                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                          title={`Edit Consumption Record #${log.challanNo || log.trackingId || log.id.replace('c-', '')}`}
-                        >
-                          <Edit className="w-3 h-3" />
-                          <span>Edit</span>
-                        </button>
+                        <div className="inline-flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setViewingLog(log)}
+                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title={`View Consumption Record #${log.challanNo || log.trackingId || log.id.replace('c-', '')}`}
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>View</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(log)}
+                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title={`Edit Consumption Record #${log.challanNo || log.trackingId || log.id.replace('c-', '')}`}
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          {onDeleteConsumption && confirmDeleteId !== log.id && (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(log.id)}
+                              className="inline-flex items-center p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer shadow-2xs"
+                              title="Delete Consumption Record"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        {onDeleteConsumption && confirmDeleteId === log.id && (
+                          <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
+                            <span className="font-bold text-rose-900">Delete?</span>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await onDeleteConsumption(log);
+                                setConfirmDeleteId(null);
+                                setToastMessage('Feed consumption record deleted from database.');
+                                setTimeout(() => setToastMessage(null), 3500);
+                              }}
+                              className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 cursor-pointer"
+                            >
+                              No
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -1546,7 +1618,13 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="mt-4 space-y-3.5 text-xs">
+            <form onSubmit={handleEditSubmit} noValidate className="mt-4 space-y-3.5 text-xs">
+              {editFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{editFormError}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <UIInput
                   label="Date"
@@ -1638,6 +1716,59 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* View Daily Consumption Popup Modal */}
+      {viewingLog && (
+        <RecordDetailModal
+          isOpen={Boolean(viewingLog)}
+          onClose={() => setViewingLog(null)}
+          title={`Daily Consumption #${viewingLog.challanNo || viewingLog.trackingId || viewingLog.id.replace('c-', '')}`}
+          subtitle={`${viewingLog.flockName} • ${viewingLog.date}`}
+          badge={{ text: viewingLog.feedType || 'Layer Feed', color: 'amber' }}
+          fields={[
+            {
+              label: 'Challan / Tracking ID',
+              value: `#${viewingLog.challanNo || viewingLog.trackingId || viewingLog.id}`,
+              mono: true,
+            },
+            { label: 'Date', value: viewingLog.date, mono: true },
+            { label: 'Flock / Shed', value: viewingLog.flockName },
+            { label: 'Feed Formulation', value: viewingLog.feedType },
+            {
+              label: 'Bags Consumed (50kg)',
+              value: `${(viewingLog.bags || Math.round((viewingLog.feedQuantityKg || 0) / 50)).toLocaleString()} bags`,
+              mono: true,
+              highlight: true,
+            },
+            {
+              label: 'Total Weight',
+              value: `${(viewingLog.feedQuantityKg || (viewingLog.bags || 0) * 50).toLocaleString()} kg`,
+              mono: true,
+            },
+            {
+              label: 'Grams Per Bird',
+              value: `${viewingLog.gramsPerBird || 0} g/bird`,
+              mono: true,
+            },
+            {
+              label: 'Water Intake',
+              value: `${(viewingLog.waterIntakeLiters || 0).toLocaleString()} L`,
+              mono: true,
+            },
+          ]}
+          notes={viewingLog.notes}
+          onEdit={() => openEditModal(viewingLog)}
+          onDelete={
+            onDeleteConsumption
+              ? async () => {
+                  await onDeleteConsumption(viewingLog);
+                  setToastMessage('Feed consumption record deleted from database.');
+                  setTimeout(() => setToastMessage(null), 3500);
+                }
+              : undefined
+          }
+        />
       )}
 
       {toastMessage && (

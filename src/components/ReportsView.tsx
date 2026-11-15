@@ -2069,11 +2069,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <StatCard
               title="Period Mortality"
               value={
-                !fromDate && !toDate && selectedUnit === 'all'
-                  ? Math.max(
-                      filteredMortality.reduce((acc, curr) => acc + curr.count, 0),
-                      flocks.reduce((acc, f) => acc + (f.mortality || 0), 0)
-                    )
+                !fromDate && !toDate
+                  ? flocks
+                      .filter(
+                        (f) =>
+                          selectedUnit === 'all' ||
+                          f.name.toLowerCase().includes(selectedUnit.toLowerCase()) ||
+                          (selectedUnit === 'Unit 1' && String(f.id) === '8') ||
+                          (selectedUnit === 'Unit 2' && String(f.id) === '9') ||
+                          (selectedUnit === 'Unit 3' && String(f.id) === '10')
+                      )
+                      .reduce((acc, f) => acc + (f.mortality || 0), 0)
                   : filteredMortality.reduce((acc, curr) => acc + curr.count, 0)
               }
               unit="Birds"
@@ -2141,12 +2147,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 );
                 const flockEggsCount = flockEggs.reduce((acc, curr) => acc + curr.totalEggs, 0);
                 const livability = flock.initialCount > 0 ? ((flock.currentCount / flock.initialCount) * 100).toFixed(1) : '100.0';
-                const flockMort = Math.max(
-                  flock.mortality || 0,
-                  filteredMortality
-                    .filter((m) => String(m.flockId) === String(flock.id) || m.flockName === flock.name)
-                    .reduce((s, m) => s + (m.count || 0), 0)
-                );
+                const logMort = filteredMortality
+                  .filter((m) => String(m.flockId) === String(flock.id) || m.flockName === flock.name)
+                  .reduce((s, m) => s + (m.count || 0), 0);
+                const flockMort =
+                  !fromDate && !toDate && flock.mortality !== undefined ? flock.mortality : logMort;
 
                 return (
                   <div

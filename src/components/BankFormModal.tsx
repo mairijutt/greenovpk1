@@ -58,10 +58,26 @@ export const BankFormModal: React.FC<BankFormModalProps> = ({
       setError('Please enter or select a Bank Name.');
       return;
     }
+    if (!accountTitle.trim()) {
+      setError('Please enter an Account Title / Branch.');
+      return;
+    }
+    if (!accountNumber.trim()) {
+      setError('Please enter an Account No / IBAN.');
+      return;
+    }
+    if (openingBalance.trim() === '') {
+      setError('Please enter an Opening Balance (0 or greater).');
+      return;
+    }
 
     const balNum = Number(openingBalance);
     if (isNaN(balNum) || balNum < 0) {
       setError('Please enter a valid Opening Balance (0 or greater).');
+      return;
+    }
+    if (!openingDate) {
+      setError('Please select an Opening Date.');
       return;
     }
 
@@ -69,10 +85,10 @@ export const BankFormModal: React.FC<BankFormModalProps> = ({
     const saved: BankAccount = {
       id: initialBank?.id || `bank-${Date.now()}`,
       bankName: bankName.trim(),
-      accountTitle: accountTitle.trim() || 'GreenOva Poultry Farm',
+      accountTitle: accountTitle.trim(),
       accountNumber: accountNumber.trim(),
       openingBalance: balNum,
-      openingDate: openingDate || getToday(),
+      openingDate,
       notes: notes.trim(),
       createdAt: initialBank?.createdAt || nowIso,
       updatedAt: nowIso,
@@ -114,7 +130,7 @@ export const BankFormModal: React.FC<BankFormModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
           {/* Quick-Pick Bank Chips */}
           <div>
             <label className="block font-bold text-slate-700 mb-1.5">

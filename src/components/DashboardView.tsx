@@ -74,7 +74,7 @@ interface DashboardViewProps {
   financials: FinancialRecord[];
   inventory?: InventoryItem[];
   bankAccounts?: BankAccount[];
-  onAddTransaction?: (record: FinancialRecord) => void;
+  onAddTransaction?: (record: FinancialRecord) => Promise<void> | void;
   onAddBank?: (bank: BankAccount) => void;
   onRestock?: (id: string, amount: number) => void;
   onOpenRecordModal: (type: 'egg' | 'mortality' | 'feed') => void;
@@ -251,6 +251,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [selectedFlock, fromDate, toDate, financials]);
 
+  const BIRD_EXPENSE_HEADS = useMemo(() => new Set(['FEED', 'CHICKEN', 'MEDICINE', 'VACCINE']), []);
+  const isBirdRelatedExpense = (exp: any) => {
+    const rawHead = String(exp?.head || exp?.category || '').trim().toUpperCase().replace(/\s+/g, '_');
+    return BIRD_EXPENSE_HEADS.has(rawHead);
+  };
+
   const activeUserExpenses = useMemo(() => {
     const allExpenses = [
       ...financials.filter((f) => f.type === 'Expense'),
@@ -321,6 +327,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const cash = activeSales.reduce((sum, s) => sum + ((s as any).cashPayment || (s.amount - ((s as any).onlinePayment || 0))), 0);
 
     const expenses = activeUserExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const birdExpenses = activeUserExpenses
+      .filter(isBirdRelatedExpense)
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
 
     const net = revenue - expenses;
     const profitMarginPercent = revenue > 0 ? Number(((net / revenue) * 100).toFixed(1)) : 0;
@@ -331,6 +340,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       online,
       cash,
       expenses,
+      birdExpenses,
       net,
       profitMarginPercent,
       isProfit: net >= 0,
@@ -386,16 +396,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
   }, [activeStocks]);
 
-  // Dynamic Per Bird Economics Calculation (Revenue, Expense, Margin per bird)
+  // Dynamic Per Bird Economics Calculation (Bird-related cost, Revenue, Margin per bird)
   const perBirdEconomics = useMemo(() => {
     const birds = liveBirdsCount > 0 ? liveBirdsCount : 81714;
     const revPerBird = Number((dynamicFinance.revenue / birds).toFixed(2));
-    const expPerBird = Number((dynamicFinance.expenses / birds).toFixed(2));
+    const expPerBird = Number((dynamicFinance.birdExpenses / birds).toFixed(2));
     const netPerBird = Number((revPerBird - expPerBird).toFixed(2));
     const eggsPerBird = Number((dynamicEggs.totalEggs / birds).toFixed(2));
+    const birdNet = dynamicFinance.revenue - dynamicFinance.birdExpenses;
     const profitMarginPercent =
       dynamicFinance.revenue > 0
-        ? Number(((dynamicFinance.net / dynamicFinance.revenue) * 100).toFixed(1))
+        ? Number(((birdNet / dynamicFinance.revenue) * 100).toFixed(1))
         : 0;
 
     return {
@@ -524,18 +535,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           : preset === 'all' && !fromDate && !toDate
           ? u.allTimeExp
           : 0;
+      const unitBirdExpenses =
+        unitExps.length > 0
+          ? unitExps.filter(isBirdRelatedExpense).reduce((sum, e) => sum + (e.amount || 0), 0)
+          : 0;
 
       // Unit mortality specifically for this unit
       const unitMortLogs = allPeriodMortality.filter((m) => isRecordForUnit(m.flockId, m.flockName, u.id, u.unit));
       const mortalityPeriod = unitMortLogs.reduce((sum, m) => sum + (m.count || 0), 0);
-      const flockObj = flocks.find((f: any) => f.id === u.id || f.name.includes(u.unit));
+      const flockObj = flocks.find((f: any) => String(f.id) === String(u.id) || f.name.toLowerCase() === u.unit.toLowerCase());
       const allTimeMort = flockObj?.mortality !== undefined ? flockObj.mortality : (u.unit === 'Unit 1' ? 5 : u.unit === 'Unit 2' ? 7 : 3);
       const displayMortality = preset === 'all' && !fromDate && !toDate ? allTimeMort : mortalityPeriod;
 
-      const revPerBird = u.birds > 0 ? Number((revenue / u.birds).toFixed(2)) : 0;
-      const expPerBird = u.birds > 0 ? Number((expenses / u.birds).toFixed(2)) : 0;
+      const effectiveRev = revenue > 0 ? revenue : (preset === 'all' && !fromDate && !toDate ? u.allTimeRev : 0);
+      const revPerBird = u.birds > 0 ? Number((effectiveRev / u.birds).toFixed(2)) : 0;
+      const expPerBird = u.birds > 0 ? Number((unitBirdExpenses / u.birds).toFixed(2)) : 0;
       const netPerBird = Number((revPerBird - expPerBird).toFixed(2));
-      const marginPercent = revenue > 0 ? Number((((revenue - expenses) / revenue) * 100).toFixed(1)) : 0;
+      const marginPercent = effectiveRev > 0 ? Number((((effectiveRev - unitBirdExpenses) / effectiveRev) * 100).toFixed(1)) : 0;
       const isProfit = netPerBird >= 0;
 
       const todayMorning = unitEggLogs.reduce((sum, e) => sum + (e.morningEggs || 0), 0);
@@ -582,7 +598,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ? 86.4
               : 83.9
             : avgLay,
-        displayRevenue: revenue > 0 ? revenue : (preset === 'all' && !fromDate && !toDate ? u.allTimeRev : 0),
+        displayRevenue: effectiveRev,
         salesCount: unitSales.length,
         eggsSoldQty,
         onlineRev,
@@ -598,6 +614,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       };
     });
   }, [eggProductions, financials, mortalityLogs, flocks, preset, fromDate, toDate]);
+
+  // All-In Cost per Unit Economics (includes ALL expense heads across scoped units)
+  const perUnitEconomics = useMemo(() => {
+    const isAllUnits = selectedFlock === 'all';
+    const matchingUnits = isAllUnits
+      ? unitCards
+      : unitCards.filter((u) => isFlockMatch(u.id, u.unit));
+    const activeFlockCount = isAllUnits
+      ? (flocks && flocks.length > 0 ? flocks.filter((f) => f.status === 'Active').length || unitCards.length : unitCards.length)
+      : 1;
+    const unitCount = Math.max(1, isAllUnits ? activeFlockCount : matchingUnits.length || 1);
+    const totalAllExpenses = dynamicFinance.expenses;
+    const avgCostPerUnit = totalAllExpenses / unitCount;
+    const birds = liveBirdsCount > 0 ? liveBirdsCount : 81714;
+    const allInCostPerBird = totalAllExpenses / birds;
+
+    return {
+      isAllUnits,
+      unitCount,
+      totalAllExpenses,
+      avgCostPerUnit,
+      allInCostPerBird,
+      units: matchingUnits.length > 0 ? matchingUnits : unitCards,
+    };
+  }, [selectedFlock, unitCards, flocks, dynamicFinance.expenses, liveBirdsCount]);
+
+  const formatCompactRs = (val: number) => {
+    const abs = Math.abs(val);
+    if (abs >= 1_000_000) {
+      return `Rs. ${(val / 1_000_000).toFixed(2)}M`;
+    }
+    return `Rs. ${Math.round(val).toLocaleString()}`;
+  };
 
   // Month-by-month financial ledger (Dynamically computed from sales & expenses, Apr – Nov 2026+)
   const monthlyFinanceData = useMemo(() => {
@@ -1034,7 +1083,77 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </a>
 
-          {/* Card 5: Payment Collections & Settlement -> Opens Sales in new tab */}
+          {/* Card 5: Cost per Unit (All Expense Heads Included) -> Opens Expenses in new tab */}
+          <a
+            href="/expenses"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-indigo-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between block"
+          >
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-indigo-700 transition-colors">
+                  Cost per Unit
+                </span>
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white transition-colors flex items-center gap-1">
+                  <Building2 className="w-5 h-5" />
+                  <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className="text-2xl sm:text-3xl font-black text-indigo-950 font-mono tracking-tight">
+                    Rs. {Math.round(perUnitEconomics.avgCostPerUnit).toLocaleString()}
+                    <span className="text-xs font-normal text-slate-500 ml-1.5">
+                      {perUnitEconomics.isAllUnits ? 'avg / unit' : '/ unit'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 shrink-0">
+                    {perUnitEconomics.unitCount} {perUnitEconomics.unitCount === 1 ? 'Unit' : 'Units'}
+                  </span>
+                </div>
+
+                {perUnitEconomics.isAllUnits ? (
+                  <div className="grid grid-cols-3 gap-2 mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                    {perUnitEconomics.units.slice(0, 3).map((u) => (
+                      <div key={u.id}>
+                        <span className="text-[11px] text-slate-500 block">{u.unit}</span>
+                        <span className="font-bold text-slate-900 font-mono">
+                          {formatCompactRs(u.displayExpenses)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">Unit Total Cost</span>
+                      <span className="font-bold text-slate-900 font-mono">
+                        {formatCompactRs(perUnitEconomics.totalAllExpenses)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-500 block">All-In / Bird</span>
+                      <span className="font-bold text-indigo-700 font-mono">
+                        Rs. {perUnitEconomics.allInCostPerBird.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+              <span className="text-[11px] text-slate-600 font-medium">
+                All Costs: <strong className="text-slate-900 font-mono">{formatCompactRs(perUnitEconomics.totalAllExpenses)}</strong>
+              </span>
+              <span className="font-bold text-indigo-700 group-hover:text-indigo-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                <span>Cost Ledger</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </a>
+
+          {/* Card 6 (Last): Payment Collections & Settlement -> Opens Sales in new tab */}
           <a
             href="/sales"
             target="_blank"
@@ -1077,43 +1196,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
               <span className="font-bold text-purple-700 group-hover:text-purple-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
                 <span>Payment Register</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </span>
-            </div>
-          </a>
-
-          {/* Card 6: Feed Stock Procurement Logistics -> Opens Stocks in new tab */}
-          <a
-            href="/stocks"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:border-indigo-400 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group flex flex-col justify-between block"
-          >
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-indigo-700 transition-colors">
-                  Feed Stock &amp; Logistics
-                </span>
-                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white transition-colors flex items-center gap-1">
-                  <Package className="w-5 h-5" />
-                  <ExternalLink className="w-3.5 h-3.5 opacity-60" />
-                </div>
-              </div>
-              <div className="mt-4">
-                <div className="text-2xl sm:text-3xl font-black text-indigo-950 font-mono tracking-tight">
-                  {dynamicStock.bags.toLocaleString()}
-                  <span className="text-xs font-normal text-slate-500 ml-1.5">bags procured</span>
-                </div>
-                <p className="text-xs font-semibold text-indigo-700 mt-1.5 flex items-center gap-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full bg-indigo-500"></span>
-                  <span>{dynamicStock.shipments} Verified Shipments</span>
-                </p>
-              </div>
-            </div>
-            <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-              <span className="text-slate-600">Disbursed: <strong className="text-slate-900 font-mono">Rs. {Math.round(dynamicStock.amount).toLocaleString()}</strong></span>
-              <span className="font-bold text-indigo-700 group-hover:text-indigo-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Open Stocks</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>

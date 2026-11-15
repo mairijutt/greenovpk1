@@ -18,8 +18,10 @@ import {
   Info,
   Users,
   ChevronDown,
+  Eye,
   Edit,
   Trash2,
+  AlertCircle,
 } from 'lucide-react';
 import { MortalityLog, VaccineLog, Flock, Farm } from '../types/farm';
 import {
@@ -34,6 +36,7 @@ import {
   UIInput,
   UISelect,
   UITextarea,
+  RecordDetailModal,
 } from './ui';
 
 interface BirdHealthViewProps {
@@ -45,7 +48,8 @@ interface BirdHealthViewProps {
   onAddVaccine?: (vaccine: VaccineLog) => void;
   onEditVaccine?: (vaccine: VaccineLog) => void;
   onDeleteVaccine?: (id: string) => void;
-  onEditMortality?: (log: MortalityLog) => void;
+  onEditMortality?: (log: MortalityLog) => Promise<void> | void;
+  onDeleteMortality?: (log: MortalityLog) => Promise<void> | void;
   farms?: Farm[];
   selectedFarmId?: string;
   onSelectFarm?: (farmId: string) => void;
@@ -64,6 +68,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
   onEditVaccine,
   onDeleteVaccine,
   onEditMortality,
+  onDeleteMortality,
   farms = [],
   selectedFarmId = 'all',
   onSelectFarm,
@@ -120,7 +125,10 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
   const [vetNotes, setVetNotes] = useState('Maintain cold chain at 2-8°C. Water withheld 2 hours prior to administration.');
   const [scheduleSuccess, setScheduleSuccess] = useState(false);
 
-  // Mortality Edit Modal State
+  // Mortality & Vaccine View / Edit Modal State
+  const [confirmDeleteMortalityId, setConfirmDeleteMortalityId] = useState<string | null>(null);
+  const [viewingMortality, setViewingMortality] = useState<MortalityLog | null>(null);
+  const [viewingVaccine, setViewingVaccine] = useState<VaccineLog | null>(null);
   const [editingMortality, setEditingMortality] = useState<MortalityLog | null>(null);
   const [mortFormDate, setMortFormDate] = useState('');
   const [mortFormFlockId, setMortFormFlockId] = useState('8');
@@ -128,6 +136,8 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
   const [mortFormCause, setMortFormCause] = useState('');
   const [mortFormSymptoms, setMortFormSymptoms] = useState('');
   const [mortFormRecordedBy, setMortFormRecordedBy] = useState('');
+  const [vaccineFormError, setVaccineFormError] = useState<string | null>(null);
+  const [mortFormError, setMortFormError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -213,7 +223,9 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
       const totalMortLogs = mortalityLogs
         .filter((m) => (m.flockId && availIds.has(String(m.flockId))) || (m.flockName && availNames.has(m.flockName.toLowerCase())))
         .reduce((sum, m) => sum + (m.count || 0), 0);
-      const totalMort = Math.max(totalMortLogs, flMortFromFlocks);
+      const totalMort = availableFlocks.some((f) => f.mortality !== undefined)
+        ? flMortFromFlocks
+        : totalMortLogs;
       const mortRate = totalActiveBirds > 0 ? Number(((totalMort / totalActiveBirds) * 100).toFixed(3)) : 0;
 
       return {
@@ -266,16 +278,13 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
         .filter((m) => m.flockId === fid || m.flockName?.includes(fid === '8' ? '1' : fid === '9' ? '2' : '3'))
         .reduce((sum, m) => sum + (m.count || 0), 0);
 
-    const u1Mort = u1.mortality !== undefined ? Math.max(u1.mortality, getMortCount('8')) : (getMortCount('8') || 5);
-    const u2Mort = u2.mortality !== undefined ? Math.max(u2.mortality, getMortCount('9')) : (getMortCount('9') || 7);
-    const u3Mort = u3.mortality !== undefined ? Math.max(u3.mortality, getMortCount('10')) : (getMortCount('10') || 3);
+    const u1Mort = u1.mortality !== undefined ? u1.mortality : (getMortCount('8') || 5);
+    const u2Mort = u2.mortality !== undefined ? u2.mortality : (getMortCount('9') || 7);
+    const u3Mort = u3.mortality !== undefined ? u3.mortality : (getMortCount('10') || 3);
     const extraUnitsMort = availableFlocks
       .filter((f) => f.id !== '8' && f.id !== '9' && f.id !== '10' && !['Unit 1', 'Unit 2', 'Unit 3'].includes(f.name))
       .reduce((sum, f) => sum + (f.mortality || 0), 0);
-    const totalMort = Math.max(
-      mortalityLogs.reduce((sum, m) => sum + (m.count || 0), 0),
-      u1Mort + u2Mort + u3Mort + extraUnitsMort
-    );
+    const totalMort = u1Mort + u2Mort + u3Mort + extraUnitsMort;
 
     const totalActiveBirds = u1.currentCount + u2.currentCount + u3.currentCount;
     const totalCapacity = (u1.initialCount || 25000) + (u2.initialCount || 35000) + (u3.initialCount || 25500);
@@ -332,9 +341,10 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
       if (selectedFlock !== 'all') {
         const fl = availableFlocks.find((f) => String(f.id) === selectedFlock || f.name === selectedFlock);
         if (fl) {
-          const flMort = mortalityLogs
+          const flLogMort = mortalityLogs
             .filter((m) => String(m.flockId) === String(fl.id) || m.flockName === fl.name)
             .reduce((s, m) => s + (m.count || 0), 0);
+          const flMort = fl.mortality !== undefined ? fl.mortality : flLogMort;
           const act = fl.currentCount || 0;
           const cap = fl.initialCount || fl.currentCount || 0;
           return {
@@ -527,7 +537,8 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
     });
   }, [vaccines, isFirstFarm, availableFlocks, searchTerm, selectedFlock, vaccineStatusFilter]);
 
-  const totalPeriodDeaths = filteredMortality.reduce((acc, curr) => acc + (curr.count || 0), 0);
+  const logPeriodDeaths = filteredMortality.reduce((acc, curr) => acc + (curr.count || 0), 0);
+  const totalPeriodDeaths = !fromDate && !toDate && !searchTerm.trim() ? scopedMetrics.mortality : logPeriodDeaths;
   const pendingVaccines = filteredVaccines.filter((v) => v.status !== 'Completed').length;
   const completedVaccines = filteredVaccines.filter((v) => v.status === 'Completed').length;
 
@@ -582,21 +593,23 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
 
   const openCreateVaccineModal = () => {
     setEditingVaccineId(null);
-    setTargetFlockId(availableFlocks[0]?.id || '8');
-    setVaccineName('ND + IB Lasota Booster');
+    setVaccineFormError(null);
+    setTargetFlockId('');
+    setVaccineName('');
     setScheduledWeek(38);
     setScheduledDate(getTodayDateStr());
     setMethod('Drinking Water');
-    setDosage('25,000 Doses');
-    setBatchNumber('V-2026-901');
+    setDosage('');
+    setBatchNumber('');
     setVaccineStatus('Scheduled');
-    setVetNotes('Maintain cold chain at 2-8°C. Water withheld 2 hours prior to administration.');
+    setVetNotes('');
     setScheduleSuccess(false);
     setIsScheduleModalOpen(true);
   };
 
   const openEditVaccineModal = (v: VaccineLog) => {
     setEditingVaccineId(v.id);
+    setVaccineFormError(null);
     setTargetFlockId(String(v.flockId || '8'));
     setVaccineName(v.vaccineName || '');
     setScheduledWeek(v.scheduledWeek || 30);
@@ -613,6 +626,27 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
   // Handle Vaccine Scheduling or Update Form Submit
   const handleScheduleVaccineSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setVaccineFormError(null);
+    if (!targetFlockId) {
+      setVaccineFormError('Please select a target flock / unit.');
+      return;
+    }
+    if (!scheduledDate) {
+      setVaccineFormError('Please select a scheduled target date.');
+      return;
+    }
+    if (!vaccineName.trim()) {
+      setVaccineFormError('Please enter the vaccine formulation or medication name.');
+      return;
+    }
+    if (!scheduledWeek || Number(scheduledWeek) < 1) {
+      setVaccineFormError('Please enter a valid flock age / week (at least 1).');
+      return;
+    }
+    if (!dosage.trim()) {
+      setVaccineFormError('Please enter the target dosage / quantity.');
+      return;
+    }
     const targetFlock =
       flocks.find((f) => String(f.id) === String(targetFlockId)) ||
       flocks[0] || {
@@ -675,6 +709,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
 
   const openEditMortalityModal = (log: MortalityLog) => {
     setEditingMortality(log);
+    setMortFormError(null);
     setMortFormDate(log.date ? log.date.split('T')[0] : getTodayDateStr());
     setMortFormFlockId(String(log.flockId || '8'));
     setMortFormCount(Number(log.count) || 0);
@@ -686,6 +721,27 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
   const handleEditMortalitySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMortality) return;
+    setMortFormError(null);
+    if (!mortFormDate) {
+      setMortFormError('Please select a date.');
+      return;
+    }
+    if (!mortFormFlockId) {
+      setMortFormError('Please select a flock / shed.');
+      return;
+    }
+    if (!mortFormCount || Number(mortFormCount) < 1) {
+      setMortFormError('Deaths count must be at least 1.');
+      return;
+    }
+    if (!mortFormRecordedBy.trim()) {
+      setMortFormError('Please enter Inspecting Vet / Supervisor.');
+      return;
+    }
+    if (!mortFormCause.trim()) {
+      setMortFormError('Please enter the identified cause.');
+      return;
+    }
     const matchedFlock =
       flocks.find((f) => String(f.id) === String(mortFormFlockId)) ||
       flocks.find((f) => f.name === editingMortality.flockName);
@@ -898,9 +954,10 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
             </div>
           ) : (
             availableFlocks.map((flock, idx) => {
-              const flMort = mortalityLogs
+              const flLogMort = mortalityLogs
                 .filter((m) => String(m.flockId) === String(flock.id) || m.flockName === flock.name)
                 .reduce((s, m) => s + (m.count || 0), 0);
+              const flMort = flock.mortality !== undefined ? flock.mortality : flLogMort;
               const act = flock.currentCount || 0;
               const cap = flock.initialCount || flock.currentCount || 0;
               const rate = act > 0 ? Number(((flMort / act) * 100).toFixed(3)) : 0;
@@ -1186,15 +1243,59 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
                         {log.recordedBy}
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => openEditMortalityModal(log)}
-                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                          title={`Edit Mortality Record #${log.id.replace('m-', '')}`}
-                        >
-                          <Edit className="w-3 h-3" />
-                          <span>Edit</span>
-                        </button>
+                        <div className="inline-flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setViewingMortality(log)}
+                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title={`View Mortality Record #${log.id.replace('m-', '')}`}
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>View</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditMortalityModal(log)}
+                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                            title={`Edit Mortality Record #${log.id.replace('m-', '')}`}
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          {onDeleteMortality && confirmDeleteMortalityId !== log.id && (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteMortalityId(log.id)}
+                              className="inline-flex items-center p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer shadow-2xs"
+                              title="Delete Mortality Record"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        {onDeleteMortality && confirmDeleteMortalityId === log.id && (
+                          <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
+                            <span className="font-bold text-rose-900">Delete?</span>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await onDeleteMortality(log);
+                                setConfirmDeleteMortalityId(null);
+                                showToast('Mortality record deleted and flock count adjusted.');
+                              }}
+                              className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteMortalityId(null)}
+                              className="px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 cursor-pointer"
+                            >
+                              No
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -1331,6 +1432,15 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
 
                       <button
                         type="button"
+                        onClick={() => setViewingVaccine(v)}
+                        className="p-2 rounded-lg border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 transition-colors cursor-pointer"
+                        title="View Vaccine Schedule Details"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => openEditVaccineModal(v)}
                         className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
                         title="Edit Vaccine Schedule"
@@ -1439,13 +1549,26 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
                 )}
               </div>
             ) : (
-              <form onSubmit={handleScheduleVaccineSubmit} className="mt-4 space-y-3.5 text-xs">
+              <form onSubmit={handleScheduleVaccineSubmit} noValidate className="mt-4 space-y-3.5 text-xs">
+                {vaccineFormError && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-semibold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{vaccineFormError}</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <UISelect
                     label="Target Flock / Unit"
+                    required
                     value={targetFlockId}
-                    onChange={(e) => setTargetFlockId(e.target.value)}
+                    onChange={(e) => {
+                      setTargetFlockId(e.target.value);
+                      setVaccineFormError(null);
+                    }}
                   >
+                    <option value="" disabled>
+                      Select flock
+                    </option>
                     {flocks.map((f) => (
                       <option key={f.id} value={f.id}>
                         {f.name} ({f.shedNumber || `Shed ${f.id}`}) — {(f.currentCount || 25000).toLocaleString()} Birds
@@ -1626,7 +1749,13 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleEditMortalitySubmit} className="mt-4 space-y-3.5 text-xs">
+            <form onSubmit={handleEditMortalitySubmit} noValidate className="mt-4 space-y-3.5 text-xs">
+              {mortFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{mortFormError}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <UIInput
                   label="Date"
@@ -1698,6 +1827,82 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* View Mortality Record Popup Modal */}
+      {viewingMortality && (
+        <RecordDetailModal
+          isOpen={Boolean(viewingMortality)}
+          onClose={() => setViewingMortality(null)}
+          title={`Mortality Log #${viewingMortality.id.replace('m-', '')}`}
+          subtitle={`${viewingMortality.flockName} • ${viewingMortality.date}`}
+          badge={{ text: `${viewingMortality.count} Deaths`, color: 'rose' }}
+          fields={[
+            { label: 'Record ID', value: `#${viewingMortality.id.replace('m-', '')}`, mono: true },
+            { label: 'Date', value: viewingMortality.date, mono: true },
+            { label: 'Flock / Shed', value: viewingMortality.flockName },
+            {
+              label: 'Mortality Count',
+              value: `${viewingMortality.count.toLocaleString()} Birds`,
+              mono: true,
+              highlight: true,
+            },
+            { label: 'Primary Cause', value: viewingMortality.cause },
+            { label: 'Recorded By', value: viewingMortality.recordedBy || 'Farm Admin' },
+          ]}
+          notes={viewingMortality.symptoms}
+          onEdit={() => openEditMortalityModal(viewingMortality)}
+          onDelete={
+            onDeleteMortality
+              ? async () => {
+                  await onDeleteMortality(viewingMortality);
+                  showToast('Mortality record deleted and flock count adjusted.');
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {/* View Vaccine Schedule Popup Modal */}
+      {viewingVaccine && (
+        <RecordDetailModal
+          isOpen={Boolean(viewingVaccine)}
+          onClose={() => setViewingVaccine(null)}
+          title={viewingVaccine.vaccineName}
+          subtitle={`${viewingVaccine.flockName || `Unit ${viewingVaccine.flockId}`} • Week ${viewingVaccine.scheduledWeek}`}
+          badge={{
+            text: viewingVaccine.status === 'Completed' ? 'Administered' : 'Scheduled Due',
+            color: viewingVaccine.status === 'Completed' ? 'emerald' : 'amber',
+          }}
+          fields={[
+            {
+              label: 'Flock / Shed',
+              value: viewingVaccine.flockName || `Unit ${viewingVaccine.flockId}`,
+            },
+            { label: 'Scheduled Week', value: `Week ${viewingVaccine.scheduledWeek}`, mono: true },
+            { label: 'Scheduled Date', value: viewingVaccine.scheduledDate || '—', mono: true },
+            {
+              label: 'Administered Date',
+              value: viewingVaccine.administeredDate || 'Not yet administered',
+              mono: true,
+              highlight: Boolean(viewingVaccine.administeredDate),
+            },
+            { label: 'Administration Method', value: viewingVaccine.method || 'Drinking Water' },
+            { label: 'Dosage', value: viewingVaccine.dosage || '—', mono: true },
+            { label: 'Batch Number', value: viewingVaccine.batchNumber || '—', mono: true },
+            { label: 'Status', value: viewingVaccine.status },
+          ]}
+          notes={viewingVaccine.vetNotes}
+          onEdit={() => openEditVaccineModal(viewingVaccine)}
+          onDelete={
+            onDeleteVaccine
+              ? () => {
+                  onDeleteVaccine(viewingVaccine.id);
+                  showToast(`Deleted schedule "${viewingVaccine.vaccineName}".`);
+                }
+              : undefined
+          }
+        />
       )}
 
       {toastMessage && (

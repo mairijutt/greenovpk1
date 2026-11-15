@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   UserCheck,
   Plus,
@@ -15,8 +15,10 @@ import {
   Eye,
   EyeOff,
   ShieldAlert,
+  AlertCircle,
 } from 'lucide-react';
-import { StatCard, PageHeader, UIButton, UIInput, UISelect, UISearchInput, UIFilterBar, TableCard } from './ui';
+import { StatCard, PageHeader, UIButton, UIInput, UISelect, UISearchInput, UIFilterBar, TableCard, RecordDetailModal } from './ui';
+import { apiFetch } from '../services/api.ts';
 
 export interface UserRecord {
   id: string;
@@ -134,6 +136,24 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [selectedRole, setSelectedRole] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserRecord | null>(null);
+  const [viewingUser, setViewingUser] = useState<UserRecord | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Hydrate users directly from PostgreSQL on mount
+  useEffect(() => {
+    apiFetch('/api/user/allUsers')
+      .then((res) => {
+        const rows = res?.data;
+        if (Array.isArray(rows) && rows.length > 0) {
+          setUsers(rows);
+          try {
+            localStorage.setItem('greenova_users_v2', JSON.stringify(rows));
+          } catch {}
+        }
+      })
+      .catch((err) => console.warn('Failed to load users:', err));
+  }, []);
 
   // New user form state
   const [newUser, setNewUser] = useState({
@@ -159,8 +179,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [addUserError, setAddUserError] = useState<string | null>(null);
+  const [editUserError, setEditUserError] = useState<string | null>(null);
 
-  // Persist users to localStorage
   const handleUpdateUsers = (updatedList: UserRecord[]) => {
     setUsers(updatedList);
     try {
@@ -179,35 +200,63 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
     return matchesSearch && matchesRole;
   });
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSuperAdmin) {
       setToastMessage('Access Denied: Only Super Admin can add new user accounts.');
       setTimeout(() => setToastMessage(null), 4000);
       return;
     }
-    if (!newUser.name.trim() || !newUser.email.trim()) return;
-    const user: UserRecord = {
-      id: `usr-${Date.now()}`,
-      name: newUser.name.trim(),
-      email: newUser.email.trim(),
-      role: newUser.role,
-      farmAssigned: newUser.farmAssigned,
-      status: 'Active',
-      lastLogin: 'Invited',
-      password: newUser.password.trim() || 'Greenova@2026',
-    };
-    handleUpdateUsers([...users, user]);
-    setNewUser({
-      name: '',
-      email: '',
-      role: 'supervisor',
-      farmAssigned: 'GreenOva Unit 1',
-      password: '',
-    });
-    setShowAddModal(false);
-    setToastMessage(`User "${user.name}" created successfully!`);
-    setTimeout(() => setToastMessage(null), 4000);
+    if (!newUser.name.trim()) {
+      setAddUserError('Please enter full name.');
+      return;
+    }
+    if (!newUser.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUser.email.trim())) {
+      setAddUserError('Please enter a valid email address.');
+      return;
+    }
+    if (!newUser.role) {
+      setAddUserError('Please select a role permission.');
+      return;
+    }
+    if (!newUser.farmAssigned) {
+      setAddUserError('Please select an assigned unit.');
+      return;
+    }
+    if (!newUser.password.trim() || newUser.password.trim().length < 6) {
+      setAddUserError('Please enter an initial password (minimum 6 characters).');
+      return;
+    }
+    setAddUserError(null);
+    setIsSaving(true);
+    try {
+      const res = await apiFetch('/api/user/create', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newUser.name.trim(),
+          email: newUser.email.trim(),
+          role: newUser.role,
+          farmAssigned: newUser.farmAssigned,
+          password: newUser.password.trim(),
+        }),
+      });
+      const created: UserRecord = res.data;
+      handleUpdateUsers([...users, created]);
+      setNewUser({
+        name: '',
+        email: '',
+        role: 'supervisor',
+        farmAssigned: 'GreenOva Unit 1',
+        password: '',
+      });
+      setShowAddModal(false);
+      setToastMessage(`User "${created.name}" created in database successfully!`);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      setAddUserError(err?.message || 'Failed to create user account.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleOpenEdit = (user: UserRecord) => {
@@ -216,6 +265,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       setTimeout(() => setToastMessage(null), 4000);
       return;
     }
+    setEditUserError(null);
     setEditingUser(user);
     setEditName(user.name);
     setEditEmail(user.email);
@@ -238,7 +288,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
     setShowNewPassword(false);
   };
 
-  const handleChangePasswordSubmit = (e: React.FormEvent) => {
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSuperAdmin) {
       setPasswordError('Permission denied: Only Super Admin can update passwords.');
@@ -254,42 +304,71 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       return;
     }
 
-    const updated = users.map((u) =>
-      u.id === passwordModalUser.id ? { ...u, password: newPassword } : u
-    );
-    handleUpdateUsers(updated);
-    setToastMessage(`Password for "${passwordModalUser.name}" successfully updated!`);
-    setTimeout(() => setToastMessage(null), 4000);
-    setPasswordModalUser(null);
+    setIsSaving(true);
+    try {
+      await apiFetch('/api/user/change-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: passwordModalUser.id,
+          password: newPassword,
+        }),
+      });
+      setToastMessage(`Password for "${passwordModalUser.name}" updated in database!`);
+      setTimeout(() => setToastMessage(null), 4000);
+      setPasswordModalUser(null);
+    } catch (err: any) {
+      setPasswordError(err?.message || 'Failed to update password.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSuperAdmin) {
       setToastMessage('Access Denied: Only Super Admin can modify account details.');
       setTimeout(() => setToastMessage(null), 4000);
       return;
     }
-    if (!editingUser || !editName.trim() || !editEmail.trim()) return;
+    if (!editingUser) return;
+    if (!editName.trim()) {
+      setEditUserError('Please enter full name.');
+      return;
+    }
+    if (!editEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail.trim())) {
+      setEditUserError('Please enter a valid email address.');
+      return;
+    }
+    if (editPassword.trim() && editPassword.trim().length < 6) {
+      setEditUserError('Password must be at least 6 characters long.');
+      return;
+    }
+    setEditUserError(null);
 
-    const updated = users.map((u) =>
-      u.id === editingUser.id
-        ? {
-            ...u,
-            name: editName.trim(),
-            email: editEmail.trim(),
-            role: editRole,
-            farmAssigned: editFarm,
-            status: editStatus,
-            ...(editPassword ? { password: editPassword } : {}),
-          }
-        : u
-    );
-
-    handleUpdateUsers(updated);
-    setToastMessage(`User "${editName.trim()}" updated successfully!`);
-    setTimeout(() => setToastMessage(null), 4000);
-    setEditingUser(null);
+    setIsSaving(true);
+    try {
+      const res = await apiFetch(`/api/user/${editingUser.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: editName.trim(),
+          email: editEmail.trim(),
+          role: editRole,
+          farmAssigned: editFarm,
+          status: editStatus,
+          ...(editPassword.trim().length >= 6 ? { password: editPassword.trim() } : {}),
+        }),
+      });
+      const updatedUser: UserRecord = res.data;
+      const updated = users.map((u) => (String(u.id) === String(editingUser.id) ? updatedUser : u));
+      handleUpdateUsers(updated);
+      setToastMessage(`User "${editName.trim()}" updated in database successfully!`);
+      setTimeout(() => setToastMessage(null), 4000);
+      setEditingUser(null);
+    } catch (err: any) {
+      setEditUserError(err?.message || 'Failed to update user account.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDeleteUser = (id: string) => {
@@ -298,17 +377,35 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       setTimeout(() => setToastMessage(null), 4000);
       return;
     }
-    const target = users.find((u) => u.id === id);
-    if (target?.email === 'aaglobal500@gmail.com') {
-      alert('The primary Super Administrator account cannot be deleted.');
+    const target = users.find((u) => String(u.id) === String(id));
+    if (target?.email?.toLowerCase() === 'aaglobal500@gmail.com') {
+      setToastMessage('The primary Super Administrator account cannot be deleted.');
+      setTimeout(() => setToastMessage(null), 4000);
       return;
     }
-    if (confirm(`Are you sure you want to delete user account "${target?.name || id}"? This action cannot be undone.`)) {
-      const updated = users.filter((u) => u.id !== id);
+    if (target) {
+      setDeleteConfirmUser(target);
+    }
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteConfirmUser) return;
+    setIsSaving(true);
+    try {
+      await apiFetch(`/api/user/${deleteConfirmUser.id}`, {
+        method: 'DELETE',
+      });
+      const updated = users.filter((u) => String(u.id) !== String(deleteConfirmUser.id));
       handleUpdateUsers(updated);
-      setToastMessage('User account deleted successfully.');
+      setToastMessage(`User "${deleteConfirmUser.name}" deleted from database.`);
       setTimeout(() => setToastMessage(null), 4000);
+      setDeleteConfirmUser(null);
       setEditingUser(null);
+    } catch (err: any) {
+      setToastMessage(err?.message || 'Failed to delete user account.');
+      setTimeout(() => setToastMessage(null), 4500);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -326,7 +423,10 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             <UIButton
               variant="primary"
               icon={Plus}
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                setAddUserError(null);
+                setShowAddModal(true);
+              }}
             >
               Add New User
             </UIButton>
@@ -468,43 +568,54 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right">
-                    {isSuperAdmin ? (
-                      <div className="flex items-center justify-end space-x-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenPasswordModal(u)}
-                          title="Change Account Password (Super Admin)"
-                          className="text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
-                        >
-                          <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Password</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(u)}
-                          title="Edit User Details"
-                          className="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteUser(u.id)}
-                          disabled={u.email === 'aaglobal500@gmail.com'}
-                          title={u.email === 'aaglobal500@gmail.com' ? 'Primary Super Admin account cannot be deleted' : 'Delete User Account'}
-                          className="text-xs font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center space-x-1 shadow-2xs"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Delete</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-[11px] font-semibold text-slate-400 inline-flex items-center space-x-1 bg-slate-50 border border-slate-200/60 px-2 py-1 rounded-md">
-                        <Lock className="w-3 h-3 text-slate-400" />
-                        <span>Super Admin Only</span>
-                      </span>
-                    )}
+                    <div className="flex items-center justify-end space-x-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setViewingUser(u)}
+                        title="View User Profile"
+                        className="text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View</span>
+                      </button>
+                      {isSuperAdmin ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPasswordModal(u)}
+                            title="Change Account Password (Super Admin)"
+                            className="text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
+                          >
+                            <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Password</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(u)}
+                            title="Edit User Details"
+                            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition-colors cursor-pointer inline-flex items-center space-x-1 shadow-2xs"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(u.id)}
+                            disabled={u.email === 'aaglobal500@gmail.com'}
+                            title={u.email === 'aaglobal500@gmail.com' ? 'Primary Super Admin account cannot be deleted' : 'Delete User Account'}
+                            className="text-xs font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-1 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center space-x-1 shadow-2xs"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-slate-400 inline-flex items-center space-x-1 bg-slate-50 border border-slate-200/60 px-2 py-1 rounded-md">
+                          <Lock className="w-3 h-3 text-slate-400" />
+                          <span>Super Admin Only</span>
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -536,29 +647,44 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
               </button>
             </div>
 
-            <form onSubmit={handleAddUser} className="mt-4 space-y-4 text-xs">
+            <form onSubmit={handleAddUser} noValidate className="mt-4 space-y-4 text-xs">
+              {addUserError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{addUserError}</span>
+                </div>
+              )}
               <UIInput
-                label="Full Name"
+                label="Full Name *"
                 required
                 placeholder="e.g. Dr. Salman Khan"
                 value={newUser.name}
-                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                onChange={(e) => {
+                  setAddUserError(null);
+                  setNewUser({ ...newUser, name: e.target.value });
+                }}
               />
 
               <UIInput
-                label="Email Address"
+                label="Email Address *"
                 type="email"
                 required
                 placeholder="e.g. salman@greenovapk.com"
                 value={newUser.email}
-                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                onChange={(e) => {
+                  setAddUserError(null);
+                  setNewUser({ ...newUser, email: e.target.value });
+                }}
               />
 
               <div className="grid grid-cols-2 gap-3">
                 <UISelect
-                  label="Role Permission"
+                  label="Role Permission *"
                   value={newUser.role}
-                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value as any })}
+                  onChange={(e) => {
+                    setAddUserError(null);
+                    setNewUser({ ...newUser, role: e.target.value as any });
+                  }}
                 >
                   <option value="supervisor">Supervisor</option>
                   <option value="veterinarian">Veterinarian</option>
@@ -568,9 +694,12 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 </UISelect>
 
                 <UISelect
-                  label="Assigned Unit"
+                  label="Assigned Unit *"
                   value={newUser.farmAssigned}
-                  onChange={(e) => setNewUser({ ...newUser, farmAssigned: e.target.value })}
+                  onChange={(e) => {
+                    setAddUserError(null);
+                    setNewUser({ ...newUser, farmAssigned: e.target.value });
+                  }}
                 >
                   <option value="All Farm Complexes">All Units</option>
                   <option value="GreenOva Unit 1">GreenOva Unit 1</option>
@@ -578,6 +707,19 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                   <option value="GreenOva Unit 3">GreenOva Unit 3</option>
                 </UISelect>
               </div>
+
+              <UIInput
+                label="Initial Password *"
+                type="password"
+                minLength={6}
+                required
+                placeholder="Minimum 6 characters"
+                value={newUser.password}
+                onChange={(e) => {
+                  setAddUserError(null);
+                  setNewUser({ ...newUser, password: e.target.value });
+                }}
+              />
 
               <div className="flex justify-end space-x-2 pt-4 border-t border-slate-100">
                 <UIButton
@@ -587,7 +729,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 >
                   Cancel
                 </UIButton>
-                <UIButton type="submit" variant="primary">
+                <UIButton type="submit" variant="primary" loading={isSaving}>
                   Create User
                 </UIButton>
               </div>
@@ -619,13 +761,22 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="mt-4 space-y-4 text-xs">
+            <form onSubmit={handleSaveEdit} noValidate className="mt-4 space-y-4 text-xs">
+              {editUserError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{editUserError}</span>
+                </div>
+              )}
               <UIInput
                 label="Full Name *"
                 required
                 placeholder="e.g. Ahsan Nawaz"
                 value={editName}
-                onChange={(e) => setEditName(e.target.value)}
+                onChange={(e) => {
+                  setEditUserError(null);
+                  setEditName(e.target.value);
+                }}
               />
 
               <UIInput
@@ -634,7 +785,10 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 required
                 placeholder="e.g. user@greenovapk.com"
                 value={editEmail}
-                onChange={(e) => setEditEmail(e.target.value)}
+                onChange={(e) => {
+                  setEditUserError(null);
+                  setEditEmail(e.target.value);
+                }}
               />
 
               <div className="grid grid-cols-2 gap-3">
@@ -724,7 +878,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
               </button>
             </div>
 
-            <form onSubmit={handleChangePasswordSubmit} className="mt-4 space-y-4 text-xs">
+            <form onSubmit={handleChangePasswordSubmit} noValidate className="mt-4 space-y-4 text-xs">
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 font-medium">Account User:</span>
@@ -805,6 +959,65 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             </form>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Delete User Account</h3>
+                <p className="text-xs text-slate-500">This action cannot be undone.</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-700 leading-relaxed">
+              Are you sure you want to permanently delete <strong>{deleteConfirmUser.name}</strong> ({deleteConfirmUser.email})?
+            </p>
+            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+              <UIButton type="button" variant="secondary" onClick={() => setDeleteConfirmUser(null)}>
+                Cancel
+              </UIButton>
+              <UIButton type="button" variant="danger" loading={isSaving} onClick={confirmDeleteUser}>
+                Delete User
+              </UIButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View User Profile Popup Modal */}
+      {viewingUser && (
+        <RecordDetailModal
+          isOpen={Boolean(viewingUser)}
+          onClose={() => setViewingUser(null)}
+          title={viewingUser.name}
+          subtitle={viewingUser.email}
+          badge={{
+            text: (roleLabels[viewingUser.role] || roleLabels.admin).label,
+            color: viewingUser.status === 'Active' ? 'emerald' : 'slate',
+          }}
+          fields={[
+            { label: 'User ID', value: `#${viewingUser.id}`, mono: true },
+            { label: 'Full Name', value: viewingUser.name },
+            { label: 'Email Address', value: viewingUser.email, mono: true },
+            { label: 'Access Role', value: (roleLabels[viewingUser.role] || roleLabels.admin).label },
+            { label: 'Assigned Complex', value: viewingUser.farmAssigned },
+            { label: 'Account Status', value: viewingUser.status, highlight: viewingUser.status === 'Active' },
+            { label: 'Last Sign-In', value: viewingUser.lastLogin || 'Never', fullWidth: true },
+          ]}
+          onEdit={isSuperAdmin ? () => handleOpenEdit(viewingUser) : undefined}
+          onDelete={
+            isSuperAdmin && viewingUser.email !== 'aaglobal500@gmail.com'
+              ? () => {
+                  handleDeleteUser(viewingUser.id);
+                }
+              : undefined
+          }
+        />
       )}
 
       {/* Toast Notification */}

@@ -116,6 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [inputCode, setInputCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [profileError, setProfileError] = useState('');
 
   // Synchronize internal state if currentUser prop changes
   useEffect(() => {
@@ -238,13 +239,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     if (!userName.trim()) {
-      alert('Full name is required.');
+      setProfileError('Full name is required.');
       return;
     }
     if (!userEmail.trim()) {
-      alert('Email address is required.');
+      setProfileError('Email address is required.');
       return;
     }
+    setProfileError('');
 
     const calculatedInitials =
       userInitials.trim() ||
@@ -649,7 +651,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
 
-            <form onSubmit={handleUpdatePassword} className="space-y-3.5">
+            <form onSubmit={handleUpdatePassword} noValidate className="space-y-3.5">
               <div>
                 <label className="block text-slate-700 font-bold mb-1">Current Password *</label>
                 <div className="relative">
@@ -798,7 +800,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleVerifyEmail} className="space-y-4">
+              <form onSubmit={handleVerifyEmail} noValidate className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-slate-700 font-bold">Verification Code</label>
@@ -874,7 +876,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveProfile} className="space-y-3.5">
+            <form onSubmit={handleSaveProfile} noValidate className="space-y-3.5">
+              {profileError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg flex items-center space-x-2 text-xs">
+                  <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <span>{profileError}</span>
+                </div>
+              )}
               <div>
                 <label className="block text-slate-700 font-bold mb-1">Full Name *</label>
                 <input
@@ -901,7 +909,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Avatar Initials</label>
+                  <label className="block text-slate-700 font-bold mb-1">Avatar Initials (Optional)</label>
                   <input
                     type="text"
                     maxLength={3}
@@ -913,7 +921,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Contact Phone</label>
+                  <label className="block text-slate-700 font-bold mb-1">Contact Phone (Optional)</label>
                   <input
                     type="text"
                     value={userPhone}
@@ -925,7 +933,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">System Role / Designation</label>
+                <label className="block text-slate-700 font-bold mb-1">System Role / Designation (Optional)</label>
                 <input
                   type="text"
                   value={userRole}

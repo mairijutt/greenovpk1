@@ -22,10 +22,12 @@ import {
   TrendingUp,
   UserPlus,
   Edit2,
+  Eye,
   UserCheck,
   Timer,
   CheckCheck,
   RotateCcw,
+  Trash2,
 } from 'lucide-react';
 import {
   Worker,
@@ -42,6 +44,7 @@ import {
   UIFilterBar,
   TableCard,
   DatePreset,
+  RecordDetailModal,
 } from './ui';
 
 interface SalariesViewProps {
@@ -53,6 +56,11 @@ interface SalariesViewProps {
   onAddAdvanceRecord: (advance: AdvanceSalaryRecord) => void;
   onAddWorker?: (worker: Worker) => void;
   onUpdateWorker?: (worker: Worker) => void;
+  onDeleteWorker?: (id: string) => Promise<void> | void;
+  onEditSalaryDisbursal?: (salary: SalaryDisbursal) => Promise<void> | void;
+  onDeleteSalaryDisbursal?: (id: string) => Promise<void> | void;
+  onEditAdvanceRecord?: (advance: AdvanceSalaryRecord) => Promise<void> | void;
+  onDeleteAdvanceRecord?: (id: string) => Promise<void> | void;
 }
 
 type TabType = 'overview' | 'attendance' | 'staff' | 'disbursals' | 'advances' | 'add-staff';
@@ -66,6 +74,11 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
   onAddAdvanceRecord,
   onAddWorker,
   onUpdateWorker,
+  onDeleteWorker,
+  onEditSalaryDisbursal,
+  onDeleteSalaryDisbursal,
+  onEditAdvanceRecord,
+  onDeleteAdvanceRecord,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [selectedFlock, setSelectedFlock] = useState<string>('all');
@@ -76,7 +89,40 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [selectedSlip, setSelectedSlip] = useState<SalaryDisbursal | null>(null);
+  const [viewingSalary, setViewingSalary] = useState<SalaryDisbursal | null>(null);
+  const [viewingAdvance, setViewingAdvance] = useState<AdvanceSalaryRecord | null>(null);
+  const [viewingWorker, setViewingWorker] = useState<Worker | null>(null);
+  const [editingSalary, setEditingSalary] = useState<SalaryDisbursal | null>(null);
+  const [editingAdvance, setEditingAdvance] = useState<AdvanceSalaryRecord | null>(null);
+  const [editSalMonth, setEditSalMonth] = useState('October 2026');
+  const [editSalFlockId, setEditSalFlockId] = useState('9');
+  const [editSalBasic, setEditSalBasic] = useState<number>(0);
+  const [editSalAdvanceDeduct, setEditSalAdvanceDeduct] = useState<number>(0);
+  const [editSalBonus, setEditSalBonus] = useState<number>(0);
+  const [editSalPenalty, setEditSalPenalty] = useState<number>(0);
+  const [editSalMethod, setEditSalMethod] = useState<'Cash' | 'Bank Transfer' | 'Cheque'>('Cash');
+  const [editSalDate, setEditSalDate] = useState('');
+  const [editSalChallan, setEditSalChallan] = useState('');
+  const [editSalRemarks, setEditSalRemarks] = useState('');
+  const [editSalStatus, setEditSalStatus] = useState<'Paid' | 'Pending'>('Paid');
+  const [editAdvFlockId, setEditAdvFlockId] = useState('9');
+  const [editAdvAmount, setEditAdvAmount] = useState<number>(0);
+  const [editAdvDeducted, setEditAdvDeducted] = useState<number>(0);
+  const [editAdvDate, setEditAdvDate] = useState('');
+  const [editAdvChallan, setEditAdvChallan] = useState('');
+  const [editAdvRepaymentStatus, setEditAdvRepaymentStatus] = useState<
+    'Deducted' | 'Pending' | 'Partially Deducted'
+  >('Pending');
+  const [editAdvRemarks, setEditAdvRemarks] = useState('');
+  const [isSavingRecordEdit, setIsSavingRecordEdit] = useState(false);
   const [staffToast, setStaffToast] = useState<string | null>(null);
+  const [staffFormError, setStaffFormError] = useState<string | null>(null);
+  const [advanceFormError, setAdvanceFormError] = useState<string | null>(null);
+  const [salaryFormError, setSalaryFormError] = useState<string | null>(null);
+  const [timeLogFormError, setTimeLogFormError] = useState<string | null>(null);
+  const [editSalaryFormError, setEditSalaryFormError] = useState<string | null>(null);
+  const [editAdvanceFormError, setEditAdvanceFormError] = useState<string | null>(null);
+  const [confirmDeleteSalId, setConfirmDeleteSalId] = useState<string | null>(null);
 
   // Dedicated Attendance Sheet Date, Shift, and Status filters
   const [attendanceSheetDate, setAttendanceSheetDate] = useState<string>('2026-11-03');
@@ -185,10 +231,38 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
 
   const handleSaveStaff = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!staffName.trim()) {
-      alert('Please enter employee name.');
+    if (!staffJoiningDate) {
+      setStaffFormError('Please select a joining date.');
       return;
     }
+    if (!staffName.trim()) {
+      setStaffFormError('Please enter employee full name.');
+      return;
+    }
+    if (!staffRole.trim()) {
+      setStaffFormError('Please select a designation / role.');
+      return;
+    }
+    if (!staffFlockId) {
+      setStaffFormError('Please select an assigned flock / unit.');
+      return;
+    }
+    const parsedSalary = Number(staffSalary);
+    if (!Number.isFinite(parsedSalary) || parsedSalary <= 0) {
+      setStaffFormError('Monthly basic salary must be greater than 0.');
+      return;
+    }
+    const cleanedPhone = staffPhone.trim();
+    if (!cleanedPhone || cleanedPhone === '+92 300' || cleanedPhone.length < 7) {
+      setStaffFormError('Please enter a valid contact phone number.');
+      return;
+    }
+    const parsedAdvBal = Number(staffAdvanceBalance || 0);
+    if (!Number.isFinite(parsedAdvBal) || parsedAdvBal < 0) {
+      setStaffFormError('Initial advance balance cannot be negative.');
+      return;
+    }
+    setStaffFormError(null);
 
     const assignedFlock = flocks.find((f) => String(f.id) === staffFlockId);
     const flockName = assignedFlock
@@ -208,8 +282,8 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
       })`,
       flockId: staffFlockId,
       flockName,
-      monthlySalary: Number(staffSalary) || 30000,
-      advanceBalance: Number(staffAdvanceBalance) || 0,
+      monthlySalary: parsedSalary,
+      advanceBalance: parsedAdvBal,
       phone: staffPhone.trim(),
       status: staffStatus,
       joinedDate: staffJoiningDate,
@@ -267,6 +341,7 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
   const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'Present' | 'Late' | 'On Leave'>('all');
 
   const handleOpenEditStaff = (worker: Worker) => {
+    setStaffFormError(null);
     setEditingWorker(worker);
     setEditStaffName(worker.name);
     setEditStaffRole(worker.role);
@@ -335,10 +410,39 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
 
   const handleSaveEditStaff = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingWorker || !editStaffName.trim()) {
-      alert('Please enter employee name.');
+    if (!editingWorker) return;
+    if (!editStaffName.trim()) {
+      setStaffFormError('Please enter employee full name.');
       return;
     }
+    if (!editStaffRole.trim()) {
+      setStaffFormError('Please select a designation / role.');
+      return;
+    }
+    if (!editStaffFlockId) {
+      setStaffFormError('Please select an assigned flock / unit.');
+      return;
+    }
+    const parsedSalary = Number(editStaffSalary);
+    if (!Number.isFinite(parsedSalary) || parsedSalary <= 0) {
+      setStaffFormError('Monthly basic salary must be greater than 0.');
+      return;
+    }
+    const cleanedPhone = editStaffPhone.trim();
+    if (!cleanedPhone || cleanedPhone === '+92 300' || cleanedPhone.length < 7) {
+      setStaffFormError('Please enter a valid contact phone number.');
+      return;
+    }
+    if (!editStaffJoiningDate) {
+      setStaffFormError('Please select a joining date.');
+      return;
+    }
+    const parsedAdvBal = Number(editStaffAdvanceBalance || 0);
+    if (!Number.isFinite(parsedAdvBal) || parsedAdvBal < 0) {
+      setStaffFormError('Outstanding advance balance cannot be negative.');
+      return;
+    }
+    setStaffFormError(null);
 
     const assignedFlock = flocks.find((f) => String(f.id) === editStaffFlockId);
     const flockName = assignedFlock
@@ -358,8 +462,8 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
       })`,
       flockId: editStaffFlockId,
       flockName,
-      monthlySalary: Number(editStaffSalary) || 30000,
-      advanceBalance: Number(editStaffAdvanceBalance) || 0,
+      monthlySalary: parsedSalary,
+      advanceBalance: parsedAdvBal,
       phone: editStaffPhone.trim(),
       status: editStaffStatus,
       joinedDate: editStaffJoiningDate,
@@ -416,6 +520,7 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
     );
     setLogOvertime(0);
     setLogNotes(target.notes || 'In/out timing recorded by Admin');
+    setTimeLogFormError(null);
     setIsTimeLogModalOpen(true);
   };
 
@@ -434,11 +539,33 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
 
   const handleSaveAttendanceLog = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedWorkerForLog) return;
+    if (!selectedWorkerForLog || !logWorkerId) {
+      setTimeLogFormError('Please select a staff member.');
+      return;
+    }
+    if (!logDate) {
+      setTimeLogFormError('Please select an attendance date.');
+      return;
+    }
+    if (!logShift) {
+      setTimeLogFormError('Please select a shift schedule.');
+      return;
+    }
 
     const w = selectedWorkerForLog;
     const isLeave = logStatus === 'On Leave';
     const isAbsent = logStatus === 'Absent';
+    if (!isLeave && !isAbsent) {
+      if (!logCheckIn.trim()) {
+        setTimeLogFormError('Please enter a check-in time.');
+        return;
+      }
+      if (!logCheckOut.trim()) {
+        setTimeLogFormError('Please enter a check-out time.');
+        return;
+      }
+    }
+    setTimeLogFormError(null);
     const finalIn = isLeave || isAbsent ? '—' : logCheckIn.trim();
     const finalOut = isLeave || isAbsent ? '—' : logCheckOut.trim();
 
@@ -648,7 +775,31 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
   // Submit Salary Disbursal
   const handleDisburseSalary = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeSalWorker) return;
+    if (!activeSalWorker || !salEmployeeId) {
+      setSalaryFormError('Please select an employee.');
+      return;
+    }
+    if (!salMonth.trim()) {
+      setSalaryFormError('Please select a pay period / month.');
+      return;
+    }
+    if (!Number.isFinite(Number(salBasic)) || Number(salBasic) <= 0) {
+      setSalaryFormError('Basic salary must be greater than 0.');
+      return;
+    }
+    if (Number(salAdvanceDeduct) < 0 || Number(salBonus) < 0 || Number(salPenalty) < 0) {
+      setSalaryFormError('Deductions, bonus, and penalty amounts cannot be negative.');
+      return;
+    }
+    if (!salDate) {
+      setSalaryFormError('Please select a disbursement date.');
+      return;
+    }
+    if (!salChallan.trim()) {
+      setSalaryFormError('Please enter a voucher / slip reference number.');
+      return;
+    }
+    setSalaryFormError(null);
 
     const newSalary: SalaryDisbursal = {
       id: `sal-${Date.now()}`,
@@ -665,9 +816,9 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
       paymentDate: salDate,
       paymentMethod: salMethod,
       status: 'Paid',
-      challanNo: salChallan,
+      challanNo: salChallan.trim(),
       month: salMonth,
-      remarks: salRemarks,
+      remarks: salRemarks.trim(),
     };
 
     onAddSalaryDisbursal(newSalary);
@@ -677,7 +828,31 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
   // Submit Advance Salary
   const handleRecordAdvance = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeAdvWorker) return;
+    if (!activeAdvWorker || !advEmployeeId) {
+      setAdvanceFormError('Please select an employee.');
+      return;
+    }
+    if (!advFlockId) {
+      setAdvanceFormError('Please select an assigned flock / unit.');
+      return;
+    }
+    if (!Number.isFinite(Number(advAmount)) || Number(advAmount) <= 0) {
+      setAdvanceFormError('Advance amount must be greater than 0.');
+      return;
+    }
+    if (!advDate) {
+      setAdvanceFormError('Please select the date issued.');
+      return;
+    }
+    if (!advChallan.trim()) {
+      setAdvanceFormError('Please enter a challan / voucher number.');
+      return;
+    }
+    if (!advRemarks.trim()) {
+      setAdvanceFormError('Please enter the purpose / reason for this advance.');
+      return;
+    }
+    setAdvanceFormError(null);
 
     const targetFlock = flocks.find((f) => String(f.id) === advFlockId) || {
       id: advFlockId,
@@ -692,11 +867,11 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
       flockName: targetFlock.name,
       advanceAmount: Number(advAmount) || 0,
       date: advDate,
-      challanNo: advChallan,
+      challanNo: advChallan.trim(),
       repaymentStatus: 'Pending',
       deductedAmount: 0,
       remainingBalance: Number(advAmount) || 0,
-      remarks: advRemarks,
+      remarks: advRemarks.trim(),
     };
 
     onAddAdvanceRecord(newAdvance);
@@ -705,13 +880,174 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
 
   // Quick Action from staff row: Pay Salary or Give Advance
   const handleQuickPaySalary = (worker: Worker) => {
+    setSalaryFormError(null);
     handleSalaryWorkerChange(worker.id);
     setIsSalaryModalOpen(true);
   };
 
   const handleQuickGiveAdvance = (worker: Worker) => {
+    setAdvanceFormError(null);
     handleAdvWorkerChange(worker.id);
     setIsAdvanceModalOpen(true);
+  };
+
+  const handleOpenEditSalary = (sal: SalaryDisbursal) => {
+    setEditSalaryFormError(null);
+    setEditingSalary(sal);
+    setEditSalMonth(sal.month || 'October 2026');
+    setEditSalFlockId(String(sal.flockId || '9'));
+    setEditSalBasic(Number(sal.basicSalary) || 0);
+    setEditSalAdvanceDeduct(Number(sal.advanceDeducted) || 0);
+    setEditSalBonus(Number(sal.allowanceBonus) || 0);
+    setEditSalPenalty(Number(sal.penaltyDeduction) || 0);
+    setEditSalMethod(sal.paymentMethod || 'Cash');
+    setEditSalDate(sal.paymentDate || '');
+    setEditSalChallan(sal.challanNo || '');
+    setEditSalRemarks(sal.remarks || '');
+    setEditSalStatus(sal.status || 'Paid');
+  };
+
+  const handleSaveEditSalary = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSalary || !onEditSalaryDisbursal) return;
+    if (!editSalFlockId) {
+      setEditSalaryFormError('Please select a unit / flock.');
+      return;
+    }
+    if (!editSalMonth.trim()) {
+      setEditSalaryFormError('Please enter pay period / month.');
+      return;
+    }
+    if (!Number.isFinite(Number(editSalBasic)) || Number(editSalBasic) <= 0) {
+      setEditSalaryFormError('Basic salary must be greater than 0.');
+      return;
+    }
+    if (Number(editSalAdvanceDeduct) < 0 || Number(editSalBonus) < 0 || Number(editSalPenalty) < 0) {
+      setEditSalaryFormError('Deductions, bonus, and penalty amounts cannot be negative.');
+      return;
+    }
+    if (!editSalDate) {
+      setEditSalaryFormError('Please select payment date.');
+      return;
+    }
+    if (!editSalChallan.trim()) {
+      setEditSalaryFormError('Please enter voucher / reference number.');
+      return;
+    }
+    setEditSalaryFormError(null);
+    setIsSavingRecordEdit(true);
+    try {
+      const targetFlock = flocks.find((f) => String(f.id) === editSalFlockId);
+      const flockName =
+        targetFlock?.name ||
+        (editSalFlockId === '9' ? 'Unit 2' : editSalFlockId === '10' ? 'Unit 3' : 'Unit 1');
+      const netPaid = Math.max(
+        0,
+        (Number(editSalBasic) || 0) -
+          (Number(editSalAdvanceDeduct) || 0) +
+          (Number(editSalBonus) || 0) -
+          (Number(editSalPenalty) || 0)
+      );
+      const updatedSalary: SalaryDisbursal = {
+        ...editingSalary,
+        flockId: editSalFlockId,
+        flockName,
+        month: editSalMonth.trim(),
+        basicSalary: Number(editSalBasic) || 0,
+        advanceDeducted: Number(editSalAdvanceDeduct) || 0,
+        allowanceBonus: Number(editSalBonus) || 0,
+        penaltyDeduction: Number(editSalPenalty) || 0,
+        netSalaryPaid: netPaid,
+        totalSalary: (Number(editSalBasic) || 0) + (Number(editSalBonus) || 0),
+        paymentMethod: editSalMethod,
+        paymentDate: editSalDate,
+        challanNo: editSalChallan.trim(),
+        remarks: editSalRemarks.trim(),
+        status: editSalStatus,
+      };
+      await onEditSalaryDisbursal(updatedSalary);
+      setEditingSalary(null);
+      setStaffToast(`Updated salary disbursal for ${updatedSalary.employeeName}`);
+      setTimeout(() => setStaffToast(null), 3500);
+    } finally {
+      setIsSavingRecordEdit(false);
+    }
+  };
+
+  const handleOpenEditAdvance = (adv: AdvanceSalaryRecord) => {
+    setEditAdvanceFormError(null);
+    setEditingAdvance(adv);
+    setEditAdvFlockId(String(adv.flockId || '9'));
+    setEditAdvAmount(Number(adv.advanceAmount) || 0);
+    setEditAdvDeducted(Number(adv.deductedAmount) || 0);
+    setEditAdvDate(adv.date || '');
+    setEditAdvChallan(adv.challanNo || '');
+    setEditAdvRepaymentStatus(adv.repaymentStatus || 'Pending');
+    setEditAdvRemarks(adv.remarks || '');
+  };
+
+  const handleSaveEditAdvance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAdvance || !onEditAdvanceRecord) return;
+    if (!editAdvFlockId) {
+      setEditAdvanceFormError('Please select an assigned unit / flock.');
+      return;
+    }
+    if (!editAdvDate) {
+      setEditAdvanceFormError('Please select advance date.');
+      return;
+    }
+    const amount = Number(editAdvAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setEditAdvanceFormError('Advance amount must be greater than 0.');
+      return;
+    }
+    const rawDeducted = Number(editAdvDeducted);
+    if (!Number.isFinite(rawDeducted) || rawDeducted < 0) {
+      setEditAdvanceFormError('Deducted amount cannot be negative.');
+      return;
+    }
+    if (rawDeducted > amount) {
+      setEditAdvanceFormError('Deducted amount cannot exceed total advance amount.');
+      return;
+    }
+    if (!editAdvChallan.trim()) {
+      setEditAdvanceFormError('Please enter challan / voucher number.');
+      return;
+    }
+    if (!editAdvRemarks.trim()) {
+      setEditAdvanceFormError('Please enter remarks / purpose for this advance.');
+      return;
+    }
+    setEditAdvanceFormError(null);
+    setIsSavingRecordEdit(true);
+    try {
+      const targetFlock = flocks.find((f) => String(f.id) === editAdvFlockId);
+      const flockName =
+        targetFlock?.name ||
+        (editAdvFlockId === '9' ? 'Unit 2' : editAdvFlockId === '10' ? 'Unit 3' : 'Unit 1');
+      const deducted = Math.min(amount, Math.max(0, rawDeducted));
+      const remaining = Math.max(0, amount - deducted);
+      const updatedAdvance: AdvanceSalaryRecord = {
+        ...editingAdvance,
+        flockId: editAdvFlockId,
+        flockName,
+        advanceAmount: amount,
+        deductedAmount: deducted,
+        remainingBalance: remaining,
+        date: editAdvDate,
+        challanNo: editAdvChallan.trim(),
+        repaymentStatus:
+          remaining === 0 ? 'Deducted' : deducted > 0 ? 'Partially Deducted' : editAdvRepaymentStatus,
+        remarks: editAdvRemarks.trim(),
+      };
+      await onEditAdvanceRecord(updatedAdvance);
+      setEditingAdvance(null);
+      setStaffToast(`Updated advance record for ${updatedAdvance.employeeName}`);
+      setTimeout(() => setStaffToast(null), 3500);
+    } finally {
+      setIsSavingRecordEdit(false);
+    }
   };
 
   // -------------------------------------------------------------
@@ -1017,7 +1353,10 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
           </button>
 
           <button
-            onClick={() => setIsStaffModalOpen(true)}
+            onClick={() => {
+              setStaffFormError(null);
+              setIsStaffModalOpen(true);
+            }}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
           >
             <UserPlus className="w-3.5 h-3.5" />
@@ -1025,7 +1364,10 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
           </button>
 
           <button
-            onClick={() => setIsAdvanceModalOpen(true)}
+            onClick={() => {
+              setAdvanceFormError(null);
+              setIsAdvanceModalOpen(true);
+            }}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
           >
             <Wallet className="w-3.5 h-3.5" />
@@ -1033,7 +1375,10 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
           </button>
 
           <button
-            onClick={() => setIsSalaryModalOpen(true)}
+            onClick={() => {
+              setSalaryFormError(null);
+              setIsSalaryModalOpen(true);
+            }}
             className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -1925,7 +2270,7 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                   <th className="py-3 px-4 text-right">Advance Deducted</th>
                   <th className="py-3 px-4 text-right">Net Disbursed</th>
                   <th className="py-3 px-4">Method</th>
-                  <th className="py-3 px-4 text-center">Receipt</th>
+                  <th className="py-3 px-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1970,14 +2315,69 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                           {sal.paymentMethod}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          onClick={() => setSelectedSlip(sal)}
-                          className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition-colors inline-flex items-center space-x-1 cursor-pointer"
-                        >
-                          <FileText className="w-3 h-3 text-slate-500" />
-                          <span>Slip</span>
-                        </button>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <div className="inline-flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setViewingSalary(sal)}
+                            title="View Salary Details"
+                            className="p-1.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </button>
+                          {onEditSalaryDisbursal && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditSalary(sal)}
+                              title="Edit Salary Disbursal"
+                              className="p-1.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSlip(sal)}
+                            title="Print / View Salary Slip"
+                            className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] transition-colors inline-flex items-center space-x-1 cursor-pointer"
+                          >
+                            <FileText className="w-3 h-3 text-slate-500" />
+                            <span>Slip</span>
+                          </button>
+                          {onDeleteSalaryDisbursal && confirmDeleteSalId !== sal.id && (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteSalId(sal.id)}
+                              title="Delete Salary Record"
+                              className="p-1.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        {onDeleteSalaryDisbursal && confirmDeleteSalId === sal.id && (
+                          <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 border border-rose-200 text-[10px]">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await onDeleteSalaryDisbursal(sal.id);
+                                setConfirmDeleteSalId(null);
+                                setStaffToast(`Deleted salary record for ${sal.employeeName}`);
+                                setTimeout(() => setStaffToast(null), 3500);
+                              }}
+                              className="px-1.5 py-0.5 rounded bg-rose-600 text-white font-bold cursor-pointer"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteSalId(null)}
+                              className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 cursor-pointer"
+                            >
+                              No
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -2012,12 +2412,13 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                   <th className="py-3 px-4 text-right">Balance Due</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Remarks / Purpose</th>
+                  <th className="py-3 px-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredAdvances.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-400">
+                    <td colSpan={10} className="py-8 text-center text-slate-400">
                       No advance salary records match your filter.
                     </td>
                   </tr>
@@ -2053,6 +2454,61 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-4 text-slate-500 max-w-xs truncate">{adv.remarks}</td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <div className="inline-flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setViewingAdvance(adv)}
+                            title="View Advance Details"
+                            className="p-1.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </button>
+                          {onEditAdvanceRecord && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditAdvance(adv)}
+                              title="Edit Advance Record"
+                              className="p-1.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors cursor-pointer"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          )}
+                          {onDeleteAdvanceRecord && confirmDeleteSalId !== adv.id && (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteSalId(adv.id)}
+                              title="Delete Advance Record"
+                              className="p-1.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        {onDeleteAdvanceRecord && confirmDeleteSalId === adv.id && (
+                          <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 border border-rose-200 text-[10px]">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await onDeleteAdvanceRecord(adv.id);
+                                setConfirmDeleteSalId(null);
+                                setStaffToast(`Deleted advance record for ${adv.employeeName}`);
+                                setTimeout(() => setStaffToast(null), 3500);
+                              }}
+                              className="px-1.5 py-0.5 rounded bg-rose-600 text-white font-bold cursor-pointer"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteSalId(null)}
+                              className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 cursor-pointer"
+                            >
+                              No
+                            </button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -2079,7 +2535,10 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setIsStaffModalOpen(true)}
+                onClick={() => {
+                  setStaffFormError(null);
+                  setIsStaffModalOpen(true);
+                }}
                 className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-colors flex items-center space-x-1 cursor-pointer shadow-2xs"
               >
                 <UserPlus className="w-3.5 h-3.5" />
@@ -2253,6 +2712,14 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center space-x-1">
                             <button
+                              type="button"
+                              onClick={() => setViewingWorker(w)}
+                              title="View Staff Profile"
+                              className="p-1.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </button>
+                            <button
                               onClick={() => handleOpenTimeLogModal(w)}
                               title="Admin: Log / Edit Staff In-Out Timings"
                               className="px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold transition-colors cursor-pointer flex items-center space-x-1"
@@ -2282,7 +2749,41 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                             >
                               Pay
                             </button>
+                            {onDeleteWorker && confirmDeleteSalId !== w.id && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteSalId(w.id)}
+                                title="Delete Staff Member"
+                                className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
+                          {onDeleteWorker && confirmDeleteSalId === w.id && (
+                            <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 border border-rose-200 text-[10px]">
+                              <span className="font-bold text-rose-900">Remove?</span>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await onDeleteWorker(w.id);
+                                  setConfirmDeleteSalId(null);
+                                  setStaffToast(`Removed staff member ${w.name}`);
+                                  setTimeout(() => setStaffToast(null), 3500);
+                                }}
+                                className="px-1.5 py-0.5 rounded bg-rose-600 text-white font-bold cursor-pointer"
+                              >
+                                Yes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteSalId(null)}
+                                className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 cursor-pointer"
+                              >
+                                No
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -2310,7 +2811,13 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
               </p>
             </div>
 
-            <form onSubmit={handleSaveStaff} className="space-y-5 text-xs">
+            <form onSubmit={handleSaveStaff} noValidate className="space-y-5 text-xs">
+              {staffFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{staffFormError}</span>
+                </div>
+              )}
               {/* Row 1: Date & Employee Name */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -2581,7 +3088,13 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
             </div>
 
             {/* Form */}
-            <form onSubmit={handleRecordAdvance} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleRecordAdvance} noValidate className="p-6 space-y-4 text-xs">
+              {advanceFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{advanceFormError}</span>
+                </div>
+              )}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Select Employee *</label>
                 <select
@@ -2724,7 +3237,13 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
             </div>
 
             {/* Form */}
-            <form onSubmit={handleDisburseSalary} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleDisburseSalary} noValidate className="p-6 space-y-4 text-xs">
+              {salaryFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{salaryFormError}</span>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Select Employee *</label>
@@ -2889,7 +3408,7 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Notes / Remarks</label>
+                <label className="block font-bold text-slate-700 mb-1">Notes / Remarks (Optional)</label>
                 <input
                   type="text"
                   value={salRemarks}
@@ -3042,7 +3561,13 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSaveStaff} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveStaff} noValidate className="p-6 space-y-4 text-xs">
+              {staffFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{staffFormError}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Employee Full Name *</label>
@@ -3273,7 +3798,13 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSaveEditStaff} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveEditStaff} noValidate className="p-6 space-y-4 text-xs">
+              {staffFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{staffFormError}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Employee Full Name *</label>
@@ -3506,7 +4037,13 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveAttendanceLog} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveAttendanceLog} noValidate className="space-y-4 text-xs">
+              {timeLogFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{timeLogFormError}</span>
+                </div>
+              )}
               {/* Employee Selection */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Select Staff Member *</label>
@@ -3742,6 +4279,514 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
           </div>
         </div>
       )}
+      {/* ========================================================= */}
+      {/* MODAL 6: EDIT SALARY DISBURSAL RECORD                     */}
+      {/* ========================================================= */}
+      {editingSalary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-emerald-700 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <Edit2 className="w-5 h-5" />
+                <div>
+                  <h3 className="text-base font-bold">Edit Salary Disbursal</h3>
+                  <p className="text-xs text-emerald-100">
+                    {editingSalary.employeeName} • {editingSalary.designation}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingSalary(null)}
+                className="p-1 rounded-lg hover:bg-white/20 transition-colors text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEditSalary} noValidate className="p-6 space-y-4 text-xs">
+              {editSalaryFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{editSalaryFormError}</span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Unit / Flock</label>
+                  <select
+                    value={editSalFlockId}
+                    onChange={(e) => setEditSalFlockId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                  >
+                    <option value="8">Unit 1 (Shed 1)</option>
+                    <option value="9">Unit 2 (Shed 2)</option>
+                    <option value="10">Unit 3 (Shed 3)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Pay Period / Month</label>
+                  <input
+                    type="text"
+                    value={editSalMonth}
+                    onChange={(e) => setEditSalMonth(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Basic Salary (Rs.)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editSalBasic}
+                    onChange={(e) => setEditSalBasic(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-black text-slate-900"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Advance Deducted (Rs.)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editSalAdvanceDeduct}
+                    onChange={(e) => setEditSalAdvanceDeduct(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-bold text-amber-800"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Bonus / Allowance</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editSalBonus}
+                    onChange={(e) => setEditSalBonus(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Penalty / Fine</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editSalPenalty}
+                    onChange={(e) => setEditSalPenalty(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Method</label>
+                  <select
+                    value={editSalMethod}
+                    onChange={(e) =>
+                      setEditSalMethod(e.target.value as 'Cash' | 'Bank Transfer' | 'Cheque')
+                    }
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                  >
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Cheque">Cheque</option>
+                  </select>
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                <span className="font-semibold text-emerald-900">Net Disbursed</span>
+                <span className="text-lg font-black text-emerald-800">
+                  Rs.{' '}
+                  {Math.max(
+                    0,
+                    (Number(editSalBasic) || 0) -
+                      (Number(editSalAdvanceDeduct) || 0) +
+                      (Number(editSalBonus) || 0) -
+                      (Number(editSalPenalty) || 0)
+                  ).toLocaleString()}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Payment Date</label>
+                  <input
+                    type="date"
+                    value={editSalDate}
+                    onChange={(e) => setEditSalDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Voucher / Ref #</label>
+                  <input
+                    type="text"
+                    value={editSalChallan}
+                    onChange={(e) => setEditSalChallan(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Status</label>
+                  <select
+                    value={editSalStatus}
+                    onChange={(e) => setEditSalStatus(e.target.value as 'Paid' | 'Pending')}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                  >
+                    <option value="Paid">Paid</option>
+                    <option value="Pending">Pending</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Remarks (Optional)</label>
+                <input
+                  type="text"
+                  value={editSalRemarks}
+                  onChange={(e) => setEditSalRemarks(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                />
+              </div>
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setEditingSalary(null)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingRecordEdit}
+                  className="px-5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold cursor-pointer disabled:opacity-60"
+                >
+                  {isSavingRecordEdit ? 'Saving...' : 'Update Salary Record'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL 7: EDIT ADVANCE SALARY RECORD                       */}
+      {/* ========================================================= */}
+      {editingAdvance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-amber-600 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <Edit2 className="w-5 h-5" />
+                <div>
+                  <h3 className="text-base font-bold">Edit Advance Salary Record</h3>
+                  <p className="text-xs text-amber-100">
+                    {editingAdvance.employeeName} • {editingAdvance.designation}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingAdvance(null)}
+                className="p-1 rounded-lg hover:bg-white/20 transition-colors text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveEditAdvance} noValidate className="p-6 space-y-4 text-xs">
+              {editAdvanceFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{editAdvanceFormError}</span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Assigned Unit / Flock</label>
+                  <select
+                    value={editAdvFlockId}
+                    onChange={(e) => setEditAdvFlockId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                  >
+                    <option value="8">Unit 1 (Shed 1)</option>
+                    <option value="9">Unit 2 (Shed 2)</option>
+                    <option value="10">Unit 3 (Shed 3)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Advance Date</label>
+                  <input
+                    type="date"
+                    value={editAdvDate}
+                    onChange={(e) => setEditAdvDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Advance Amount (Rs.)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editAdvAmount}
+                    onChange={(e) => setEditAdvAmount(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-black text-amber-900"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Deducted So Far (Rs.)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editAdvDeducted}
+                    onChange={(e) => setEditAdvDeducted(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-bold text-slate-800"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Challan / Voucher #</label>
+                  <input
+                    type="text"
+                    value={editAdvChallan}
+                    onChange={(e) => setEditAdvChallan(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Repayment Status</label>
+                  <select
+                    value={editAdvRepaymentStatus}
+                    onChange={(e) =>
+                      setEditAdvRepaymentStatus(
+                        e.target.value as 'Deducted' | 'Pending' | 'Partially Deducted'
+                      )
+                    }
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Partially Deducted">Partially Deducted</option>
+                    <option value="Deducted">Deducted</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Remarks / Purpose</label>
+                <textarea
+                  rows={2}
+                  value={editAdvRemarks}
+                  onChange={(e) => setEditAdvRemarks(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800"
+                />
+              </div>
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setEditingAdvance(null)}
+                  className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingRecordEdit}
+                  className="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold cursor-pointer disabled:opacity-60"
+                >
+                  {isSavingRecordEdit ? 'Saving...' : 'Update Advance Record'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW DETAIL POPUPS FOR SALARY DISBURSAL, ADVANCE & STAFF PROFILE */}
+      <RecordDetailModal
+        isOpen={Boolean(viewingSalary)}
+        onClose={() => setViewingSalary(null)}
+        title={viewingSalary?.employeeName || 'Salary Disbursal'}
+        subtitle={`${viewingSalary?.designation || ''} • ${viewingSalary?.month || ''}`}
+        badge={
+          viewingSalary
+            ? {
+                text: viewingSalary.status || 'Paid',
+                color: viewingSalary.status === 'Paid' ? 'emerald' : 'amber',
+              }
+            : undefined
+        }
+        fields={
+          viewingSalary
+            ? [
+                { label: 'Payment Date', value: viewingSalary.paymentDate, mono: true },
+                { label: 'Challan / Ref #', value: viewingSalary.challanNo || '—', mono: true },
+                { label: 'Assigned Unit', value: viewingSalary.flockName },
+                { label: 'Pay Period / Month', value: viewingSalary.month || '—' },
+                {
+                  label: 'Basic Salary',
+                  value: `Rs. ${viewingSalary.basicSalary.toLocaleString()}`,
+                },
+                {
+                  label: 'Advance Deducted',
+                  value:
+                    viewingSalary.advanceDeducted > 0
+                      ? `Rs. ${viewingSalary.advanceDeducted.toLocaleString()}`
+                      : 'Rs. 0',
+                  highlight: viewingSalary.advanceDeducted > 0,
+                },
+                {
+                  label: 'Bonus / Allowance',
+                  value: `Rs. ${(viewingSalary.allowanceBonus || 0).toLocaleString()}`,
+                },
+                {
+                  label: 'Penalty Deduction',
+                  value: `Rs. ${(viewingSalary.penaltyDeduction || 0).toLocaleString()}`,
+                },
+                {
+                  label: 'Net Disbursed',
+                  value: `Rs. ${viewingSalary.netSalaryPaid.toLocaleString()}`,
+                  highlight: true,
+                },
+                { label: 'Payment Method', value: viewingSalary.paymentMethod },
+              ]
+            : []
+        }
+        notes={viewingSalary?.remarks}
+        onEdit={
+          viewingSalary && onEditSalaryDisbursal
+            ? () => handleOpenEditSalary(viewingSalary)
+            : undefined
+        }
+        onDelete={
+          viewingSalary && onDeleteSalaryDisbursal
+            ? async () => {
+                await onDeleteSalaryDisbursal(viewingSalary.id);
+                setStaffToast(`Deleted salary record for ${viewingSalary.employeeName}`);
+                setTimeout(() => setStaffToast(null), 3500);
+              }
+            : undefined
+        }
+      />
+
+      <RecordDetailModal
+        isOpen={Boolean(viewingAdvance)}
+        onClose={() => setViewingAdvance(null)}
+        title={viewingAdvance?.employeeName || 'Advance Salary'}
+        subtitle={viewingAdvance?.designation}
+        badge={
+          viewingAdvance
+            ? {
+                text: viewingAdvance.repaymentStatus,
+                color: viewingAdvance.repaymentStatus === 'Deducted' ? 'emerald' : 'amber',
+              }
+            : undefined
+        }
+        fields={
+          viewingAdvance
+            ? [
+                { label: 'Date Issued', value: viewingAdvance.date, mono: true },
+                { label: 'Challan / Voucher #', value: viewingAdvance.challanNo || '—', mono: true },
+                { label: 'Assigned Unit', value: viewingAdvance.flockName },
+                {
+                  label: 'Advance Amount',
+                  value: `Rs. ${viewingAdvance.advanceAmount.toLocaleString()}`,
+                  highlight: true,
+                },
+                {
+                  label: 'Deducted Amount',
+                  value: `Rs. ${(viewingAdvance.deductedAmount || 0).toLocaleString()}`,
+                },
+                {
+                  label: 'Remaining Balance',
+                  value: `Rs. ${viewingAdvance.remainingBalance.toLocaleString()}`,
+                  highlight: viewingAdvance.remainingBalance > 0,
+                },
+              ]
+            : []
+        }
+        notes={viewingAdvance?.remarks}
+        onEdit={
+          viewingAdvance && onEditAdvanceRecord
+            ? () => handleOpenEditAdvance(viewingAdvance)
+            : undefined
+        }
+        onDelete={
+          viewingAdvance && onDeleteAdvanceRecord
+            ? async () => {
+                await onDeleteAdvanceRecord(viewingAdvance.id);
+                setStaffToast(`Deleted advance record for ${viewingAdvance.employeeName}`);
+                setTimeout(() => setStaffToast(null), 3500);
+              }
+            : undefined
+        }
+      />
+
+      <RecordDetailModal
+        isOpen={Boolean(viewingWorker)}
+        onClose={() => setViewingWorker(null)}
+        title={viewingWorker?.name || 'Staff Profile'}
+        subtitle={viewingWorker?.role}
+        badge={
+          viewingWorker
+            ? {
+                text: viewingWorker.attendanceStatus || viewingWorker.status,
+                color:
+                  viewingWorker.status === 'On Leave' || viewingWorker.attendanceStatus === 'On Leave'
+                    ? 'slate'
+                    : viewingWorker.attendanceStatus === 'Late'
+                    ? 'amber'
+                    : 'emerald',
+              }
+            : undefined
+        }
+        fields={
+          viewingWorker
+            ? [
+                { label: 'Phone Number', value: viewingWorker.phone, mono: true },
+                {
+                  label: 'Assigned Unit',
+                  value: viewingWorker.flockName || viewingWorker.farmAssigned,
+                },
+                {
+                  label: 'Monthly Basic Salary',
+                  value: `Rs. ${viewingWorker.monthlySalary.toLocaleString()}`,
+                  highlight: true,
+                },
+                {
+                  label: 'Advance Balance',
+                  value: `Rs. ${(viewingWorker.advanceBalance || 0).toLocaleString()}`,
+                  highlight: (viewingWorker.advanceBalance || 0) > 0,
+                },
+                {
+                  label: 'Shift Schedule',
+                  value: viewingWorker.shift || 'Morning Shift (07:00 - 17:00)',
+                },
+                {
+                  label: 'In / Out Timings',
+                  value: `${viewingWorker.checkInTime || '07:00 AM'} → ${
+                    viewingWorker.checkOutTime || '05:00 PM'
+                  }`,
+                  mono: true,
+                },
+                { label: 'Joined Date', value: viewingWorker.joinedDate, mono: true },
+                { label: 'Employment Status', value: viewingWorker.status },
+              ]
+            : []
+        }
+        notes={viewingWorker?.notes}
+        onEdit={viewingWorker ? () => handleOpenEditStaff(viewingWorker) : undefined}
+        onDelete={
+          viewingWorker && onDeleteWorker
+            ? async () => {
+                await onDeleteWorker(viewingWorker.id);
+                setStaffToast(`Removed staff member ${viewingWorker.name}`);
+                setTimeout(() => setStaffToast(null), 3500);
+              }
+            : undefined
+        }
+      />
     </div>
   );
 };

@@ -6,7 +6,7 @@ import path from 'path';
 const app = express();
 const port = parseInt(process.env.PORT || '3000', 10);
 
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 
 // Mount the standalone API router (100% disconnected from greenovapk.com)
 app.use('/api', apiRouter);

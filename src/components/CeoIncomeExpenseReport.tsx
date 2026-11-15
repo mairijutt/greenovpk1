@@ -19,10 +19,11 @@ import {
   Landmark,
   Plus,
   Edit,
+  Eye,
   Trash2,
 } from 'lucide-react';
 import { BankAccount } from '../types/farm.ts';
-import { StatCard, TableCard } from './ui';
+import { StatCard, TableCard, RecordDetailModal } from './ui';
 import { BankFormModal } from './BankFormModal.tsx';
 import {
   CeoSummaryMetrics,
@@ -88,6 +89,9 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
   const [showBankModal, setShowBankModal] = useState(false);
   const [editingBank, setEditingBank] = useState<BankAccount | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [viewingBankItem, setViewingBankItem] = useState<(typeof bankSummary.banks)[number] | null>(
+    null
+  );
 
   const buildCardHref = (tabPath: string, extraParams?: Record<string, string>) => {
     const params = new URLSearchParams();
@@ -515,6 +519,14 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                             </div>
                           ) : (
                             <div className="inline-flex items-center space-x-1">
+                              <button
+                                type="button"
+                                onClick={() => setViewingBankItem(item)}
+                                title="View Bank Account Details"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1416,6 +1428,71 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
           }}
         />
       )}
+
+      {/* Bank Account View Detail Popup */}
+      <RecordDetailModal
+        isOpen={Boolean(viewingBankItem)}
+        onClose={() => setViewingBankItem(null)}
+        title={viewingBankItem?.bank.bankName || 'Bank Account Details'}
+        subtitle={viewingBankItem?.bank.accountTitle}
+        badge={
+          viewingBankItem
+            ? {
+                text: 'Active Bank Ledger',
+                color: 'emerald',
+              }
+            : undefined
+        }
+        fields={
+          viewingBankItem
+            ? [
+                { label: 'Bank Name', value: viewingBankItem.bank.bankName },
+                { label: 'Account Title', value: viewingBankItem.bank.accountTitle },
+                {
+                  label: 'Account Number / IBAN',
+                  value: viewingBankItem.bank.accountNumber || '—',
+                  mono: true,
+                },
+                { label: 'Opening Date', value: viewingBankItem.bank.openingDate, mono: true },
+                {
+                  label: 'Opening Balance',
+                  value: formatFullPkr(viewingBankItem.openingBalance),
+                },
+                {
+                  label: 'Sales Added (Period)',
+                  value: `+${formatFullPkr(viewingBankItem.salesInPeriod)} (${viewingBankItem.periodTxCount} tx)`,
+                  highlight: true,
+                },
+                {
+                  label: 'Total Sales Added',
+                  value: `+${formatFullPkr(viewingBankItem.totalSalesAdded)} (${viewingBankItem.txCount} tx)`,
+                  highlight: true,
+                },
+                {
+                  label: 'Current Live Balance',
+                  value: formatFullPkr(viewingBankItem.currentBalance),
+                  highlight: true,
+                },
+              ]
+            : []
+        }
+        notes={viewingBankItem?.bank.notes}
+        onEdit={
+          viewingBankItem
+            ? () => {
+                setEditingBank(viewingBankItem.bank);
+                setShowBankModal(true);
+              }
+            : undefined
+        }
+        onDelete={
+          viewingBankItem
+            ? () => {
+                onDeleteBank(viewingBankItem.bank.id);
+              }
+            : undefined
+        }
+      />
     </div>
   );
 };

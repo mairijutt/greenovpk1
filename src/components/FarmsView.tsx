@@ -10,9 +10,11 @@ import {
   X,
   Edit2,
   Trash2,
+  Eye,
+  AlertCircle,
 } from 'lucide-react';
 import { Farm, Flock } from '../types/farm';
-import { StatCard, UIButton, UIInput, UITextarea } from './ui';
+import { StatCard, UIButton, UIInput, UITextarea, RecordDetailModal } from './ui';
 
 interface FarmsViewProps {
   farms: Farm[];
@@ -40,14 +42,17 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
 
   const [showModal, setShowModal] = useState(false);
   const [editingFarmId, setEditingFarmId] = useState<string | null>(null);
+  const [viewingFarm, setViewingFarm] = useState<Farm | null>(null);
+  const [confirmDeleteFarmId, setConfirmDeleteFarmId] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
     code: '',
     location: '',
     description: '',
-    capacity: 50000,
-    manager: 'Farm Supervisor',
+    capacity: 0,
+    manager: '',
   });
 
   const showNotice = (msg: string) => {
@@ -57,19 +62,21 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
 
   const handleOpenAdd = () => {
     setEditingFarmId(null);
+    setFormError(null);
     setFormData({
       name: '',
       code: '',
       location: '',
       description: '',
-      capacity: 50000,
-      manager: 'Farm Supervisor',
+      capacity: 0,
+      manager: '',
     });
     setShowModal(true);
   };
 
   const handleOpenEdit = (farm: Farm) => {
     setEditingFarmId(farm.id);
+    setFormError(null);
     setFormData({
       name: farm.name,
       code: farm.code || '',
@@ -94,7 +101,31 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    setFormError(null);
+    if (!formData.name.trim()) {
+      setFormError('Please enter a Farm Name.');
+      return;
+    }
+    if (!formData.code.trim()) {
+      setFormError('Please enter a Farm Code.');
+      return;
+    }
+    if (!formData.location.trim()) {
+      setFormError('Please enter the Farm Location.');
+      return;
+    }
+    if (!formData.description.trim()) {
+      setFormError('Please enter a Description.');
+      return;
+    }
+    if (!formData.capacity || Number(formData.capacity) <= 0) {
+      setFormError('Please enter Total Capacity (Birds) greater than 0.');
+      return;
+    }
+    if (!formData.manager.trim()) {
+      setFormError('Please enter Manager In-Charge.');
+      return;
+    }
 
     if (editingFarmId) {
       const existing = farmList.find((f) => String(f.id) === String(editingFarmId));
@@ -199,23 +230,57 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
                   <td className="py-4 px-5 text-slate-600">
                     {farm.description || 'Main Processing Facility'}
                   </td>
-                  <td className="py-4 px-5 text-right">
-                    <div className="flex items-center justify-end space-x-3">
+                  <td className="py-4 px-5 text-right whitespace-nowrap">
+                    <div className="inline-flex items-center justify-end gap-1.5">
                       <button
+                        type="button"
+                        onClick={() => setViewingFarm(farm)}
+                        title="View Farm Details"
+                        className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleOpenEdit(farm)}
                         title="Edit Farm Record"
-                        className="p-1 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors cursor-pointer"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        onClick={() => handleDelete(farm.id)}
-                        title="Delete Farm Record"
-                        className="p-1 text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {confirmDeleteFarmId !== farm.id && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteFarmId(farm.id)}
+                          title="Delete Farm Record"
+                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
+                    {confirmDeleteFarmId === farm.id && (
+                      <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
+                        <span className="font-bold text-rose-900">Delete?</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleDelete(farm.id);
+                            setConfirmDeleteFarmId(null);
+                          }}
+                          className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
+                        >
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteFarmId(null)}
+                          className="px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 cursor-pointer"
+                        >
+                          No
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -292,35 +357,56 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="mt-4 space-y-4 text-xs">
+            <form onSubmit={handleSave} noValidate className="mt-4 space-y-4 text-xs">
+              {formError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
               <UIInput
                 label="Farm Name"
                 required
                 placeholder="e.g. GreenOva"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  setFormError(null);
+                }}
               />
 
               <div className="grid grid-cols-2 gap-3">
                 <UIInput
                   label="Farm Code"
+                  required
                   placeholder="e.g. GVF2025"
                   value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, code: e.target.value });
+                    setFormError(null);
+                  }}
                 />
                 <UIInput
                   label="Location"
+                  required
                   placeholder="e.g. Multan, Punjab"
                   value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, location: e.target.value });
+                    setFormError(null);
+                  }}
                 />
               </div>
 
               <UIInput
                 label="Description"
+                required
                 placeholder="e.g. Main Processing Facility"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, description: e.target.value });
+                  setFormError(null);
+                }}
               />
 
               <div className="grid grid-cols-2 gap-3">
@@ -328,13 +414,28 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
                   label="Total Capacity (Birds)"
                   type="number"
                   min="1"
+                  required
                   value={formData.capacity}
-                  onChange={(e) => setFormData({ ...formData, capacity: Number(e.target.value) })}
+                  onFocus={() => {
+                    if (Number(formData.capacity) === 0) setFormData({ ...formData, capacity: '' as any });
+                  }}
+                  onBlur={() => {
+                    if ((formData.capacity as any) === '') setFormData({ ...formData, capacity: 0 });
+                  }}
+                  onChange={(e) => {
+                    setFormData({ ...formData, capacity: Number(e.target.value) || 0 });
+                    setFormError(null);
+                  }}
                 />
                 <UIInput
                   label="Manager In-Charge"
+                  required
+                  placeholder="e.g. Farm Supervisor"
                   value={formData.manager}
-                  onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, manager: e.target.value });
+                    setFormError(null);
+                  }}
                 />
               </div>
 
@@ -353,6 +454,53 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* View Farm Details Popup Modal */}
+      {viewingFarm && (
+        <RecordDetailModal
+          isOpen={Boolean(viewingFarm)}
+          onClose={() => setViewingFarm(null)}
+          title={`${viewingFarm.name} — Facility Profile`}
+          subtitle={`Farm Code: ${viewingFarm.code || 'GVF2025'}`}
+          badge={{ text: viewingFarm.location || 'Active Complex', color: 'emerald' }}
+          fields={[
+            { label: 'Farm Name', value: viewingFarm.name },
+            { label: 'Farm Code', value: viewingFarm.code || 'GVF2025', mono: true },
+            { label: 'Location', value: viewingFarm.location || 'Multan, Punjab' },
+            { label: 'Manager In-Charge', value: viewingFarm.manager || 'Farm Supervisor' },
+            {
+              label: 'Housing Capacity',
+              value: `${(viewingFarm.capacity || 0).toLocaleString()} Birds`,
+              mono: true,
+              highlight: true,
+            },
+            {
+              label: 'Current Population',
+              value: `${(viewingFarm.currentBirds || 0).toLocaleString()} Birds`,
+              mono: true,
+            },
+            { label: 'Sheds Count', value: viewingFarm.shedsCount || 1, mono: true },
+            {
+              label: 'Telemetry (Temp / RH)',
+              value: `${viewingFarm.temperature ?? 25}°C / ${viewingFarm.humidity ?? 56}% RH`,
+              mono: true,
+            },
+            {
+              label: 'Description',
+              value: viewingFarm.description || 'Main Processing Facility',
+              fullWidth: true,
+            },
+          ]}
+          onEdit={() => handleOpenEdit(viewingFarm)}
+          onDelete={
+            farmList.length > 1
+              ? () => {
+                  handleDelete(viewingFarm.id);
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );

@@ -20,9 +20,12 @@ import {
   Scale,
   DollarSign,
   ChevronDown,
+  Eye,
   Edit,
+  Trash2,
   X,
   CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { EggProduction, Flock, Farm } from '../types/farm';
 import { getInitialUrlFilters } from '../utils/urlFilters';
@@ -35,13 +38,15 @@ import {
   TableCard,
   DateRangePickerBar,
   DatePreset,
+  RecordDetailModal,
 } from './ui';
 
 interface EggProductionViewProps {
   eggProductions: EggProduction[];
   flocks: Flock[];
   onOpenRecordModal: (type: 'egg') => void;
-  onEditEgg?: (updated: EggProduction) => void;
+  onEditEgg?: (updated: EggProduction) => Promise<void> | void;
+  onDeleteEgg?: (id: string) => Promise<void> | void;
   farms?: Farm[];
   selectedFarmId?: string;
   onSelectFarm?: (farmId: string) => void;
@@ -55,6 +60,7 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
   flocks,
   onOpenRecordModal,
   onEditEgg,
+  onDeleteEgg,
   farms = [],
   selectedFarmId = 'farm-1',
   onSelectFarm,
@@ -74,6 +80,8 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
   const [toDate, setToDate] = useState(() => initialUrlFilters.to);
   const [preset, setPreset] = useState<DatePreset>(() => (initialUrlFilters.hasDateRange ? 'custom' : 'all'));
   const [editingEgg, setEditingEgg] = useState<EggProduction | null>(null);
+  const [viewingEgg, setViewingEgg] = useState<EggProduction | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Sync external farm selection if changed
@@ -1427,15 +1435,60 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                       {entry.notes || '—'}
                     </td>
                     <td className="py-3 px-4 text-center whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => setEditingEgg(entry)}
-                        className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
-                        title={`Edit record #${entry.id}`}
-                      >
-                        <Edit className="w-3.5 h-3.5 text-amber-700" />
-                        <span>Edit</span>
-                      </button>
+                      <div className="inline-flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setViewingEgg(entry)}
+                          className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                          title={`View record #${entry.id}`}
+                        >
+                          <Eye className="w-3.5 h-3.5 text-sky-700" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingEgg(entry)}
+                          className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                          title={`Edit record #${entry.id}`}
+                        >
+                          <Edit className="w-3.5 h-3.5 text-amber-700" />
+                          <span>Edit</span>
+                        </button>
+                        {onDeleteEgg && confirmDeleteId !== entry.id && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(entry.id)}
+                            className="inline-flex items-center p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer shadow-2xs"
+                            title={`Delete record #${entry.id}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      {onDeleteEgg && confirmDeleteId === entry.id && (
+                        <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
+                          <span className="font-bold text-rose-900">Delete?</span>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await onDeleteEgg(entry.id);
+                              setConfirmDeleteId(null);
+                              setToastMessage(`Egg record #${entry.id} deleted from database.`);
+                              setTimeout(() => setToastMessage(null), 3500);
+                            }}
+                            className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
+                          >
+                            Yes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 cursor-pointer"
+                          >
+                            No
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -1529,6 +1582,67 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
         </div>
       )}
 
+      {/* View Egg Production Popup Modal */}
+      {viewingEgg && (
+        <RecordDetailModal
+          isOpen={Boolean(viewingEgg)}
+          onClose={() => setViewingEgg(null)}
+          title={`Egg Production Record #${viewingEgg.id}`}
+          subtitle={`${viewingEgg.flockName} • ${viewingEgg.date}`}
+          badge={{ text: `${viewingEgg.layingRatePercent}% Laying Rate`, color: 'emerald' }}
+          fields={[
+            { label: 'Record ID', value: `#${viewingEgg.id}`, mono: true },
+            { label: 'Production Date', value: viewingEgg.date, mono: true },
+            { label: 'Flock / Shed', value: viewingEgg.flockName },
+            { label: 'Egg Grade', value: viewingEgg.eggGrade || 'Standard' },
+            {
+              label: 'Morning Eggs (A.M.)',
+              value: (viewingEgg.morningEggs || 0).toLocaleString(),
+              mono: true,
+            },
+            {
+              label: 'Evening Eggs (P.M.)',
+              value: (viewingEgg.eveningEggs || 0).toLocaleString(),
+              mono: true,
+            },
+            {
+              label: 'Total Eggs Produced',
+              value: `${(viewingEgg.totalEggs || 0).toLocaleString()} eggs (${(
+                (viewingEgg.totalEggs || 0) / 360
+              ).toFixed(1)} cartons)`,
+              mono: true,
+              highlight: true,
+            },
+            {
+              label: 'Clean Trays / Cartons / Loose',
+              value: `${viewingEgg.cleanTrays || 0} trays • ${viewingEgg.cartons ?? Math.floor((viewingEgg.totalEggs || 0) / 360)} ctn • ${viewingEgg.looseEggs ?? (viewingEgg.totalEggs || 0) % 30} loose`,
+              mono: true,
+            },
+            {
+              label: 'Damaged / Cracked Eggs',
+              value: (viewingEgg.damagedEggs || 0).toLocaleString(),
+              mono: true,
+            },
+            {
+              label: 'Avg Egg Weight',
+              value: `${viewingEgg.avgWeightGrams || 60} g`,
+              mono: true,
+            },
+          ]}
+          notes={viewingEgg.notes}
+          onEdit={() => setEditingEgg(viewingEgg)}
+          onDelete={
+            onDeleteEgg
+              ? async () => {
+                  await onDeleteEgg(viewingEgg.id);
+                  setToastMessage(`Egg record #${viewingEgg.id} deleted from database.`);
+                  setTimeout(() => setToastMessage(null), 3500);
+                }
+              : undefined
+          }
+        />
+      )}
+
       {/* Edit Egg Production Modal */}
       {editingEgg && (
         <EditEggModal
@@ -1563,6 +1677,7 @@ const EditEggModal: React.FC<EditEggModalProps> = ({ record, flocks, onClose, on
   const [avgWeightGrams, setAvgWeightGrams] = useState<number>(record.avgWeightGrams || 60);
   const [eggGrade, setEggGrade] = useState<string>(record.eggGrade || 'Standard');
   const [notes, setNotes] = useState<string>(record.notes || '');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const totalEggs = Math.max(0, (Number(morningEggs) || 0) + (Number(eveningEggs) || 0));
   const cleanEggs = Math.max(0, totalEggs - (Number(damagedEggs) || 0));
@@ -1579,6 +1694,31 @@ const EditEggModal: React.FC<EditEggModalProps> = ({ record, flocks, onClose, on
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+    if (!date) {
+      setFormError('Please select a production date.');
+      return;
+    }
+    if (!flockId) {
+      setFormError('Please select a flock / shed.');
+      return;
+    }
+    if (totalEggs <= 0) {
+      setFormError('Total produced eggs (Morning + Evening) must be greater than 0.');
+      return;
+    }
+    if ((Number(damagedEggs) || 0) < 0 || (Number(damagedEggs) || 0) > totalEggs) {
+      setFormError('Broken/cracked eggs cannot be negative or exceed total eggs.');
+      return;
+    }
+    if (!avgWeightGrams || Number(avgWeightGrams) <= 0) {
+      setFormError('Average egg weight (g) must be greater than 0.');
+      return;
+    }
+    if (!eggGrade) {
+      setFormError('Please select an egg grade.');
+      return;
+    }
     onSave({
       ...record,
       date,
@@ -1615,7 +1755,13 @@ const EditEggModal: React.FC<EditEggModalProps> = ({ record, flocks, onClose, on
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4 text-xs">
+          {formError && (
+            <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-semibold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Production Date</label>

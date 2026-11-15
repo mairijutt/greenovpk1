@@ -16,10 +16,60 @@ export const setApiBaseUrl = (url: string) => {
   localStorage.setItem('greenova_api_url', url);
 };
 
+export const getAuthToken = (): string | null => {
+  try {
+    const raw = localStorage.getItem('greenova_user');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.token || null;
+  } catch {
+    return null;
+  }
+};
+
+export async function apiFetch<T = any>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getAuthToken();
+  const headers = new Headers(options.headers || {});
+  if (!headers.has('Content-Type') && options.body) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const res = await fetch(path, {
+    ...options,
+    headers,
+  });
+
+  let payload: any = null;
+  try {
+    payload = await res.json();
+  } catch {
+    payload = null;
+  }
+
+  if (res.status === 401 && !path.includes('/auth/signin')) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('greenova:unauthorized'));
+    }
+    throw new Error(payload?.message || 'Session expired. Please sign in again.');
+  }
+
+  if (!res.ok) {
+    throw new Error(payload?.message || `Server error (${res.status})`);
+  }
+
+  return payload as T;
+}
+
 export const testVpsConnection = async (customUrl?: string): Promise<VpsStatus> => {
   const endpoint = customUrl || getApiBaseUrl();
   const startTime = Date.now();
-  
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -27,11 +77,10 @@ export const testVpsConnection = async (customUrl?: string): Promise<VpsStatus> 
     const response = await fetch(`${endpoint}/health`, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
       signal: controller.signal,
     }).catch(async () => {
-      // Fallback probe to root or options if /health is not defined
       return await fetch(endpoint, {
         method: 'HEAD',
         signal: controller.signal,

@@ -25,54 +25,39 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
     setLoading(true);
     setError(null);
 
-    // Verify against saved users registry
-    let registeredUsers: any[] = [];
     try {
-      const saved = localStorage.getItem('greenova_users_v2');
-      if (saved) {
-        registeredUsers = JSON.parse(saved);
+      const response = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.data?.token || !payload?.data?.user) {
+        setError(
+          payload?.message ||
+            'Invalid credentials or account suspended. Please verify with Super Admin.'
+        );
+        setLoading(false);
+        return;
       }
-    } catch (err) {}
 
-    const cleanInput = email.trim().toLowerCase();
-    const matchedUser = registeredUsers.find(
-      (u: any) =>
-        u.email?.toLowerCase() === cleanInput ||
-        u.name?.toLowerCase() === cleanInput ||
-        (cleanInput.includes('aaglobal') && u.email?.toLowerCase().includes('aaglobal'))
-    );
-
-    // Determine expected password if matched
-    const expectedPassword = matchedUser?.password || (cleanInput.includes('aaglobal') ? 'GreenovaAdmin@2026' : undefined);
-
-    // If a custom password was specifically set by super admin, enforce it
-    if (expectedPassword && password !== expectedPassword && password !== 'GreenovaAdmin@2026' && password !== 'Greenova@2026') {
-      setLoading(false);
-      setError('Incorrect password. Please verify your credentials or contact Super Admin.');
-      return;
-    }
-
-    const isSuper =
-      cleanInput === 'aaglobal500@gmail.com' ||
-      cleanInput.includes('aaglobal') ||
-      matchedUser?.role === 'super_admin';
-
-    const displayName =
-      matchedUser?.name ||
-      (cleanInput.includes('aaglobal') ? 'Ahsan Nawaz' : cleanInput.split('@')[0] || 'User');
-
-    const roleName = matchedUser?.role || (isSuper ? 'super_admin' : 'supervisor');
-
-    setTimeout(() => {
+      const { token, user } = payload.data;
       setLoading(false);
       onLoginSuccess({
-        email: matchedUser?.email || email.trim(),
-        name: displayName,
-        token: 'auth-token-prod-' + Date.now(),
-        role: roleName,
-        isSuperAdmin: isSuper,
+        email: user.email,
+        name: user.name,
+        token,
+        role: user.role,
+        isSuperAdmin: Boolean(user.isSuperAdmin || user.role === 'super_admin'),
       });
-    }, 400);
+    } catch {
+      setLoading(false);
+      setError('Unable to reach authentication server. Please check your connection.');
+    }
   };
 
   return (
@@ -151,7 +136,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4 text-xs">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Email or Username
