@@ -148,76 +148,39 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Executive Period Context Banner */}
-      <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* Compact Executive Period Context Strip */}
+      <div className="bg-slate-900 text-white rounded-2xl px-5 py-4 border border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center space-x-2 text-emerald-400 text-[11px] font-bold uppercase tracking-wider">
             <BarChart3 className="w-4 h-4" />
-            <span>Income vs Expenses Executive Summary</span>
+            <span>Income Statement &amp; Executive Summary</span>
             <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
               {selectedUnit === 'all' ? 'All Units Combined' : selectedUnit}
             </span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black mt-1 tracking-tight">
+          <h2 className="text-lg sm:text-xl font-black mt-0.5 tracking-tight">
             {metrics.periodLabel}
           </h2>
-          <p className="text-xs text-slate-300 mt-1">
-            Active Flock Strength:{' '}
-            <span className="font-bold text-white">{metrics.activeBirds.toLocaleString()} Birds</span>
-            {' • '}Opening Balance from{' '}
-            <span className="font-semibold text-amber-300">{metrics.prevPeriodLabel}</span>
-            {' → '}Closing Rollover to{' '}
-            <span className="font-semibold text-emerald-300">{metrics.nextPeriodLabel}</span>
-          </p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 shrink-0">
-          <div className="bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2.5">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Avg Carton Price
-            </div>
-            <div className="text-lg font-black text-amber-400 mt-0.5">
-              Rs. {Math.round(metrics.avgCartonPrice).toLocaleString()}
-            </div>
-            <div className="text-[10px] text-slate-400">
-              Rs. {metrics.avgEggPrice.toFixed(2)} / egg
-            </div>
-          </div>
-
-          <div className="bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2.5">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Avg Cost / Bird
-            </div>
-            <div className="text-lg font-black text-rose-400 mt-0.5">
-              Rs. {Math.round(metrics.avgPerBirdCost).toLocaleString()}
-            </div>
-            <div className="text-[10px] text-slate-400">
-              Feed: Rs. {Math.round(metrics.avgPerBirdFeedCost).toLocaleString()} / bird
-            </div>
-          </div>
-
-          <div className="col-span-2 sm:col-span-1 bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2.5">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Net Position ({isSurplus ? 'Surplus' : 'Deficit'})
-            </div>
-            <div
-              className={`text-lg font-black mt-0.5 ${
-                isSurplus ? 'text-emerald-400' : 'text-rose-400'
-              }`}
-            >
-              {formatPkr(metrics.netIncome)}
-            </div>
-            <div className="text-[10px] text-slate-400">
-              Margin: {metrics.netMarginPercent.toFixed(1)}%
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+          <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
+            Active Flock:{' '}
+            <strong className="text-white">{metrics.activeBirds.toLocaleString()} Birds</strong>
+          </span>
+          <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
+            Rollover:{' '}
+            <strong className="text-amber-300">{metrics.prevPeriodLabel}</strong>
+            {' → '}
+            <strong className="text-emerald-300">{metrics.nextPeriodLabel}</strong>
+          </span>
         </div>
       </div>
 
-      {/* Row 1: Financial Executive KPIs */}
+      {/* Top Relevant KPI Cards (Row 1: Financial P&L & Unit Economics) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Sale (Income)"
+          title="Total Revenue (Sales)"
           value={formatPkr(metrics.totalSalesRevenue)}
           icon={DollarSign}
           color="emerald"
@@ -230,20 +193,20 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
         />
 
         <StatCard
-          title="Total Expense"
+          title="Total Expenses (Consumed Basis)"
           value={formatPkr(metrics.totalExpenses)}
           icon={Receipt}
           color="rose"
           valueColor="text-rose-700"
           badge={{ text: `${metrics.expenseCount.toLocaleString()} Vouchers`, color: 'rose' }}
-          subtext={`${formatFullPkr(metrics.totalExpenses)} • COGS: ${formatPkr(metrics.cogsExpenses)}`}
+          subtext={`Bird/Feed Cost: ${formatPkr(metrics.cogsExpenses)} • OpEx: ${formatPkr(metrics.operatingExpenses)}`}
           href={buildCardHref('/expenses')}
           target="_blank"
           linkLabel="Open Expenses Ledger"
         />
 
         <StatCard
-          title="Net Income (Income − Expense)"
+          title="Net Income (Profit / Loss)"
           value={formatPkr(metrics.netIncome)}
           icon={isSurplus ? TrendingUp : TrendingDown}
           color={isSurplus ? 'teal' : 'rose'}
@@ -252,21 +215,21 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
             value: `${metrics.netMarginPercent.toFixed(1)}% Net Margin`,
             isUp: isSurplus,
           }}
-          subtext={`Excl. Bird CAPEX Margin: ${metrics.operatingMarginPercent.toFixed(1)}%`}
+          subtext={`Excl. Flock CAPEX Margin: ${metrics.operatingMarginPercent.toFixed(1)}%`}
           href={buildCardHref('/dashboard')}
           target="_blank"
           linkLabel="Open Financial Dashboard"
         />
 
         <StatCard
-          title="Unit Economics (Price & Bird Cost)"
+          title="Unit Economics & Operating Cost"
           value={`Rs. ${Math.round(metrics.avgCartonPrice).toLocaleString()}`}
           unit="/ carton"
           icon={Calculator}
           color="indigo"
           valueColor="text-indigo-700"
           badge={{
-            text: `Bird Cost: Rs. ${Math.round(metrics.avgPerBirdCost).toLocaleString()}`,
+            text: `Cost/Bird: Rs. ${Math.round(metrics.avgPerBirdCost).toLocaleString()}`,
             color: 'indigo',
           }}
           subtext={`Rev/Bird: Rs. ${Math.round(metrics.avgPerBirdRevenue).toLocaleString()} • Net/Bird: Rs. ${Math.round(metrics.avgPerBirdNet).toLocaleString()}`}
@@ -276,10 +239,10 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
         />
       </div>
 
-      {/* Row 2: Production, Cartons Sold, Remaining Production & Feed Consumption KPIs */}
+      {/* Top Relevant KPI Cards (Row 2: Production, Sales & Feed Continuity) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Productions"
+          title="Total Egg Production"
           value={Math.round(metrics.totalCartonsProduced).toLocaleString()}
           unit="Cartons"
           icon={Egg}
@@ -302,261 +265,455 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
             text: `${metrics.eggSalesCount.toLocaleString()} Egg Sales`,
             color: 'indigo',
           }}
-          subtext={`${metrics.eggsSold.toLocaleString()} Eggs • ${formatPkr(metrics.eggSalesRevenue)} (Avg Rs. ${Math.round(metrics.avgCartonPrice).toLocaleString()}/ctn)`}
+          subtext={`${metrics.eggsSold.toLocaleString()} Eggs • ${formatPkr(metrics.eggSalesRevenue)}`}
           href={buildCardHref('/sales', { head: 'EGG' })}
           target="_blank"
           linkLabel="Open Sales Ledger"
         />
 
         <StatCard
-          title="Remaining Production"
+          title="Closing Egg Stock"
           value={Math.round(metrics.carriedNextCartons).toLocaleString()}
-          unit="Cartons On Hand"
+          unit="Cartons"
           icon={ArrowRightLeft}
           color="sky"
           valueColor="text-sky-700"
           badge={{
-            text: `C/F: ${Math.round(metrics.carriedPrevCartons).toLocaleString()} → ${Math.round(metrics.carriedNextCartons).toLocaleString()} ctns`,
+            text: `C/F: ${Math.round(metrics.carriedPrevCartons).toLocaleString()} → ${Math.round(metrics.carriedNextCartons).toLocaleString()}`,
             color: metrics.periodRemainingCartons >= 0 ? 'emerald' : 'amber',
           }}
-          subtext={`Open ${Math.round(metrics.carriedPrevCartons).toLocaleString()} + Prod ${Math.round(metrics.totalCartonsProduced).toLocaleString()} − Sold ${Math.round(metrics.cartonsSold).toLocaleString()} • Est. ${formatPkr(metrics.carriedNextEggValue)}`}
+          subtext={`Est. Closing Value: ${formatPkr(metrics.carriedNextEggValue)}`}
           href={buildCardHref('/stocks')}
           target="_blank"
           linkLabel="Open Inventory & Stocks"
         />
 
         <StatCard
-          title="Total Feed Consumption & Remaining"
+          title="Feed Consumed & Balance"
           value={metrics.feedConsumedBags.toLocaleString()}
-          unit="Bags Consumed"
+          unit="Bags Used"
           icon={Wheat}
           color="blue"
           badge={{
             text: `Rem: ${metrics.remainingFeedBags.toLocaleString()} Bags`,
             color: 'blue',
           }}
-          subtext={`${metrics.feedConsumedKg.toLocaleString()} kg consumed • Feed C/F: ${metrics.carriedPrevFeedBags.toLocaleString()} → ${metrics.carriedNextFeedBags.toLocaleString()} Bags`}
+          subtext={`Cost: ${formatPkr(metrics.feedExpenses)} • Purchased: ${metrics.feedStockReceivedBags.toLocaleString()} Bags`}
           href={buildCardHref('/daily-consumption')}
           target="_blank"
           linkLabel="Open Daily Consumption"
         />
       </div>
 
-      {/* Bank Balances & Opening Balances Section (Dynamically Updated on Sales) */}
+      {/* Income Statement (Profit & Loss) — Primary Financial Statement */}
+      {(() => {
+        const rev = metrics.totalSalesRevenue || 0;
+        const pct = (val: number) => (rev > 0 ? `${((val / rev) * 100).toFixed(1)}%` : '0.0%');
+        const grossProfit = rev - metrics.cogsExpenses;
+        const otherOpEx = Math.max(
+          0,
+          metrics.operatingExpenses - metrics.salariesExpenses - metrics.utilitiesPolExpenses
+        );
+        const opProfitExclCapex = rev - (metrics.totalExpenses - metrics.chickenCapexExpenses);
+
+        return (
+          <TableCard
+            title="Income Statement (Profit & Loss)"
+            subtitle={`GreenOva Farms • ${metrics.periodLabel} • ${
+              selectedUnit === 'all' ? 'All Units Combined' : selectedUnit
+            }`}
+            badge={
+              <span
+                className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                  isSurplus
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-rose-100 text-rose-800'
+                }`}
+              >
+                {isSurplus ? 'Net Surplus' : 'Net Deficit'} ({metrics.netMarginPercent.toFixed(1)}%)
+              </span>
+            }
+          >
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase text-[10px]">
+                <tr>
+                  <th className="py-3 px-4">Statement Line Item / Particulars</th>
+                  <th className="py-3 px-4 text-right">Amount (PKR)</th>
+                  <th className="py-3 px-4 text-right">% of Revenue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {/* Revenue Section */}
+                <tr className="bg-emerald-50/40">
+                  <td colSpan={3} className="py-2 px-4 font-black text-emerald-900 uppercase text-[10px] tracking-wider">
+                    A. Revenue (Income)
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-2.5 px-4 pl-6 text-slate-700">
+                    Egg Sales Revenue{' '}
+                    <span className="text-[11px] text-slate-400">
+                      ({Math.round(metrics.cartonsSold).toLocaleString()} ctns @ avg Rs.{' '}
+                      {Math.round(metrics.avgCartonPrice).toLocaleString()}/ctn)
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
+                    {formatFullPkr(metrics.eggSalesRevenue)}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-slate-500">
+                    {pct(metrics.eggSalesRevenue)}
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-2.5 px-4 pl-6 text-slate-700">
+                    Other Farm Sales (Manure, Feed Bags, Cull Birds &amp; Misc.)
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
+                    {formatFullPkr(metrics.otherSalesRevenue)}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-slate-500">
+                    {pct(metrics.otherSalesRevenue)}
+                  </td>
+                </tr>
+                <tr className="bg-emerald-50/70 border-t border-emerald-200">
+                  <td className="py-3 px-4 font-black text-emerald-950">Total Revenue (A)</td>
+                  <td className="py-3 px-4 text-right font-black text-emerald-800 text-sm">
+                    {formatFullPkr(rev)}
+                  </td>
+                  <td className="py-3 px-4 text-right font-bold text-emerald-800">
+                    {rev > 0 ? '100.0%' : '0.0%'}
+                  </td>
+                </tr>
+
+                {/* Direct Farm Cost (COGS) Section */}
+                <tr className="bg-amber-50/40">
+                  <td colSpan={3} className="py-2 px-4 font-black text-amber-900 uppercase text-[10px] tracking-wider">
+                    B. Cost of Goods Sold (Direct Bird &amp; Production Costs)
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-2.5 px-4 pl-6 text-slate-700">
+                    Feed Consumed Expenses{' '}
+                    <span className="text-[11px] text-slate-400">
+                      ({metrics.feedConsumedBags.toLocaleString()} bags consumed
+                      {metrics.feedAvgCostPerBag > 0
+                        ? ` @ Rs. ${Math.round(metrics.feedAvgCostPerBag).toLocaleString()}/bag`
+                        : ''}
+                      {metrics.feedStockReceivedBags > 0 &&
+                      metrics.feedStockReceivedBags !== metrics.feedConsumedBags
+                        ? ` • ${metrics.feedStockReceivedBags.toLocaleString()} bags purchased`
+                        : ''}
+                      )
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
+                    {formatFullPkr(metrics.feedExpenses)}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-slate-500">
+                    {pct(metrics.feedExpenses)}
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-2.5 px-4 pl-6 text-slate-700">
+                    Chicken / Flock Purchases (CAPEX)
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
+                    {formatFullPkr(metrics.chickenCapexExpenses)}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-slate-500">
+                    {pct(metrics.chickenCapexExpenses)}
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-2.5 px-4 pl-6 text-slate-700">
+                    Medicine &amp; Vaccines
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
+                    {formatFullPkr(metrics.medicineVaccineExpenses)}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-slate-500">
+                    {pct(metrics.medicineVaccineExpenses)}
+                  </td>
+                </tr>
+                <tr className="bg-amber-50/70 border-t border-amber-200">
+                  <td className="py-2.5 px-4 font-bold text-amber-950">
+                    Total Cost of Goods Sold (B)
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-bold text-rose-700">
+                    ({formatFullPkr(metrics.cogsExpenses)})
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-bold text-amber-900">
+                    {pct(metrics.cogsExpenses)}
+                  </td>
+                </tr>
+
+                {/* Gross Profit */}
+                <tr className="bg-slate-100/80 border-t border-slate-200">
+                  <td className="py-3 px-4 font-black text-slate-900">
+                    Gross Profit / (Loss) (A − B)
+                  </td>
+                  <td
+                    className={`py-3 px-4 text-right font-black ${
+                      grossProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                    }`}
+                  >
+                    {formatFullPkr(grossProfit)}
+                  </td>
+                  <td className="py-3 px-4 text-right font-bold text-slate-700">
+                    {pct(grossProfit)}
+                  </td>
+                </tr>
+
+                {/* Operating Expenses Section */}
+                <tr className="bg-rose-50/40">
+                  <td colSpan={3} className="py-2 px-4 font-black text-rose-900 uppercase text-[10px] tracking-wider">
+                    C. Operating Expenses (Unit Overheads)
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-2.5 px-4 pl-6 text-slate-700">
+                    Staff Salaries &amp; Labor Payments
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
+                    {formatFullPkr(metrics.salariesExpenses)}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-slate-500">
+                    {pct(metrics.salariesExpenses)}
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-2.5 px-4 pl-6 text-slate-700">
+                    Utilities, Electricity &amp; Fuel (POL)
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
+                    {formatFullPkr(metrics.utilitiesPolExpenses)}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-slate-500">
+                    {pct(metrics.utilitiesPolExpenses)}
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50/80">
+                  <td className="py-2.5 px-4 pl-6 text-slate-700">
+                    Other Farm Overheads (Rent, Packing, Repairs, Admin &amp; Misc.)
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
+                    {formatFullPkr(otherOpEx)}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-slate-500">{pct(otherOpEx)}</td>
+                </tr>
+                <tr className="bg-rose-50/70 border-t border-rose-200">
+                  <td className="py-2.5 px-4 font-bold text-rose-950">
+                    Total Operating Expenses (C)
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-bold text-rose-700">
+                    ({formatFullPkr(metrics.operatingExpenses)})
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-bold text-rose-800">
+                    {pct(metrics.operatingExpenses)}
+                  </td>
+                </tr>
+
+                {/* Total Expenses & Net Profit Footer */}
+                <tr className="bg-slate-100 border-t border-slate-200">
+                  <td className="py-3 px-4 font-bold text-slate-900">
+                    Total Expenses (B + C)
+                  </td>
+                  <td className="py-3 px-4 text-right font-black text-rose-700">
+                    ({formatFullPkr(metrics.totalExpenses)})
+                  </td>
+                  <td className="py-3 px-4 text-right font-bold text-slate-700">
+                    {pct(metrics.totalExpenses)}
+                  </td>
+                </tr>
+                <tr className="bg-slate-900 text-white">
+                  <td className="py-4 px-4">
+                    <div className="font-black text-sm">
+                      Net Income / (Net Loss) (A − Total Expenses)
+                    </div>
+                    <div className="text-[11px] text-slate-300 font-normal mt-0.5">
+                      Operating Profit excl. Flock CAPEX: {formatFullPkr(opProfitExclCapex)} (
+                      {metrics.operatingMarginPercent.toFixed(1)}%) • Net / Bird: Rs.{' '}
+                      {Math.round(metrics.avgPerBirdNet).toLocaleString()}
+                    </div>
+                  </td>
+                  <td
+                    className={`py-4 px-4 text-right font-black text-base ${
+                      isSurplus ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {formatFullPkr(metrics.netIncome)}
+                  </td>
+                  <td
+                    className={`py-4 px-4 text-right font-black text-sm ${
+                      isSurplus ? 'text-emerald-300' : 'text-rose-300'
+                    }`}
+                  >
+                    {metrics.netMarginPercent.toFixed(1)}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Quick Bottom One-Line Summary Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 border-t border-slate-200 text-center">
+              <div className="p-2.5 rounded-xl bg-white border border-slate-200">
+                <div className="text-[10px] font-semibold text-slate-500 uppercase">Total Income</div>
+                <div className="text-xs font-black text-emerald-700 mt-0.5">
+                  {formatFullPkr(rev)}
+                </div>
+              </div>
+              <div className="p-2.5 rounded-xl bg-white border border-slate-200">
+                <div className="text-[10px] font-semibold text-slate-500 uppercase">Total Expenses</div>
+                <div className="text-xs font-black text-rose-600 mt-0.5">
+                  {formatFullPkr(metrics.totalExpenses)}
+                </div>
+              </div>
+              <div className="p-2.5 rounded-xl bg-white border border-slate-200">
+                <div className="text-[10px] font-semibold text-slate-500 uppercase">
+                  {isSurplus ? 'Net Profit' : 'Net Loss'}
+                </div>
+                <div
+                  className={`text-xs font-black mt-0.5 ${
+                    isSurplus ? 'text-emerald-700' : 'text-rose-600'
+                  }`}
+                >
+                  {formatFullPkr(metrics.netIncome)}
+                </div>
+              </div>
+              <div className="p-2.5 rounded-xl bg-white border border-slate-200">
+                <div className="text-[10px] font-semibold text-slate-500 uppercase">
+                  Unit Operating Cost
+                </div>
+                <div className="text-xs font-black text-slate-900 mt-0.5">
+                  {formatFullPkr(metrics.operatingExpenses)}
+                </div>
+              </div>
+            </div>
+          </TableCard>
+        );
+      })()}
+
+      {/* Unit-Wise Comparative Performance Matrix */}
       <TableCard
-        title="Bank Balances & Opening Balance Register"
-        subtitle="Add opening balances for all farm banks. Recording or editing online/bank sales dynamically updates the selected bank's live balance."
+        title="Unit-Wise Comparative Matrix"
+        subtitle={`Side-by-side P&L, production, feed consumption, remaining stock & unit economics for ${metrics.periodLabel}. Click a unit row to filter.`}
         badge={
-          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
-            <Landmark className="w-3.5 h-3.5" />
-            <span>{bankSummary.banks.length} Active {bankSummary.banks.length === 1 ? 'Bank' : 'Banks'}</span>
+          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
+            <Building2 className="w-3.5 h-3.5" />
+            <span>3 Production Units</span>
           </span>
         }
-        actions={
-          <button
-            type="button"
-            onClick={() => {
-              setEditingBank(null);
-              setShowBankModal(true);
-            }}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Bank Opening Balance</span>
-          </button>
-        }
       >
-        <div className="p-4 space-y-4">
-          {/* Totals Bar across all configured banks */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Total Bank Opening Balance
-              </div>
-              <div className="text-base font-black text-slate-900 mt-1">
-                {formatFullPkr(bankSummary.totalOpeningBalance)}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">
-                Configured across {bankSummary.banks.length} bank{bankSummary.banks.length === 1 ? '' : 's'}
-              </div>
-            </div>
+        <table className="w-full text-left text-xs whitespace-nowrap">
+          <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase text-[10px]">
+            <tr>
+              <th className="py-3 px-3.5">Unit / Flock</th>
+              <th className="py-3 px-3 text-right">Active Birds</th>
+              <th className="py-3 px-3 text-right">Total Production</th>
+              <th className="py-3 px-3 text-right">Cartons Sold</th>
+              <th className="py-3 px-3 text-right">Total Sale</th>
+              <th className="py-3 px-3 text-right">Total Expense</th>
+              <th className="py-3 px-3 text-right">Net Income</th>
+              <th className="py-3 px-3 text-right">Feed Consumed</th>
+              <th className="py-3 px-3 text-right">Rem. Production</th>
+              <th className="py-3 px-3 text-right">Rem. Feed</th>
+              <th className="py-3 px-3 text-right">Avg Carton Price</th>
+              <th className="py-3 px-3.5 text-right">Avg Cost / Bird</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {unitMatrix.map(({ unitName, metrics: um }) => {
+              const isSelected = selectedUnit === unitName || (selectedUnit === 'all' && unitName === 'All Units');
+              const isAllRow = unitName === 'All Units';
+              const targetUnitKey = isAllRow ? 'all' : unitName;
+              const unitPositive = um.netIncome >= 0;
 
-            <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
-                + Sales Added ({metrics.periodLabel})
-              </div>
-              <div className="text-base font-black text-blue-950 mt-1">
-                +{formatFullPkr(bankSummary.totalPeriodSalesAddedToBanks)}
-              </div>
-              <div className="text-[10px] text-blue-700 mt-0.5">
-                Cumulative post-opening: +{formatFullPkr(bankSummary.totalSalesAddedToBanks)}
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
-                Current Total Bank Balance
-              </div>
-              <div className="text-base font-black text-emerald-900 mt-1">
-                {formatFullPkr(bankSummary.totalCurrentBankBalance)}
-              </div>
-              <div className="text-[10px] text-emerald-700 mt-0.5">
-                Opening Balance + Dynamic Sales Added
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
-                Unassigned Online Receipts (Period)
-              </div>
-              <div className="text-base font-black text-amber-950 mt-1">
-                {formatFullPkr(bankSummary.unassignedPeriodOnlineSales)}
-              </div>
-              <div className="text-[10px] text-amber-700 mt-0.5">
-                Online sales not linked to a specific bank
-              </div>
-            </div>
-          </div>
-
-          {bankSummary.banks.length === 0 ? (
-            <div className="p-8 text-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/70">
-              <Landmark className="w-10 h-10 text-emerald-600 mx-auto mb-2.5" />
-              <h4 className="text-sm font-bold text-slate-900">
-                No Bank Accounts Added Yet
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-                Add the opening balance for each of your farm bank accounts (e.g. Meezan Bank, HBL, UBL, MCB). When you record new online/bank sales, select the bank and its balance will update automatically.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingBank(null);
-                  setShowBankModal(true);
-                }}
-                className="mt-4 inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add First Bank Account</span>
-              </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto border border-slate-200 rounded-xl">
-              <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase text-[10px]">
-                  <tr>
-                    <th className="py-3 px-4">Bank Name &amp; Account</th>
-                    <th className="py-3 px-3 text-center">Opening Date</th>
-                    <th className="py-3 px-4 text-right">Opening Balance</th>
-                    <th className="py-3 px-4 text-right">+ Sales Added (Period)</th>
-                    <th className="py-3 px-4 text-right">+ Total Sales Added</th>
-                    <th className="py-3 px-4 text-right bg-emerald-50/70 text-emerald-900">
-                      Current Live Balance
-                    </th>
-                    <th className="py-3 px-4 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {bankSummary.banks.map((item) => {
-                    const { bank } = item;
-                    const isConfirming = confirmDeleteId === bank.id;
-                    return (
-                      <tr key={bank.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center space-x-2.5">
-                            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
-                              <Landmark className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-900">{bank.bankName}</div>
-                              <div className="text-[11px] text-slate-500">
-                                {bank.accountTitle}
-                                {bank.accountNumber ? ` • ${bank.accountNumber}` : ''}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-3 text-center font-mono text-slate-600">
-                          {bank.openingDate}
-                        </td>
-                        <td className="py-3 px-4 text-right font-bold text-slate-800">
-                          {formatFullPkr(item.openingBalance)}
-                        </td>
-                        <td className="py-3 px-4 text-right font-semibold text-blue-700">
-                          +{formatFullPkr(item.salesInPeriod)}
-                          <span className="text-[10px] text-slate-400 ml-1">
-                            ({item.periodTxCount})
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-bold text-emerald-700">
-                          +{formatFullPkr(item.totalSalesAdded)}
-                          <span className="text-[10px] text-slate-400 ml-1">
-                            ({item.txCount} {item.txCount === 1 ? 'sale' : 'sales'})
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-black text-emerald-900 bg-emerald-50/40 text-sm">
-                          {formatFullPkr(item.currentBalance)}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {isConfirming ? (
-                            <div className="inline-flex items-center space-x-1.5">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onDeleteBank(bank.id);
-                                  setConfirmDeleteId(null);
-                                }}
-                                className="px-2 py-1 rounded bg-rose-600 text-white text-[10px] font-bold hover:bg-rose-700 cursor-pointer"
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(null)}
-                                className="px-2 py-1 rounded bg-slate-200 text-slate-700 text-[10px] font-bold hover:bg-slate-300 cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="inline-flex items-center space-x-1">
-                              <button
-                                type="button"
-                                onClick={() => setViewingBankItem(item)}
-                                title="View Bank Account Details"
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors cursor-pointer"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingBank(bank);
-                                  setShowBankModal(true);
-                                }}
-                                title="Edit Bank Opening Balance"
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(bank.id)}
-                                title="Remove Bank Account"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+              return (
+                <tr
+                  key={unitName}
+                  onClick={() => onSelectUnit(targetUnitKey)}
+                  className={`cursor-pointer transition-colors ${
+                    isAllRow
+                      ? 'bg-slate-900 text-white font-bold hover:bg-slate-800'
+                      : isSelected
+                      ? 'bg-emerald-50/70 hover:bg-emerald-50'
+                      : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <td className="py-3 px-3.5">
+                    <div className="flex items-center space-x-2">
+                      <Bird className={`w-3.5 h-3.5 ${isAllRow ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                      <span className="font-bold">
+                        {isAllRow ? 'Total Combined (All Units)' : unitName}
+                      </span>
+                      {selectedUnit === unitName && !isAllRow && (
+                        <span className="px-1.5 py-0.5 text-[9px] rounded bg-emerald-600 text-white font-bold">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 text-right font-semibold">
+                    {um.activeBirds.toLocaleString()}
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    <div className="font-bold">
+                      {Math.round(um.totalCartonsProduced).toLocaleString()} ctns
+                    </div>
+                    <div className={`text-[10px] ${isAllRow ? 'text-slate-300' : 'text-slate-400'}`}>
+                      {um.totalEggsProduced.toLocaleString()} eggs
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    <div className={`font-bold ${isAllRow ? 'text-indigo-300' : 'text-indigo-700'}`}>
+                      {Math.round(um.cartonsSold).toLocaleString()} ctns
+                    </div>
+                    <div className={`text-[10px] ${isAllRow ? 'text-slate-300' : 'text-slate-400'}`}>
+                      {um.eggsSold.toLocaleString()} eggs
+                    </div>
+                  </td>
+                  <td className={`py-3 px-3 text-right font-bold ${isAllRow ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                    {formatPkr(um.totalSalesRevenue)}
+                  </td>
+                  <td className={`py-3 px-3 text-right font-bold ${isAllRow ? 'text-rose-300' : 'text-rose-600'}`}>
+                    {formatPkr(um.totalExpenses)}
+                  </td>
+                  <td
+                    className={`py-3 px-3 text-right font-black ${
+                      isAllRow
+                        ? unitPositive
+                          ? 'text-emerald-300'
+                          : 'text-rose-300'
+                        : unitPositive
+                        ? 'text-emerald-700'
+                        : 'text-rose-600'
+                    }`}
+                  >
+                    {formatPkr(um.netIncome)}
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    <div className="font-semibold">{um.feedConsumedBags.toLocaleString()} bags</div>
+                    <div className={`text-[10px] ${isAllRow ? 'text-slate-300' : 'text-slate-400'}`}>
+                      {um.feedConsumedKg.toLocaleString()} kg
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 text-right font-bold">
+                    {Math.round(um.carriedNextCartons).toLocaleString()} ctns
+                  </td>
+                  <td className="py-3 px-3 text-right font-bold">
+                    {um.remainingFeedBags.toLocaleString()} bags
+                  </td>
+                  <td className={`py-3 px-3 text-right font-bold ${isAllRow ? 'text-amber-300' : 'text-amber-700'}`}>
+                    Rs. {Math.round(um.avgCartonPrice).toLocaleString()}
+                  </td>
+                  <td className="py-3 px-3.5 text-right font-bold">
+                    Rs. {Math.round(um.avgPerBirdCost).toLocaleString()}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </TableCard>
 
       {/* Carried Forward & Continuity Waterfall Statement */}
@@ -742,125 +899,113 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
         </table>
       </TableCard>
 
-      {/* Unit-Wise Comparative Performance Matrix */}
+      {/* Month-by-Month Rollover Ledger */}
       <TableCard
-        title="Unit-Wise Comparative Matrix"
-        subtitle={`Side-by-side P&L, production, feed consumption, remaining stock & unit economics for ${metrics.periodLabel}. Click a unit row to filter.`}
+        title={`Monthly Financial & Inventory Rollover Schedule (${selectedYear === 'all' ? 'All Years' : selectedYear})`}
+        subtitle="Chronological month-by-month Income vs Expenses, Production, Feed Consumption, Remaining Stock & Unit Economics. Click any month row to focus that month."
         badge={
-          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
-            <Building2 className="w-3.5 h-3.5" />
-            <span>3 Production Units</span>
+          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold">
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span>{monthlyRows.length} Months</span>
           </span>
         }
       >
         <table className="w-full text-left text-xs whitespace-nowrap">
           <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase text-[10px]">
             <tr>
-              <th className="py-3 px-3.5">Unit / Flock</th>
-              <th className="py-3 px-3 text-right">Active Birds</th>
-              <th className="py-3 px-3 text-right">Total Production</th>
-              <th className="py-3 px-3 text-right">Cartons Sold</th>
+              <th className="py-3 px-3.5">Month</th>
+              <th className="py-3 px-3 text-right">C/F Prev (Ctns)</th>
+              <th className="py-3 px-3 text-right">Produced (Ctns)</th>
+              <th className="py-3 px-3 text-right">Sold (Ctns)</th>
+              <th className="py-3 px-3 text-right">Rem. Prod (Next)</th>
               <th className="py-3 px-3 text-right">Total Sale</th>
               <th className="py-3 px-3 text-right">Total Expense</th>
-              <th className="py-3 px-3 text-right">Net Income</th>
+              <th className="py-3 px-3 text-right">Net P&amp;L</th>
               <th className="py-3 px-3 text-right">Feed Consumed</th>
-              <th className="py-3 px-3 text-right">Rem. Production</th>
               <th className="py-3 px-3 text-right">Rem. Feed</th>
-              <th className="py-3 px-3 text-right">Avg Carton Price</th>
-              <th className="py-3 px-3.5 text-right">Avg Cost / Bird</th>
+              <th className="py-3 px-3 text-right">Avg Carton</th>
+              <th className="py-3 px-3.5 text-right">Cost / Bird</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {unitMatrix.map(({ unitName, metrics: um }) => {
-              const isSelected = selectedUnit === unitName || (selectedUnit === 'all' && unitName === 'All Units');
-              const isAllRow = unitName === 'All Units';
-              const targetUnitKey = isAllRow ? 'all' : unitName;
-              const unitPositive = um.netIncome >= 0;
+            {monthlyRows.length === 0 ? (
+              <tr>
+                <td colSpan={12} className="py-8 text-center text-slate-400">
+                  No monthly activity recorded for {selectedYear === 'all' ? 'the selected filters' : selectedYear}.
+                </td>
+              </tr>
+            ) : (
+              monthlyRows.map((row) => {
+                const isSelectedMonth = activeMonthKey === row.monthKey;
+                const monthCode = row.monthKey.split('-')[1];
+                const isProfit = row.netIncome >= 0;
 
-              return (
-                <tr
-                  key={unitName}
-                  onClick={() => onSelectUnit(targetUnitKey)}
-                  className={`cursor-pointer transition-colors ${
-                    isAllRow
-                      ? 'bg-slate-900 text-white font-bold hover:bg-slate-800'
-                      : isSelected
-                      ? 'bg-emerald-50/70 hover:bg-emerald-50'
-                      : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <td className="py-3 px-3.5">
-                    <div className="flex items-center space-x-2">
-                      <Bird className={`w-3.5 h-3.5 ${isAllRow ? 'text-emerald-400' : 'text-emerald-600'}`} />
-                      <span className="font-bold">
-                        {isAllRow ? 'Total Combined (All Units)' : unitName}
-                      </span>
-                      {selectedUnit === unitName && !isAllRow && (
-                        <span className="px-1.5 py-0.5 text-[9px] rounded bg-emerald-600 text-white font-bold">
-                          Active
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 text-right font-semibold">
-                    {um.activeBirds.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    <div className="font-bold">
-                      {Math.round(um.totalCartonsProduced).toLocaleString()} ctns
-                    </div>
-                    <div className={`text-[10px] ${isAllRow ? 'text-slate-300' : 'text-slate-400'}`}>
-                      {um.totalEggsProduced.toLocaleString()} eggs
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    <div className={`font-bold ${isAllRow ? 'text-indigo-300' : 'text-indigo-700'}`}>
-                      {Math.round(um.cartonsSold).toLocaleString()} ctns
-                    </div>
-                    <div className={`text-[10px] ${isAllRow ? 'text-slate-300' : 'text-slate-400'}`}>
-                      {um.eggsSold.toLocaleString()} eggs
-                    </div>
-                  </td>
-                  <td className={`py-3 px-3 text-right font-bold ${isAllRow ? 'text-emerald-300' : 'text-emerald-700'}`}>
-                    {formatPkr(um.totalSalesRevenue)}
-                  </td>
-                  <td className={`py-3 px-3 text-right font-bold ${isAllRow ? 'text-rose-300' : 'text-rose-600'}`}>
-                    {formatPkr(um.totalExpenses)}
-                  </td>
-                  <td
-                    className={`py-3 px-3 text-right font-black ${
-                      isAllRow
-                        ? unitPositive
-                          ? 'text-emerald-300'
-                          : 'text-rose-300'
-                        : unitPositive
-                        ? 'text-emerald-700'
-                        : 'text-rose-600'
+                return (
+                  <tr
+                    key={row.monthKey}
+                    onClick={() => onSelectMonth(monthCode)}
+                    className={`cursor-pointer transition-colors ${
+                      isSelectedMonth
+                        ? 'bg-emerald-50 font-semibold border-l-4 border-l-emerald-600'
+                        : 'hover:bg-slate-50'
                     }`}
                   >
-                    {formatPkr(um.netIncome)}
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    <div className="font-semibold">{um.feedConsumedBags.toLocaleString()} bags</div>
-                    <div className={`text-[10px] ${isAllRow ? 'text-slate-300' : 'text-slate-400'}`}>
-                      {um.feedConsumedKg.toLocaleString()} kg
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 text-right font-bold">
-                    {Math.round(um.carriedNextCartons).toLocaleString()} ctns
-                  </td>
-                  <td className="py-3 px-3 text-right font-bold">
-                    {um.remainingFeedBags.toLocaleString()} bags
-                  </td>
-                  <td className={`py-3 px-3 text-right font-bold ${isAllRow ? 'text-amber-300' : 'text-amber-700'}`}>
-                    Rs. {Math.round(um.avgCartonPrice).toLocaleString()}
-                  </td>
-                  <td className="py-3 px-3.5 text-right font-bold">
-                    Rs. {Math.round(um.avgPerBirdCost).toLocaleString()}
-                  </td>
-                </tr>
-              );
-            })}
+                    <td className="py-3 px-3.5">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-bold text-slate-900">{row.monthLabel}</span>
+                        {isSelectedMonth && (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">
+                            Selected
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-right text-amber-800 font-medium">
+                      {Math.round(row.carriedPrevCartons).toLocaleString()}
+                    </td>
+                    <td className="py-3 px-3 text-right font-bold text-slate-900">
+                      {Math.round(row.totalCartonsProduced).toLocaleString()}
+                    </td>
+                    <td className="py-3 px-3 text-right font-semibold text-slate-700">
+                      {Math.round(row.cartonsSold).toLocaleString()}
+                    </td>
+                    <td className="py-3 px-3 text-right font-bold text-sky-700">
+                      {Math.round(row.carriedNextCartons).toLocaleString()} ctns
+                    </td>
+                    <td className="py-3 px-3 text-right font-bold text-emerald-700">
+                      {formatPkr(row.totalSales)}
+                    </td>
+                    <td className="py-3 px-3 text-right font-bold text-rose-600">
+                      {formatPkr(row.totalExpenses)}
+                    </td>
+                    <td
+                      className={`py-3 px-3 text-right font-black ${
+                        isProfit ? 'text-emerald-700' : 'text-rose-600'
+                      }`}
+                    >
+                      {formatPkr(row.netIncome)}
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <div className="font-semibold text-slate-700">
+                        {row.feedConsumedBags.toLocaleString()} bags
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {formatPkr(row.feedConsumedExpense)}
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-right font-bold text-indigo-700">
+                      {row.remainingFeedBags.toLocaleString()} bags
+                    </td>
+                    <td className="py-3 px-3 text-right font-bold text-amber-700">
+                      Rs. {Math.round(row.avgCartonPrice).toLocaleString()}
+                    </td>
+                    <td className="py-3 px-3.5 text-right font-bold text-slate-800">
+                      Rs. {Math.round(row.avgPerBirdCost).toLocaleString()}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </TableCard>
@@ -1026,404 +1171,221 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
         </div>
       </div>
 
-      {/* Month-by-Month Rollover Ledger */}
+      {/* Bank Balances & Opening Balance Register */}
       <TableCard
-        title={`Monthly Financial & Inventory Rollover Schedule (${selectedYear === 'all' ? 'All Years' : selectedYear})`}
-        subtitle="Chronological month-by-month Income vs Expenses, Production, Feed Consumption, Remaining Stock & Unit Economics. Click any month row to focus that month."
+        title="Bank Balances & Opening Balance Register"
+        subtitle="Add opening balances for farm bank accounts. Recording or editing online/bank sales dynamically updates the selected bank's live balance."
         badge={
-          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold">
-            <CalendarDays className="w-3.5 h-3.5" />
-            <span>{monthlyRows.length} Months</span>
+          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+            <Landmark className="w-3.5 h-3.5" />
+            <span>{bankSummary.banks.length} Active {bankSummary.banks.length === 1 ? 'Bank' : 'Banks'}</span>
           </span>
         }
-      >
-        <table className="w-full text-left text-xs whitespace-nowrap">
-          <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase text-[10px]">
-            <tr>
-              <th className="py-3 px-3.5">Month</th>
-              <th className="py-3 px-3 text-right">C/F Prev (Ctns)</th>
-              <th className="py-3 px-3 text-right">Produced (Ctns)</th>
-              <th className="py-3 px-3 text-right">Sold (Ctns)</th>
-              <th className="py-3 px-3 text-right">Rem. Prod (Next)</th>
-              <th className="py-3 px-3 text-right">Total Sale</th>
-              <th className="py-3 px-3 text-right">Total Expense</th>
-              <th className="py-3 px-3 text-right">Net P&amp;L</th>
-              <th className="py-3 px-3 text-right">Feed Consumed</th>
-              <th className="py-3 px-3 text-right">Rem. Feed</th>
-              <th className="py-3 px-3 text-right">Avg Carton</th>
-              <th className="py-3 px-3.5 text-right">Cost / Bird</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {monthlyRows.length === 0 ? (
-              <tr>
-                <td colSpan={12} className="py-8 text-center text-slate-400">
-                  No monthly activity recorded for {selectedYear === 'all' ? 'the selected filters' : selectedYear}.
-                </td>
-              </tr>
-            ) : (
-              monthlyRows.map((row) => {
-                const isSelectedMonth = activeMonthKey === row.monthKey;
-                const monthCode = row.monthKey.split('-')[1];
-                const isProfit = row.netIncome >= 0;
-
-                return (
-                  <tr
-                    key={row.monthKey}
-                    onClick={() => onSelectMonth(monthCode)}
-                    className={`cursor-pointer transition-colors ${
-                      isSelectedMonth
-                        ? 'bg-emerald-50 font-semibold border-l-4 border-l-emerald-600'
-                        : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <td className="py-3 px-3.5">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="font-bold text-slate-900">{row.monthLabel}</span>
-                        {isSelectedMonth && (
-                          <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">
-                            Selected
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-right text-amber-800 font-medium">
-                      {Math.round(row.carriedPrevCartons).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-3 text-right font-bold text-slate-900">
-                      {Math.round(row.totalCartonsProduced).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-3 text-right font-semibold text-slate-700">
-                      {Math.round(row.cartonsSold).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-3 text-right font-bold text-sky-700">
-                      {Math.round(row.carriedNextCartons).toLocaleString()} ctns
-                    </td>
-                    <td className="py-3 px-3 text-right font-bold text-emerald-700">
-                      {formatPkr(row.totalSales)}
-                    </td>
-                    <td className="py-3 px-3 text-right font-bold text-rose-600">
-                      {formatPkr(row.totalExpenses)}
-                    </td>
-                    <td
-                      className={`py-3 px-3 text-right font-black ${
-                        isProfit ? 'text-emerald-700' : 'text-rose-600'
-                      }`}
-                    >
-                      {formatPkr(row.netIncome)}
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <div className="font-semibold text-slate-700">
-                        {row.feedConsumedBags.toLocaleString()} bags
-                      </div>
-                      <div className="text-[10px] text-slate-400">
-                        {formatPkr(row.feedConsumedExpense)}
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-right font-bold text-indigo-700">
-                      {row.remainingFeedBags.toLocaleString()} bags
-                    </td>
-                    <td className="py-3 px-3 text-right font-bold text-amber-700">
-                      Rs. {Math.round(row.avgCartonPrice).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-3.5 text-right font-bold text-slate-800">
-                      Rs. {Math.round(row.avgPerBirdCost).toLocaleString()}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </TableCard>
-
-      {/* Simplified Income Statement (Profit & Loss Summary at the End) */}
-      {(() => {
-        const rev = metrics.totalSalesRevenue || 0;
-        const pct = (val: number) => (rev > 0 ? `${((val / rev) * 100).toFixed(1)}%` : '0.0%');
-        const grossProfit = rev - metrics.cogsExpenses;
-        const otherOpEx = Math.max(
-          0,
-          metrics.operatingExpenses - metrics.salariesExpenses - metrics.utilitiesPolExpenses
-        );
-        const opProfitExclCapex = rev - (metrics.totalExpenses - metrics.chickenCapexExpenses);
-
-        return (
-          <TableCard
-            title="Simplified Income Statement (Profit & Loss)"
-            subtitle={`GreenOva Farms • ${metrics.periodLabel} • ${
-              selectedUnit === 'all' ? 'All Units Combined' : selectedUnit
-            }`}
-            badge={
-              <span
-                className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                  isSurplus
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-rose-100 text-rose-800'
-                }`}
-              >
-                {isSurplus ? 'Net Surplus' : 'Net Deficit'} ({metrics.netMarginPercent.toFixed(1)}%)
-              </span>
-            }
+        actions={
+          <button
+            type="button"
+            onClick={() => {
+              setEditingBank(null);
+              setShowBankModal(true);
+            }}
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
           >
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase text-[10px]">
-                <tr>
-                  <th className="py-3 px-4">Statement Line Item / Particulars</th>
-                  <th className="py-3 px-4 text-right">Amount (PKR)</th>
-                  <th className="py-3 px-4 text-right">% of Revenue</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {/* Revenue Section */}
-                <tr className="bg-emerald-50/40">
-                  <td colSpan={3} className="py-2 px-4 font-black text-emerald-900 uppercase text-[10px] tracking-wider">
-                    A. Revenue (Income)
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/80">
-                  <td className="py-2.5 px-4 pl-6 text-slate-700">
-                    Egg Sales Revenue{' '}
-                    <span className="text-[11px] text-slate-400">
-                      ({Math.round(metrics.cartonsSold).toLocaleString()} ctns @ avg Rs.{' '}
-                      {Math.round(metrics.avgCartonPrice).toLocaleString()}/ctn)
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
-                    {formatFullPkr(metrics.eggSalesRevenue)}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-500">
-                    {pct(metrics.eggSalesRevenue)}
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/80">
-                  <td className="py-2.5 px-4 pl-6 text-slate-700">
-                    Other Farm Sales (Manure, Feed Bags, Cull Birds &amp; Misc.)
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
-                    {formatFullPkr(metrics.otherSalesRevenue)}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-500">
-                    {pct(metrics.otherSalesRevenue)}
-                  </td>
-                </tr>
-                <tr className="bg-emerald-50/70 border-t border-emerald-200">
-                  <td className="py-3 px-4 font-black text-emerald-950">Total Revenue (A)</td>
-                  <td className="py-3 px-4 text-right font-black text-emerald-800 text-sm">
-                    {formatFullPkr(rev)}
-                  </td>
-                  <td className="py-3 px-4 text-right font-bold text-emerald-800">
-                    {rev > 0 ? '100.0%' : '0.0%'}
-                  </td>
-                </tr>
-
-                {/* Direct Farm Cost (COGS) Section */}
-                <tr className="bg-amber-50/40">
-                  <td colSpan={3} className="py-2 px-4 font-black text-amber-900 uppercase text-[10px] tracking-wider">
-                    B. Cost of Goods Sold (Direct Production Costs)
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/80">
-                  <td className="py-2.5 px-4 pl-6 text-slate-700">
-                    Feed Consumed Expenses{' '}
-                    <span className="text-[11px] text-slate-400">
-                      ({metrics.feedConsumedBags.toLocaleString()} bags consumed
-                      {metrics.feedAvgCostPerBag > 0
-                        ? ` @ Rs. ${Math.round(metrics.feedAvgCostPerBag).toLocaleString()}/bag`
-                        : ''}
-                      {metrics.feedStockReceivedBags > 0 &&
-                      metrics.feedStockReceivedBags !== metrics.feedConsumedBags
-                        ? ` • ${metrics.feedStockReceivedBags.toLocaleString()} bags purchased`
-                        : ''}
-                      )
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
-                    {formatFullPkr(metrics.feedExpenses)}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-500">
-                    {pct(metrics.feedExpenses)}
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/80">
-                  <td className="py-2.5 px-4 pl-6 text-slate-700">
-                    Chicken / Flock Purchases (CAPEX)
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
-                    {formatFullPkr(metrics.chickenCapexExpenses)}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-500">
-                    {pct(metrics.chickenCapexExpenses)}
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/80">
-                  <td className="py-2.5 px-4 pl-6 text-slate-700">
-                    Medicine &amp; Vaccines
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
-                    {formatFullPkr(metrics.medicineVaccineExpenses)}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-500">
-                    {pct(metrics.medicineVaccineExpenses)}
-                  </td>
-                </tr>
-                <tr className="bg-amber-50/70 border-t border-amber-200">
-                  <td className="py-2.5 px-4 font-bold text-amber-950">
-                    Total Cost of Goods Sold (B)
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-bold text-rose-700">
-                    ({formatFullPkr(metrics.cogsExpenses)})
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-bold text-amber-900">
-                    {pct(metrics.cogsExpenses)}
-                  </td>
-                </tr>
-
-                {/* Gross Profit */}
-                <tr className="bg-slate-100/80 border-t border-slate-200">
-                  <td className="py-3 px-4 font-black text-slate-900">
-                    Gross Profit / (Loss) (A − B)
-                  </td>
-                  <td
-                    className={`py-3 px-4 text-right font-black ${
-                      grossProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'
-                    }`}
-                  >
-                    {formatFullPkr(grossProfit)}
-                  </td>
-                  <td className="py-3 px-4 text-right font-bold text-slate-700">
-                    {pct(grossProfit)}
-                  </td>
-                </tr>
-
-                {/* Operating Expenses Section */}
-                <tr className="bg-rose-50/40">
-                  <td colSpan={3} className="py-2 px-4 font-black text-rose-900 uppercase text-[10px] tracking-wider">
-                    C. Operating Expenses (Overheads)
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/80">
-                  <td className="py-2.5 px-4 pl-6 text-slate-700">
-                    Staff Salaries &amp; Labor Payments
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
-                    {formatFullPkr(metrics.salariesExpenses)}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-500">
-                    {pct(metrics.salariesExpenses)}
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/80">
-                  <td className="py-2.5 px-4 pl-6 text-slate-700">
-                    Utilities, Electricity &amp; Fuel (POL)
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
-                    {formatFullPkr(metrics.utilitiesPolExpenses)}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-500">
-                    {pct(metrics.utilitiesPolExpenses)}
-                  </td>
-                </tr>
-                <tr className="hover:bg-slate-50/80">
-                  <td className="py-2.5 px-4 pl-6 text-slate-700">
-                    Other Farm Overheads (Rent, Packing, Repairs, Admin &amp; Misc.)
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
-                    {formatFullPkr(otherOpEx)}
-                  </td>
-                  <td className="py-2.5 px-4 text-right text-slate-500">{pct(otherOpEx)}</td>
-                </tr>
-                <tr className="bg-rose-50/70 border-t border-rose-200">
-                  <td className="py-2.5 px-4 font-bold text-rose-950">
-                    Total Operating Expenses (C)
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-bold text-rose-700">
-                    ({formatFullPkr(metrics.operatingExpenses)})
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-bold text-rose-800">
-                    {pct(metrics.operatingExpenses)}
-                  </td>
-                </tr>
-
-                {/* Total Expenses & Net Profit Footer */}
-                <tr className="bg-slate-100 border-t border-slate-200">
-                  <td className="py-3 px-4 font-bold text-slate-900">
-                    Total Expenses (B + C)
-                  </td>
-                  <td className="py-3 px-4 text-right font-black text-rose-700">
-                    ({formatFullPkr(metrics.totalExpenses)})
-                  </td>
-                  <td className="py-3 px-4 text-right font-bold text-slate-700">
-                    {pct(metrics.totalExpenses)}
-                  </td>
-                </tr>
-                <tr className="bg-slate-900 text-white">
-                  <td className="py-4 px-4">
-                    <div className="font-black text-sm">
-                      Net Income / (Net Loss) (A − Total Expenses)
-                    </div>
-                    <div className="text-[11px] text-slate-300 font-normal mt-0.5">
-                      Operating Profit excl. Flock CAPEX: {formatFullPkr(opProfitExclCapex)} (
-                      {metrics.operatingMarginPercent.toFixed(1)}%) • Net / Bird: Rs.{' '}
-                      {Math.round(metrics.avgPerBirdNet).toLocaleString()}
-                    </div>
-                  </td>
-                  <td
-                    className={`py-4 px-4 text-right font-black text-base ${
-                      isSurplus ? 'text-emerald-400' : 'text-rose-400'
-                    }`}
-                  >
-                    {formatFullPkr(metrics.netIncome)}
-                  </td>
-                  <td
-                    className={`py-4 px-4 text-right font-black text-sm ${
-                      isSurplus ? 'text-emerald-300' : 'text-rose-300'
-                    }`}
-                  >
-                    {metrics.netMarginPercent.toFixed(1)}%
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            {/* Quick Bottom One-Line Summary Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 border-t border-slate-200 text-center">
-              <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                <div className="text-[10px] font-semibold text-slate-500 uppercase">Total Income</div>
-                <div className="text-xs font-black text-emerald-700 mt-0.5">
-                  {formatFullPkr(rev)}
-                </div>
+            <Plus className="w-4 h-4" />
+            <span>Add Bank Opening Balance</span>
+          </button>
+        }
+      >
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Total Bank Opening Balance
               </div>
-              <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                <div className="text-[10px] font-semibold text-slate-500 uppercase">Total Expenses</div>
-                <div className="text-xs font-black text-rose-600 mt-0.5">
-                  {formatFullPkr(metrics.totalExpenses)}
-                </div>
+              <div className="text-base font-black text-slate-900 mt-1">
+                {formatFullPkr(bankSummary.totalOpeningBalance)}
               </div>
-              <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                <div className="text-[10px] font-semibold text-slate-500 uppercase">
-                  {isSurplus ? 'Net Profit' : 'Net Loss'}
-                </div>
-                <div
-                  className={`text-xs font-black mt-0.5 ${
-                    isSurplus ? 'text-emerald-700' : 'text-rose-600'
-                  }`}
-                >
-                  {formatFullPkr(metrics.netIncome)}
-                </div>
-              </div>
-              <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                <div className="text-[10px] font-semibold text-slate-500 uppercase">
-                  Current Bank Balance
-                </div>
-                <div className="text-xs font-black text-slate-900 mt-0.5">
-                  {formatFullPkr(bankSummary.totalCurrentBankBalance)}
-                </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">
+                Configured across {bankSummary.banks.length} bank{bankSummary.banks.length === 1 ? '' : 's'}
               </div>
             </div>
-          </TableCard>
-        );
-      })()}
+
+            <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
+                + Sales Added ({metrics.periodLabel})
+              </div>
+              <div className="text-base font-black text-blue-950 mt-1">
+                +{formatFullPkr(bankSummary.totalPeriodSalesAddedToBanks)}
+              </div>
+              <div className="text-[10px] text-blue-700 mt-0.5">
+                Cumulative post-opening: +{formatFullPkr(bankSummary.totalSalesAddedToBanks)}
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                Current Total Bank Balance
+              </div>
+              <div className="text-base font-black text-emerald-900 mt-1">
+                {formatFullPkr(bankSummary.totalCurrentBankBalance)}
+              </div>
+              <div className="text-[10px] text-emerald-700 mt-0.5">
+                Opening Balance + Dynamic Sales Added
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                Unassigned Online Receipts (Period)
+              </div>
+              <div className="text-base font-black text-amber-950 mt-1">
+                {formatFullPkr(bankSummary.unassignedPeriodOnlineSales)}
+              </div>
+              <div className="text-[10px] text-amber-700 mt-0.5">
+                Online sales not linked to a specific bank
+              </div>
+            </div>
+          </div>
+
+          {bankSummary.banks.length === 0 ? (
+            <div className="p-6 text-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/70">
+              <Landmark className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+              <h4 className="text-sm font-bold text-slate-900">
+                No Bank Accounts Added Yet
+              </h4>
+              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                Add opening balances for farm bank accounts so online/bank sales update live bank balances automatically.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingBank(null);
+                  setShowBankModal(true);
+                }}
+                className="mt-3 inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add First Bank Account</span>
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left text-xs whitespace-nowrap">
+                <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase text-[10px]">
+                  <tr>
+                    <th className="py-3 px-4">Bank Name &amp; Account</th>
+                    <th className="py-3 px-3 text-center">Opening Date</th>
+                    <th className="py-3 px-4 text-right">Opening Balance</th>
+                    <th className="py-3 px-4 text-right">+ Sales Added (Period)</th>
+                    <th className="py-3 px-4 text-right">+ Total Sales Added</th>
+                    <th className="py-3 px-4 text-right bg-emerald-50/70 text-emerald-900">
+                      Current Live Balance
+                    </th>
+                    <th className="py-3 px-4 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {bankSummary.banks.map((item) => {
+                    const { bank } = item;
+                    const isConfirming = confirmDeleteId === bank.id;
+                    return (
+                      <tr key={bank.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center space-x-2.5">
+                            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
+                              <Landmark className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900">{bank.bankName}</div>
+                              <div className="text-[11px] text-slate-500">
+                                {bank.accountTitle}
+                                {bank.accountNumber ? ` • ${bank.accountNumber}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono text-slate-600">
+                          {bank.openingDate}
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-slate-800">
+                          {formatFullPkr(item.openingBalance)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-semibold text-blue-700">
+                          +{formatFullPkr(item.salesInPeriod)}
+                          <span className="text-[10px] text-slate-400 ml-1">
+                            ({item.periodTxCount})
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-emerald-700">
+                          +{formatFullPkr(item.totalSalesAdded)}
+                          <span className="text-[10px] text-slate-400 ml-1">
+                            ({item.txCount} {item.txCount === 1 ? 'sale' : 'sales'})
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-black text-emerald-900 bg-emerald-50/40 text-sm">
+                          {formatFullPkr(item.currentBalance)}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {isConfirming ? (
+                            <div className="inline-flex items-center space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onDeleteBank(bank.id);
+                                  setConfirmDeleteId(null);
+                                }}
+                                className="px-2 py-1 rounded bg-rose-600 text-white text-[10px] font-bold hover:bg-rose-700 cursor-pointer"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="px-2 py-1 rounded bg-slate-200 text-slate-700 text-[10px] font-bold hover:bg-slate-300 cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center space-x-1">
+                              <button
+                                type="button"
+                                onClick={() => setViewingBankItem(item)}
+                                title="View Bank Account Details"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingBank(bank);
+                                  setShowBankModal(true);
+                                }}
+                                title="Edit Bank Opening Balance"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(bank.id)}
+                                title="Remove Bank Account"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </TableCard>
 
       {/* Add / Edit Bank Opening Balance Form Modal */}
       {showBankModal && (

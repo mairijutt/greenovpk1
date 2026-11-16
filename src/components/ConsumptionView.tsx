@@ -23,9 +23,12 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  Download,
+  FileText,
 } from 'lucide-react';
 import { FeedConsumption, Flock, MortalityLog, Farm } from '../types/farm';
 import { getInitialUrlFilters } from '../utils/urlFilters';
+import { downloadRecordsCSV, downloadRecordsPDF } from '../utils/exportRecords';
 import {
   StatCard,
   PageHeader,
@@ -573,6 +576,103 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
       ? dailyChartData[hoveredDayIdx]
       : null;
 
+  const getConsumptionExportPayload = () => {
+    const unitLabel =
+      selectedFlock === 'all'
+        ? 'All Units'
+        : flocks.find((f) => String(f.id) === String(selectedFlock) || f.name === selectedFlock)?.name ||
+          selectedFlock;
+    const rangeLabel =
+      fromDate || toDate ? `${fromDate || 'Start'} to ${toDate || 'Latest'}` : 'All Dates';
+    const todayStamp = new Date().toISOString().split('T')[0];
+
+    const columns = [
+      { header: 'Challan / ID', align: 'left' as const },
+      { header: 'Date', align: 'left' as const },
+      { header: 'Unit / Flock', align: 'left' as const },
+      { header: 'Feed Formulation', align: 'left' as const },
+      { header: 'Bags (50kg)', align: 'right' as const },
+      { header: 'Weight (Kg)', align: 'right' as const },
+      { header: 'Grams / Bird', align: 'right' as const },
+      { header: 'Water (L)', align: 'right' as const },
+      { header: 'Notes', align: 'left' as const },
+    ];
+
+    let sumBags = 0;
+    let sumKg = 0;
+    let sumWater = 0;
+
+    const pdfRows = filtered.map((log) => {
+      const bags = log.bags || Math.round((log.feedQuantityKg || 0) / 50);
+      const kg = log.feedQuantityKg || bags * 50;
+      const water = Number(log.waterIntakeLiters || 0);
+      sumBags += bags;
+      sumKg += kg;
+      sumWater += water;
+      return [
+        `#${log.challanNo || log.trackingId || log.id.replace('c-', '')}`,
+        log.date,
+        log.flockName,
+        log.feedType,
+        bags.toLocaleString(),
+        kg.toLocaleString(),
+        `${log.gramsPerBird || 0} g`,
+        water.toLocaleString(),
+        log.notes || '-',
+      ];
+    });
+
+    const csvRows = filtered.map((log) => {
+      const bags = log.bags || Math.round((log.feedQuantityKg || 0) / 50);
+      const kg = log.feedQuantityKg || bags * 50;
+      const water = Number(log.waterIntakeLiters || 0);
+      return [
+        log.challanNo || log.trackingId || log.id.replace('c-', ''),
+        log.date,
+        log.flockName,
+        log.feedType,
+        bags,
+        kg,
+        log.gramsPerBird || 0,
+        water,
+        log.notes || '',
+      ];
+    });
+
+    const totalsRow = [
+      'TOTAL',
+      '',
+      '',
+      '',
+      sumBags.toLocaleString(),
+      sumKg.toLocaleString(),
+      '',
+      sumWater.toLocaleString(),
+      '',
+    ];
+
+    return {
+      title: 'Daily Feed & Water Consumption Records',
+      subtitle: `Unit: ${unitLabel}  |  Range: ${rangeLabel}`,
+      filenameBase: `GreenOva_Daily_Consumption_Records_${unitLabel}_${todayStamp}`,
+      columns,
+      rows: pdfRows,
+      csvRows,
+      totalsRow,
+      orientation: 'landscape' as const,
+    };
+  };
+
+  const handleExportCSV = () => {
+    if (filtered.length === 0) return;
+    downloadRecordsCSV(getConsumptionExportPayload());
+  };
+
+  const handleExportPDF = () => {
+    if (filtered.length === 0) return;
+    downloadRecordsPDF(getConsumptionExportPayload());
+  };
+
   return (
     <div className="space-y-6">
       {/* Standardized Page Header */}
@@ -583,13 +683,31 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
         iconColor="amber"
         badge="Active Feed Records"
         actions={
-          <UIButton
-            variant="amber"
-            icon={Plus}
-            onClick={() => onOpenRecordModal('feed')}
-          >
-            Record Feed Intake
-          </UIButton>
+          <div className="flex flex-wrap items-center gap-2">
+            <UIButton
+              variant="secondary"
+              icon={Download}
+              onClick={handleExportCSV}
+              disabled={filtered.length === 0}
+            >
+              Export CSV ({filtered.length})
+            </UIButton>
+            <UIButton
+              variant="secondary"
+              icon={FileText}
+              onClick={handleExportPDF}
+              disabled={filtered.length === 0}
+            >
+              Download PDF ({filtered.length})
+            </UIButton>
+            <UIButton
+              variant="amber"
+              icon={Plus}
+              onClick={() => onOpenRecordModal('feed')}
+            >
+              Record Feed Intake
+            </UIButton>
+          </div>
         }
       />
 

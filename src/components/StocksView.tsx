@@ -10,7 +10,7 @@ import {
   Building2,
   Search,
   Download,
-  Printer,
+  FileText,
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
@@ -36,6 +36,7 @@ import {
 } from '../data/liveStocks.ts';
 import { getInitialUrlFilters } from '../utils/urlFilters.ts';
 import { apiFetch } from '../services/api.ts';
+import { downloadRecordsCSV, downloadRecordsPDF } from '../utils/exportRecords.ts';
 
 interface StocksViewProps {
   inventory?: InventoryItem[];
@@ -544,26 +545,97 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
     setCurrentPage(1);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const getStockExportPayload = () => {
+    const unitLabel = selectedUnit === 'all' ? 'All Units' : selectedUnit;
+    const rangeLabel =
+      fromDate || toDate ? `${fromDate || 'Start'} to ${toDate || 'Latest'}` : 'All Dates';
+    const todayStamp = new Date().toISOString().split('T')[0];
+
+    const columns = [
+      { header: 'ID', align: 'left' as const },
+      { header: 'Date', align: 'left' as const },
+      { header: 'Unit / Flock', align: 'left' as const },
+      { header: 'Category', align: 'left' as const },
+      { header: 'Item / Feed Type', align: 'left' as const },
+      { header: 'Qty (Bags)', align: 'right' as const },
+      { header: 'Rate / Bag', align: 'right' as const },
+      { header: 'Amount (PKR)', align: 'right' as const },
+      { header: 'Payment', align: 'center' as const },
+      { header: 'Challan #', align: 'left' as const },
+      { header: 'Notes', align: 'left' as const },
+    ];
+
+    let sumQty = 0;
+    let sumAmt = 0;
+
+    const pdfRows = filteredShipments.map((r) => {
+      const qty = Number(r.quantity || 0);
+      const amt = Number(r.amount || 0);
+      sumQty += qty;
+      sumAmt += amt;
+      return [
+        `#${r.trackingId}`,
+        r.rawDate || r.date,
+        r.flockName,
+        r.head,
+        r.head === 'FEED' ? `Feed ${r.type}` : r.type || r.feedType,
+        qty.toLocaleString(),
+        (r.costPerBag || 0).toLocaleString(),
+        amt.toLocaleString(),
+        r.paymentType || '-',
+        r.challanNo ? `CH-${r.challanNo}` : '-',
+        r.notes || '-',
+      ];
+    });
+
+    const csvRows = filteredShipments.map((r) => [
+      r.trackingId,
+      r.rawDate || r.date,
+      r.flockName,
+      r.head,
+      r.head === 'FEED' ? `Feed ${r.type}` : r.type || r.feedType,
+      Number(r.quantity || 0),
+      Number(r.costPerBag || 0),
+      Number(r.amount || 0),
+      r.paymentType || '',
+      r.challanNo || '',
+      r.notes || '',
+    ]);
+
+    const totalsRow = [
+      'TOTAL',
+      '',
+      '',
+      '',
+      '',
+      sumQty.toLocaleString(),
+      '',
+      sumAmt.toLocaleString(),
+      '',
+      '',
+      '',
+    ];
+
+    return {
+      title: 'Stock Inventory Records',
+      subtitle: `Unit: ${unitLabel}  |  Range: ${rangeLabel}`,
+      filenameBase: `GreenOva_Stock_Records_${unitLabel}_${todayStamp}`,
+      columns,
+      rows: pdfRows,
+      csvRows,
+      totalsRow,
+      orientation: 'landscape' as const,
+    };
   };
 
   const handleExportCSV = () => {
-    const headers =
-      'Tracking ID,Date,Type,Flock Name,Head,Quantity (Bags),Amount (PKR),Avg Rate/Bag,Payment Type,Challan No,Notes\n';
-    const rows = filteredShipments
-      .map(
-        (r) =>
-          `${r.trackingId},"${r.date}","${r.feedType}","${r.flockName}",${r.head},${r.quantity},${r.amount},${r.costPerBag},${r.paymentType},"${r.challanNo}","${(r.notes || '').replace(/"/g, '""')}"`
-      )
-      .join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `GreenOva_Stock_Inventory_Report_${selectedUnit}_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (filteredShipments.length === 0) return;
+    downloadRecordsCSV(getStockExportPayload());
+  };
+
+  const handleExportPDF = () => {
+    if (filteredShipments.length === 0) return;
+    downloadRecordsPDF(getStockExportPayload());
   };
 
   return (
@@ -584,7 +656,23 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
         iconColor="indigo"
         badge="Unit-Direct Stock Ledger"
         actions={
-          <>
+          <div className="flex flex-wrap items-center gap-2">
+            <UIButton
+              variant="secondary"
+              icon={Download}
+              onClick={handleExportCSV}
+              disabled={filteredShipments.length === 0}
+            >
+              Export CSV ({filteredShipments.length})
+            </UIButton>
+            <UIButton
+              variant="secondary"
+              icon={FileText}
+              onClick={handleExportPDF}
+              disabled={filteredShipments.length === 0}
+            >
+              Download PDF ({filteredShipments.length})
+            </UIButton>
             <UIButton
               variant="primary"
               icon={Plus}
@@ -592,21 +680,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
             >
               + Add Stock Record
             </UIButton>
-            <UIButton
-              variant="secondary"
-              icon={Download}
-              onClick={handleExportCSV}
-            >
-              Export CSV ({filteredShipments.length})
-            </UIButton>
-            <UIButton
-              variant="secondary"
-              icon={Printer}
-              onClick={handlePrint}
-            >
-              Print Ledger
-            </UIButton>
-          </>
+          </div>
         }
       />
 

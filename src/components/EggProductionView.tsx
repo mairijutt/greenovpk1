@@ -26,9 +26,12 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  Download,
+  FileText,
 } from 'lucide-react';
 import { EggProduction, Flock, Farm } from '../types/farm';
 import { getInitialUrlFilters } from '../utils/urlFilters';
+import { downloadRecordsCSV, downloadRecordsPDF } from '../utils/exportRecords';
 import {
   StatCard,
   PageHeader,
@@ -468,6 +471,127 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
       ? dailyChartData[hoveredDayIdx]
       : null;
 
+  const getEggExportPayload = () => {
+    const unitLabel =
+      selectedFlock === 'all'
+        ? 'All Units'
+        : flocks.find((f) => String(f.id) === String(selectedFlock) || f.name === selectedFlock)?.name ||
+          selectedFlock;
+    const rangeLabel =
+      fromDate || toDate ? `${fromDate || 'Start'} to ${toDate || 'Latest'}` : 'All Dates';
+    const todayStamp = new Date().toISOString().split('T')[0];
+
+    const columns = [
+      { header: 'ID', align: 'left' as const },
+      { header: 'Date', align: 'left' as const },
+      { header: 'Unit / Flock', align: 'left' as const },
+      { header: 'Grade', align: 'center' as const },
+      { header: 'Morning', align: 'right' as const },
+      { header: 'Evening', align: 'right' as const },
+      { header: 'Total Eggs', align: 'right' as const },
+      { header: 'Cartons', align: 'right' as const },
+      { header: 'Broken', align: 'right' as const },
+      { header: 'Laying %', align: 'center' as const },
+      { header: 'Notes', align: 'left' as const },
+    ];
+
+    let sumMorning = 0;
+    let sumEvening = 0;
+    let sumTotal = 0;
+    let sumBroken = 0;
+    let sumRate = 0;
+
+    const formatGrade = (raw?: string) => {
+      const g = String(raw || '').trim().toLowerCase();
+      if (g === 'started' || g === 'starter') return 'Starter';
+      if (g === 'medium') return 'Medium';
+      if (g === 'jumbo' || g === 'extra large') return 'Jumbo';
+      return 'Standard';
+    };
+
+    const pdfRows = filtered.map((r) => {
+      const m = Number(r.morningEggs || 0);
+      const ev = Number(r.eveningEggs || 0);
+      const tot = Number(r.totalEggs || 0);
+      const brk = Number(r.damagedEggs || 0);
+      const ctn = (tot / 360).toFixed(1);
+      sumMorning += m;
+      sumEvening += ev;
+      sumTotal += tot;
+      sumBroken += brk;
+      sumRate += Number(r.layingRatePercent || 0);
+      return [
+        `#${r.id}`,
+        r.date,
+        r.flockName,
+        formatGrade(r.eggGrade),
+        m.toLocaleString(),
+        ev.toLocaleString(),
+        tot.toLocaleString(),
+        ctn,
+        brk.toLocaleString(),
+        `${r.layingRatePercent}%`,
+        r.notes || '-',
+      ];
+    });
+
+    const csvRows = filtered.map((r) => {
+      const m = Number(r.morningEggs || 0);
+      const ev = Number(r.eveningEggs || 0);
+      const tot = Number(r.totalEggs || 0);
+      const brk = Number(r.damagedEggs || 0);
+      return [
+        r.id,
+        r.date,
+        r.flockName,
+        formatGrade(r.eggGrade),
+        m,
+        ev,
+        tot,
+        Number((tot / 360).toFixed(2)),
+        brk,
+        `${r.layingRatePercent}%`,
+        r.notes || '',
+      ];
+    });
+
+    const avgRateText = filtered.length > 0 ? `${(sumRate / filtered.length).toFixed(1)}%` : '0%';
+    const totalsRow = [
+      'TOTAL',
+      '',
+      '',
+      '',
+      sumMorning.toLocaleString(),
+      sumEvening.toLocaleString(),
+      sumTotal.toLocaleString(),
+      (sumTotal / 360).toFixed(1),
+      sumBroken.toLocaleString(),
+      avgRateText,
+      '',
+    ];
+
+    return {
+      title: 'Egg Production Records',
+      subtitle: `Unit: ${unitLabel}  |  Range: ${rangeLabel}`,
+      filenameBase: `GreenOva_Egg_Production_Records_${unitLabel}_${todayStamp}`,
+      columns,
+      rows: pdfRows,
+      csvRows,
+      totalsRow,
+      orientation: 'landscape' as const,
+    };
+  };
+
+  const handleExportCSV = () => {
+    if (filtered.length === 0) return;
+    downloadRecordsCSV(getEggExportPayload());
+  };
+
+  const handleExportPDF = () => {
+    if (filtered.length === 0) return;
+    downloadRecordsPDF(getEggExportPayload());
+  };
+
   return (
     <div className="space-y-6">
       {/* Standardized Page Header */}
@@ -478,13 +602,31 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
         iconColor="amber"
         badge="Active Layer Operations"
         actions={
-          <UIButton
-            variant="primary"
-            icon={Plus}
-            onClick={() => onOpenRecordModal('egg')}
-          >
-            Record Daily Eggs
-          </UIButton>
+          <div className="flex flex-wrap items-center gap-2">
+            <UIButton
+              variant="secondary"
+              icon={Download}
+              onClick={handleExportCSV}
+              disabled={filtered.length === 0}
+            >
+              Export CSV ({filtered.length})
+            </UIButton>
+            <UIButton
+              variant="secondary"
+              icon={FileText}
+              onClick={handleExportPDF}
+              disabled={filtered.length === 0}
+            >
+              Download PDF ({filtered.length})
+            </UIButton>
+            <UIButton
+              variant="primary"
+              icon={Plus}
+              onClick={() => onOpenRecordModal('egg')}
+            >
+              Record Daily Eggs
+            </UIButton>
+          </div>
         }
       />
 

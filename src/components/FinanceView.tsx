@@ -45,6 +45,7 @@ import {
   unitWiseSalesSummary,
 } from '../data/liveSales.ts';
 import { getInitialUrlFilters } from '../utils/urlFilters.ts';
+import { downloadRecordsCSV, downloadRecordsPDF } from '../utils/exportRecords.ts';
 import {
   StatCard,
   PageHeader,
@@ -1227,6 +1228,274 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     return 'bg-amber-50 text-amber-700 border-amber-200/80';
   };
 
+  const getFinanceExportPayload = () => {
+    const unitLabel = selectedUnit === 'all' ? 'All Units' : selectedUnit;
+    const rangeLabel =
+      fromDate || toDate ? `${fromDate || 'Start'} to ${toDate || 'Latest'}` : 'All Dates';
+    const todayStamp = new Date().toISOString().split('T')[0];
+
+    const resolveUnit = (fin: FinancialRecord) =>
+      fin.flockName ||
+      (fin.flockId === 8 || fin.flockId === '8'
+        ? 'Unit 1'
+        : fin.flockId === 9 || fin.flockId === '9'
+        ? 'Unit 2'
+        : fin.flockId === 10 || fin.flockId === '10'
+        ? 'Unit 3'
+        : '-');
+
+    const resolveTrackId = (fin: FinancialRecord) =>
+      fin.trackingId ||
+      (fin.id
+        ? fin.id.replace('exp-', '').replace('fin-', '').replace('sale-', '').replace('inc-', '')
+        : '-');
+
+    if (selectedType === 'Income') {
+      const columns = [
+        { header: 'ID', align: 'left' as const },
+        { header: 'Date', align: 'left' as const },
+        { header: 'Unit', align: 'left' as const },
+        { header: 'Category', align: 'left' as const },
+        { header: 'Qty (Eggs)', align: 'right' as const },
+        { header: 'Cartons', align: 'right' as const },
+        { header: 'Rate / Ctn', align: 'right' as const },
+        { header: 'Online (PKR)', align: 'right' as const },
+        { header: 'Cash (PKR)', align: 'right' as const },
+        { header: 'Total (PKR)', align: 'right' as const },
+        { header: 'Party / Buyer', align: 'left' as const },
+        { header: 'Challan / Vehicle', align: 'left' as const },
+      ];
+
+      let sumQty = 0;
+      let sumOnline = 0;
+      let sumCash = 0;
+      let sumTotal = 0;
+
+      const pdfRows = filtered.map((fin) => {
+        const s = fin as any;
+        const qty = Number(s.quantity || 0);
+        const ratePerCtn = s.unitPrice ? Math.round(Number(s.unitPrice) * 360) : 0;
+        const online = Number(s.onlinePayment || 0);
+        const cash = Number(s.cashPayment || 0);
+        const amt = Number(fin.amount || 0);
+        sumQty += qty;
+        sumOnline += online;
+        sumCash += cash;
+        sumTotal += amt;
+        const vehicleChallan = [
+          s.vehicleNumber || '',
+          s.challanNo ? `#${s.challanNo}` : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+        return [
+          `#${resolveTrackId(fin)}`,
+          fin.date,
+          resolveUnit(fin),
+          fin.head || fin.category || 'EGG',
+          qty.toLocaleString(),
+          (qty / 360).toFixed(1),
+          ratePerCtn.toLocaleString(),
+          online.toLocaleString(),
+          cash.toLocaleString(),
+          amt.toLocaleString(undefined, { maximumFractionDigits: 1 }),
+          s.partyName || '-',
+          vehicleChallan || '-',
+        ];
+      });
+
+      const csvRows = filtered.map((fin) => {
+        const s = fin as any;
+        const qty = Number(s.quantity || 0);
+        const ratePerCtn = s.unitPrice ? Math.round(Number(s.unitPrice) * 360) : 0;
+        const online = Number(s.onlinePayment || 0);
+        const cash = Number(s.cashPayment || 0);
+        const amt = Number(fin.amount || 0);
+        return [
+          resolveTrackId(fin),
+          fin.date,
+          resolveUnit(fin),
+          fin.head || fin.category || 'EGG',
+          qty,
+          Number((qty / 360).toFixed(2)),
+          ratePerCtn,
+          online,
+          cash,
+          amt,
+          s.partyName || '',
+          s.challanNo || s.vehicleNumber || '',
+        ];
+      });
+
+      const totalsRow = [
+        'TOTAL',
+        '',
+        '',
+        '',
+        sumQty.toLocaleString(),
+        (sumQty / 360).toFixed(1),
+        '',
+        sumOnline.toLocaleString(),
+        sumCash.toLocaleString(),
+        sumTotal.toLocaleString(undefined, { maximumFractionDigits: 1 }),
+        '',
+        '',
+      ];
+
+      return {
+        title: 'Commercial Sales Records',
+        subtitle: `Unit: ${unitLabel}  |  Range: ${rangeLabel}`,
+        filenameBase: `GreenOva_Sales_Records_${unitLabel}_${todayStamp}`,
+        columns,
+        rows: pdfRows,
+        csvRows,
+        totalsRow,
+        orientation: 'landscape' as const,
+      };
+    }
+
+    if (selectedType === 'Expense') {
+      const columns = [
+        { header: 'ID', align: 'left' as const },
+        { header: 'Date', align: 'left' as const },
+        { header: 'Unit', align: 'left' as const },
+        { header: 'Expense Head', align: 'left' as const },
+        { header: 'Challan No', align: 'left' as const },
+        { header: 'Description & Notes', align: 'left' as const },
+        { header: 'Amount (PKR)', align: 'right' as const },
+        { header: 'Status', align: 'center' as const },
+      ];
+
+      let sumAmt = 0;
+
+      const pdfRows = filtered.map((fin) => {
+        const amt = Number(fin.amount || 0);
+        sumAmt += amt;
+        return [
+          `#${resolveTrackId(fin)}`,
+          fin.date,
+          resolveUnit(fin),
+          fin.head || fin.category || 'OTHER',
+          fin.challanNo ? `#${fin.challanNo}` : fin.referenceNo || '-',
+          fin.notes || fin.description || '-',
+          amt.toLocaleString(undefined, { maximumFractionDigits: 1 }),
+          fin.status || 'Paid',
+        ];
+      });
+
+      const csvRows = filtered.map((fin) => [
+        resolveTrackId(fin),
+        fin.date,
+        resolveUnit(fin),
+        fin.head || fin.category || 'OTHER',
+        fin.challanNo || fin.referenceNo || '',
+        fin.notes || fin.description || '',
+        Number(fin.amount || 0),
+        fin.status || 'Paid',
+      ]);
+
+      const totalsRow = [
+        'TOTAL',
+        '',
+        '',
+        '',
+        '',
+        '',
+        sumAmt.toLocaleString(undefined, { maximumFractionDigits: 1 }),
+        '',
+      ];
+
+      return {
+        title: 'Operational Expense Records',
+        subtitle: `Unit: ${unitLabel}  |  Head: ${selectedHead === 'all' ? 'All Heads' : selectedHead}  |  Range: ${rangeLabel}`,
+        filenameBase: `GreenOva_Expense_Records_${unitLabel}_${todayStamp}`,
+        columns,
+        rows: pdfRows,
+        csvRows,
+        totalsRow,
+        orientation: 'landscape' as const,
+      };
+    }
+
+    // Combined Ledger ('all')
+    const columns = [
+      { header: 'ID', align: 'left' as const },
+      { header: 'Date', align: 'left' as const },
+      { header: 'Type', align: 'center' as const },
+      { header: 'Unit', align: 'left' as const },
+      { header: 'Head / Category', align: 'left' as const },
+      { header: 'Challan No', align: 'left' as const },
+      { header: 'Description & Notes', align: 'left' as const },
+      { header: 'Amount (PKR)', align: 'right' as const },
+      { header: 'Status', align: 'center' as const },
+    ];
+
+    let sumIncome = 0;
+    let sumExpense = 0;
+
+    const pdfRows = filtered.map((fin) => {
+      const amt = Number(fin.amount || 0);
+      if (fin.type === 'Income') sumIncome += amt;
+      else sumExpense += amt;
+      return [
+        `#${resolveTrackId(fin)}`,
+        fin.date,
+        fin.type,
+        resolveUnit(fin),
+        fin.head || fin.category || '-',
+        fin.challanNo ? `#${fin.challanNo}` : fin.referenceNo || '-',
+        fin.notes || fin.description || '-',
+        amt.toLocaleString(undefined, { maximumFractionDigits: 1 }),
+        fin.status || 'Paid',
+      ];
+    });
+
+    const csvRows = filtered.map((fin) => [
+      resolveTrackId(fin),
+      fin.date,
+      fin.type,
+      resolveUnit(fin),
+      fin.head || fin.category || '',
+      fin.challanNo || fin.referenceNo || '',
+      fin.notes || fin.description || '',
+      Number(fin.amount || 0),
+      fin.status || 'Paid',
+    ]);
+
+    const totalsRow = [
+      'NET',
+      '',
+      '',
+      '',
+      '',
+      '',
+      `In: ${sumIncome.toLocaleString()} | Out: ${sumExpense.toLocaleString()}`,
+      (sumIncome - sumExpense).toLocaleString(undefined, { maximumFractionDigits: 1 }),
+      '',
+    ];
+
+    return {
+      title: 'Financial Ledger Records',
+      subtitle: `Unit: ${unitLabel}  |  Range: ${rangeLabel}`,
+      filenameBase: `GreenOva_Financial_Records_${unitLabel}_${todayStamp}`,
+      columns,
+      rows: pdfRows,
+      csvRows,
+      totalsRow,
+      orientation: 'landscape' as const,
+    };
+  };
+
+  const handleExportCSV = () => {
+    if (filtered.length === 0) return;
+    downloadRecordsCSV(getFinanceExportPayload());
+  };
+
+  const handleExportPDF = () => {
+    if (filtered.length === 0) return;
+    downloadRecordsPDF(getFinanceExportPayload());
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -1255,7 +1524,23 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             : 'Complete Audited Ledger'
         }
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <UIButton
+              variant="secondary"
+              icon={Download}
+              onClick={handleExportCSV}
+              disabled={filtered.length === 0}
+            >
+              Export CSV ({filtered.length.toLocaleString()})
+            </UIButton>
+            <UIButton
+              variant="secondary"
+              icon={FileText}
+              onClick={handleExportPDF}
+              disabled={filtered.length === 0}
+            >
+              Download PDF ({filtered.length.toLocaleString()})
+            </UIButton>
             <UIButton
               variant={selectedType === 'Expense' ? 'danger' : 'primary'}
               icon={Plus}

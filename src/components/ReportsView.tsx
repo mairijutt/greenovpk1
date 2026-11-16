@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileBarChart2,
-  Printer,
+  FileText,
   Download,
   TrendingUp,
   Award,
@@ -37,6 +37,15 @@ import { StatCard, PageHeader, UIButton, TableCard, DateRangePickerBar, DatePres
 import { initialInventory } from '../data/mockData.ts';
 import { liveExpenseRecords, liveConsumptionRecords } from '../data/productionData.ts';
 import { CeoIncomeExpenseReport } from './CeoIncomeExpenseReport.tsx';
+import { apiFetch } from '../services/api.ts';
+import {
+  downloadRecordsCSV,
+  downloadRecordsPDF,
+  downloadStructuredCSV,
+  downloadIncomeStatementPDF,
+  PdfKpiCard,
+  PdfIncomeStatementLine,
+} from '../utils/exportRecords.ts';
 import {
   MONTH_OPTIONS,
   getMonthDateBounds,
@@ -228,27 +237,27 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     }
   };
 
-  // Egg Production dataset: prefer full liveEggProductions (413 records)
+  // Egg Production dataset: use live synced productions whenever loaded
   const eggDataset: DetailedEggProduction[] = useMemo(() => {
-    if (eggProductions.length >= 413) {
+    if (eggProductions.length > 0) {
       return eggProductions as DetailedEggProduction[];
     }
     return liveEggProductions;
   }, [eggProductions]);
 
-  // Sales dataset: prefer full liveSalesRecords (938 records)
+  // Sales dataset: use live synced sales whenever loaded
   const salesDataset: SaleRecord[] = useMemo(() => {
     const incomeFromFinancials = financials.filter((f) => f.type === 'Income') as SaleRecord[];
-    if (incomeFromFinancials.length >= 938) {
+    if (incomeFromFinancials.length > 0) {
       return incomeFromFinancials;
     }
     return liveSalesRecords;
   }, [financials]);
 
-  // Expense dataset: prefer full liveExpenseRecords (1,378 records)
+  // Expense dataset: use live synced expenses whenever loaded
   const expenseDataset: FinancialRecord[] = useMemo(() => {
     const expenseFromFinancials = financials.filter((f) => f.type === 'Expense');
-    if (expenseFromFinancials.length >= 1378) {
+    if (expenseFromFinancials.length > 0) {
       return expenseFromFinancials;
     }
     return liveExpenseRecords;
@@ -262,18 +271,64 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     return liveConsumptionRecords;
   }, [consumptionLogs]);
 
-  // Stock dataset: 157+ authentic records + any newly logged stock shipments
-  const stockDataset: StockRecord[] = useMemo(() => {
+  // Stock dataset: hydrated from live PostgreSQL /api/stocks with local fallback
+  const [stockDataset, setStockDataset] = useState<StockRecord[]>(() => {
     try {
       const saved = localStorage.getItem('greenova_stocks_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= liveStockRecords.length) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
     } catch (e) {}
     return liveStockRecords;
+  });
+
+  useEffect(() => {
+    let active = true;
+    apiFetch('/api/stocks?limit=2000')
+      .then((res) => {
+        const items = res?.data?.items;
+        if (!active || !Array.isArray(items) || items.length === 0) return;
+        const mapped: StockRecord[] = items.map((r: any) => {
+          const fid = String(r.flockId || 8);
+          const fname =
+            r.flock?.flockName || (fid === '9' ? 'Unit 2' : fid === '10' ? 'Unit 3' : 'Unit 1');
+          const dateStr = r.rawDate || (r.date ? String(r.date).slice(0, 10) : '');
+          return {
+            id: String(r.id),
+            trackingId: Number(r.trackingId || r.id) || 0,
+            date: dateStr,
+            rawDate: dateStr,
+            type: String(r.Type || r.type || '13'),
+            feedType:
+              r.feedType ||
+              (r.head === 'FEED'
+                ? `Layer Feed ${r.Type || '13'}`
+                : String(r.Type || r.head || 'Stock')),
+            flockName: fname,
+            flockId: fid,
+            head: String(r.head || 'FEED'),
+            category: String(r.head || 'FEED'),
+            quantity: Number(r.quantity || 0),
+            bags: Number(r.bags ?? r.quantity ?? 0),
+            amount: Number(r.amountPaid ?? r.amount ?? 0),
+            costPerBag: Number(r.costPerBag || 0),
+            paymentType: String(r.paymentType || 'CASH'),
+            challanNo: String(r.challanNo || ''),
+            notes: String(r.notes || ''),
+          };
+        });
+        setStockDataset(mapped);
+        try {
+          localStorage.setItem('greenova_stocks_v2', JSON.stringify(mapped));
+        } catch {}
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Unit supply inventory dataset
@@ -561,7 +616,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       ? filteredSales.length
       : activeReport === 'stock-inventory'
       ? filteredStocks.length
-      : filteredEggs.length;
+      : filteredMortality.length;
 
   const totalPages = Math.max(1, Math.ceil(currentDatasetLength / recordsPerPage));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -579,6 +634,102 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     return filteredStocks.slice(startIndex, startIndex + recordsPerPage);
   }, [filteredStocks, startIndex, recordsPerPage]);
 
+  const paginatedMortality = useMemo(() => {
+    return filteredMortality.slice(startIndex, startIndex + recordsPerPage);
+  }, [filteredMortality, startIndex, recordsPerPage]);
+
+  const unitMatchHelper = (rec: any, unitKey: string): boolean => {
+    if (unitKey === 'all') return true;
+    const fname = String(rec?.flockName || rec?.flock || '').toLowerCase();
+    const fid = String(rec?.flockId ?? '');
+    if (unitKey === 'Unit 1') return fname.includes('unit 1') || fid === '8';
+    if (unitKey === 'Unit 2') return fname.includes('unit 2') || fid === '9';
+    if (unitKey === 'Unit 3') return fname.includes('unit 3') || fid === '10';
+    return false;
+  };
+
+  const eggUnitCards = useMemo(() => {
+    const allEggs = eggDataset.reduce((s, e) => s + (e.totalEggs || 0), 0);
+    return ['all', 'Unit 1', 'Unit 2', 'Unit 3'].map((key) => {
+      const subset = eggDataset.filter((e) => unitMatchHelper(e, key));
+      const eggs = subset.reduce((s, e) => s + (e.totalEggs || 0), 0);
+      const cartons = Math.round(eggs / 360);
+      const share = allEggs > 0 ? ((eggs / allEggs) * 100).toFixed(1) : '0.0';
+      return {
+        key,
+        label: key === 'all' ? 'All Units Combined' : key,
+        count: subset.length,
+        cartons,
+        eggs,
+        share,
+      };
+    });
+  }, [eggDataset]);
+
+  const salesUnitCards = useMemo(() => {
+    const allAmt = salesDataset.reduce((s, x) => s + (x.amount || 0), 0);
+    return ['all', 'Unit 1', 'Unit 2', 'Unit 3'].map((key) => {
+      const subset = salesDataset.filter((x) => unitMatchHelper(x, key));
+      const amount = subset.reduce((s, x) => s + (x.amount || 0), 0);
+      const cartons = Math.round(
+        subset.reduce((s, x) => s + (x.quantity || 0), 0) / 360
+      );
+      const share = allAmt > 0 ? ((amount / allAmt) * 100).toFixed(1) : '0.0';
+      return {
+        key,
+        label: key === 'all' ? 'All Units Combined' : key,
+        count: subset.length,
+        amount,
+        cartons,
+        share,
+      };
+    });
+  }, [salesDataset]);
+
+  const stockUnitCards = useMemo(() => {
+    const allBags = stockDataset.reduce((s, x) => s + (x.quantity || 0), 0);
+    return ['all', 'Unit 1', 'Unit 2', 'Unit 3'].map((key) => {
+      const subset = stockDataset.filter((x) => unitMatchHelper(x, key));
+      const bags = subset.reduce((s, x) => s + (x.quantity || 0), 0);
+      const amount = subset.reduce((s, x) => s + (x.amount || 0), 0);
+      const share = allBags > 0 ? ((bags / allBags) * 100).toFixed(1) : '0.0';
+      return {
+        key,
+        label: key === 'all' ? 'All Units Combined' : key,
+        count: subset.length,
+        bags,
+        amount,
+        share,
+      };
+    });
+  }, [stockDataset]);
+
+  const healthUnitCards = useMemo(() => {
+    return ['all', 'Unit 1', 'Unit 2', 'Unit 3'].map((key) => {
+      const unitFlocks = flocks.filter((f) => {
+        if (key === 'all') return true;
+        if (key === 'Unit 1') return f.name === 'Unit 1' || String(f.id) === '8';
+        if (key === 'Unit 2') return f.name === 'Unit 2' || String(f.id) === '9';
+        if (key === 'Unit 3') return f.name === 'Unit 3' || String(f.id) === '10';
+        return false;
+      });
+      const activeBirds = unitFlocks.reduce((s, f) => s + (f.currentCount || 0), 0);
+      const initialBirds = unitFlocks.reduce((s, f) => s + (f.initialCount || f.currentCount || 0), 0);
+      const unitMortLogs = mortalityLogs.filter((m) => unitMatchHelper(m, key));
+      const mortality = unitFlocks.reduce((s, f) => s + (f.mortality || 0), 0) ||
+        unitMortLogs.reduce((s, m) => s + (m.count || 0), 0);
+      const livability = initialBirds > 0 ? ((activeBirds / initialBirds) * 100).toFixed(1) : '100.0';
+      return {
+        key,
+        label: key === 'all' ? 'All Units Combined' : key,
+        activeBirds,
+        mortality,
+        livability,
+        incidents: unitMortLogs.length,
+      };
+    });
+  }, [flocks, mortalityLogs]);
+
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
@@ -595,173 +746,709 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const fmtReportPkr = (val: number) => {
+    const sign = val < 0 ? '-' : '';
+    return `${sign}Rs. ${Math.round(Math.abs(val)).toLocaleString()}`;
+  };
+
+  const fmtCompactReportPkr = (val: number) => {
+    const sign = val < 0 ? '-' : '';
+    const abs = Math.abs(val);
+    if (abs >= 1_000_000) return `${sign}Rs. ${(abs / 1_000_000).toFixed(2)}M`;
+    return `${sign}Rs. ${Math.round(abs).toLocaleString()}`;
+  };
+
+  const buildIncomeVsExpenseExports = () => {
+    const m = activeCeoMetrics;
+    const rev = m.totalSalesRevenue || 0;
+    const pctStr = (v: number) => (rev > 0 ? `${((v / rev) * 100).toFixed(1)}%` : '0.0%');
+    const grossProfit = rev - m.cogsExpenses;
+    const otherOpEx = Math.max(0, m.operatingExpenses - m.salariesExpenses - m.utilitiesPolExpenses);
+    const opProfitExclCapex = rev - (m.totalExpenses - m.chickenCapexExpenses);
+    const unitLabel = selectedUnit === 'all' ? 'All Units Combined' : selectedUnit;
+    const isSurplus = m.netIncome >= 0;
+
+    const topCards: PdfKpiCard[] = [
+      {
+        label: 'Total Revenue',
+        value: fmtCompactReportPkr(rev),
+        subtext: `${m.salesCount.toLocaleString()} Bills | ${rev > 0 ? ((m.eggSalesRevenue / rev) * 100).toFixed(1) : '0.0'}% Eggs`,
+        tone: 'emerald',
+      },
+      {
+        label: 'Total Expenses',
+        value: fmtCompactReportPkr(m.totalExpenses),
+        subtext: `${m.expenseCount.toLocaleString()} Vouchers | Consumed Feed`,
+        tone: 'rose',
+      },
+      {
+        label: isSurplus ? 'Net Income' : 'Net Deficit',
+        value: fmtCompactReportPkr(m.netIncome),
+        subtext: `Net Margin: ${m.netMarginPercent.toFixed(1)}% | Excl. CAPEX: ${m.operatingMarginPercent.toFixed(1)}%`,
+        tone: isSurplus ? 'emerald' : 'rose',
+      },
+      {
+        label: 'Unit Economics',
+        value: `Rs. ${Math.round(m.avgCartonPrice).toLocaleString()}/ctn`,
+        subtext: `Cost/Bird: Rs. ${Math.round(m.avgPerBirdCost).toLocaleString()} | OpEx: ${fmtCompactReportPkr(m.operatingExpenses)}`,
+        tone: 'indigo',
+      },
+      {
+        label: 'Egg Production',
+        value: `${Math.round(m.totalCartonsProduced).toLocaleString()} Ctns`,
+        subtext: `${m.totalEggsProduced.toLocaleString()} Eggs | ${m.avgLayingRate.toFixed(1)}% Lay`,
+        tone: 'amber',
+      },
+      {
+        label: 'Cartons Sold',
+        value: `${Math.round(m.cartonsSold).toLocaleString()} Ctns`,
+        subtext: `${m.eggsSold.toLocaleString()} Eggs | ${m.eggSalesCount.toLocaleString()} Bills`,
+        tone: 'indigo',
+      },
+      {
+        label: 'Closing Egg Stock',
+        value: `${Math.round(m.carriedNextCartons).toLocaleString()} Ctns`,
+        subtext: `Open ${Math.round(m.carriedPrevCartons).toLocaleString()} -> Close ${Math.round(m.carriedNextCartons).toLocaleString()}`,
+        tone: 'slate',
+      },
+      {
+        label: 'Feed Consumed & Rem.',
+        value: `${m.feedConsumedBags.toLocaleString()} Bags`,
+        subtext: `Cost: ${fmtCompactReportPkr(m.feedExpenses)} | Rem: ${m.remainingFeedBags.toLocaleString()} Bags`,
+        tone: 'slate',
+      },
+    ];
+
+    const incomeStatementLines: PdfIncomeStatementLine[] = [
+      { kind: 'section', particulars: 'A. REVENUE (INCOME)', basis: '', amount: '', percentRevenue: '' },
+      {
+        kind: 'item',
+        particulars: 'Egg Sales Revenue',
+        basis: `${Math.round(m.cartonsSold).toLocaleString()} ctns @ Rs. ${Math.round(m.avgCartonPrice).toLocaleString()}/ctn`,
+        amount: fmtReportPkr(m.eggSalesRevenue),
+        percentRevenue: pctStr(m.eggSalesRevenue),
+      },
+      {
+        kind: 'item',
+        particulars: 'Other Farm Sales',
+        basis: 'Manure, Bags, Birds & Misc.',
+        amount: fmtReportPkr(m.otherSalesRevenue),
+        percentRevenue: pctStr(m.otherSalesRevenue),
+      },
+      {
+        kind: 'subtotal',
+        particulars: 'Total Revenue (A)',
+        basis: `${m.salesCount.toLocaleString()} Sales Bills`,
+        amount: fmtReportPkr(rev),
+        percentRevenue: rev > 0 ? '100.0%' : '0.0%',
+      },
+      {
+        kind: 'section',
+        particulars: 'B. COST OF GOODS SOLD (DIRECT BIRD & PRODUCTION COSTS)',
+        basis: '',
+        amount: '',
+        percentRevenue: '',
+      },
+      {
+        kind: 'item',
+        particulars: 'Feed Consumed Expenses',
+        basis: `${m.feedConsumedBags.toLocaleString()} bags consumed (${m.feedStockReceivedBags.toLocaleString()} purch.)`,
+        amount: fmtReportPkr(m.feedExpenses),
+        percentRevenue: pctStr(m.feedExpenses),
+      },
+      {
+        kind: 'item',
+        particulars: 'Chicken / Flock Purchases (CAPEX)',
+        basis: 'Flock Placement / Acquisition',
+        amount: fmtReportPkr(m.chickenCapexExpenses),
+        percentRevenue: pctStr(m.chickenCapexExpenses),
+      },
+      {
+        kind: 'item',
+        particulars: 'Medicine & Vaccines',
+        basis: 'Health & Biosecurity',
+        amount: fmtReportPkr(m.medicineVaccineExpenses),
+        percentRevenue: pctStr(m.medicineVaccineExpenses),
+      },
+      {
+        kind: 'subtotal',
+        particulars: 'Total Cost of Goods Sold (B)',
+        basis: 'Direct Bird & Feed Cost',
+        amount: `(${fmtReportPkr(m.cogsExpenses)})`,
+        percentRevenue: pctStr(m.cogsExpenses),
+      },
+      {
+        kind: 'gross',
+        particulars: 'Gross Profit / (Loss) (A - B)',
+        basis: '',
+        amount: fmtReportPkr(grossProfit),
+        percentRevenue: pctStr(grossProfit),
+      },
+      {
+        kind: 'section',
+        particulars: 'C. OPERATING EXPENSES (UNIT OVERHEADS)',
+        basis: '',
+        amount: '',
+        percentRevenue: '',
+      },
+      {
+        kind: 'item',
+        particulars: 'Staff Salaries & Labor Payments',
+        basis: 'Farm Crew & Management',
+        amount: fmtReportPkr(m.salariesExpenses),
+        percentRevenue: pctStr(m.salariesExpenses),
+      },
+      {
+        kind: 'item',
+        particulars: 'Utilities, Electricity & Fuel (POL)',
+        basis: 'Power, Generator & Transport',
+        amount: fmtReportPkr(m.utilitiesPolExpenses),
+        percentRevenue: pctStr(m.utilitiesPolExpenses),
+      },
+      {
+        kind: 'item',
+        particulars: 'Other Farm Overheads',
+        basis: 'Repairs, Packing, Rent & Admin',
+        amount: fmtReportPkr(otherOpEx),
+        percentRevenue: pctStr(otherOpEx),
+      },
+      {
+        kind: 'subtotal',
+        particulars: 'Total Operating Expenses (C)',
+        basis: 'Unit Operating Cost (Excl. Bird Cost)',
+        amount: `(${fmtReportPkr(m.operatingExpenses)})`,
+        percentRevenue: pctStr(m.operatingExpenses),
+      },
+      {
+        kind: 'subtotal',
+        particulars: 'Total Expenses (B + C)',
+        basis: `${m.expenseCount.toLocaleString()} Vouchers (Consumed Feed)`,
+        amount: `(${fmtReportPkr(m.totalExpenses)})`,
+        percentRevenue: pctStr(m.totalExpenses),
+      },
+      {
+        kind: 'net',
+        particulars: isSurplus ? 'Net Income (A - Total Expenses)' : 'Net Loss (A - Total Expenses)',
+        basis: `Op. Profit excl. CAPEX: ${fmtReportPkr(opProfitExclCapex)}`,
+        amount: fmtReportPkr(m.netIncome),
+        percentRevenue: `${m.netMarginPercent.toFixed(1)}%`,
+        isPositive: isSurplus,
+      },
+    ];
+
+    const unitMatrixList = [
+      { name: 'Unit 1', u: ceoUnit1Metrics },
+      { name: 'Unit 2', u: ceoUnit2Metrics },
+      { name: 'Unit 3', u: ceoUnit3Metrics },
+      { name: 'All Units', u: ceoAllMetrics },
+    ];
+
+    return {
+      title: 'Income Statement & Executive Summary',
+      subtitle: `Period: ${m.periodLabel}  |  Unit: ${unitLabel}  |  Active Flock: ${m.activeBirds.toLocaleString()} Birds`,
+      filenameBase: `GreenOva_Income_Statement_${unitLabel}_${selectedYear}_${selectedMonth}`,
+      cards: topCards,
+      incomeStatementLines,
+      unitSummaryColumns: [
+        { header: 'Unit', align: 'left' as const, width: 19 },
+        { header: 'Birds', align: 'right' as const, width: 16 },
+        { header: 'Prod (Ctns)', align: 'right' as const, width: 19 },
+        { header: 'Sold (Ctns)', align: 'right' as const, width: 19 },
+        { header: 'Revenue (PKR)', align: 'right' as const, width: 28 },
+        { header: 'Expense (PKR)', align: 'right' as const, width: 28 },
+        { header: 'Net P&L (PKR)', align: 'right' as const, width: 28 },
+        { header: 'Feed (Bags)', align: 'right' as const, width: 17 },
+        { header: 'Cost/Bird', align: 'right' as const, width: 16 },
+      ],
+      unitSummaryRows: unitMatrixList.map(({ name, u }) => [
+        name,
+        u.activeBirds.toLocaleString(),
+        Math.round(u.totalCartonsProduced).toLocaleString(),
+        Math.round(u.cartonsSold).toLocaleString(),
+        Math.round(u.totalSalesRevenue).toLocaleString(),
+        Math.round(u.totalExpenses).toLocaleString(),
+        Math.round(u.netIncome).toLocaleString(),
+        u.feedConsumedBags.toLocaleString(),
+        `Rs. ${Math.round(u.avgPerBirdCost).toLocaleString()}`,
+      ]),
+      monthlyColumns: [
+        { header: 'Month', align: 'left' as const, width: 22 },
+        { header: 'Prod (Ctns)', align: 'right' as const, width: 20 },
+        { header: 'Sold (Ctns)', align: 'right' as const, width: 20 },
+        { header: 'Rem Prod', align: 'right' as const, width: 20 },
+        { header: 'Revenue (PKR)', align: 'right' as const, width: 27 },
+        { header: 'Expense (PKR)', align: 'right' as const, width: 27 },
+        { header: 'Net P&L (PKR)', align: 'right' as const, width: 26 },
+        { header: 'Feed (Bags)', align: 'right' as const, width: 14 },
+        { header: 'Rem Feed', align: 'right' as const, width: 14 },
+      ],
+      monthlyRows: ceoMonthlyRows.map((r) => [
+        r.monthLabel,
+        Math.round(r.totalCartonsProduced).toLocaleString(),
+        Math.round(r.cartonsSold).toLocaleString(),
+        Math.round(r.carriedNextCartons).toLocaleString(),
+        Math.round(r.totalSales).toLocaleString(),
+        Math.round(r.totalExpenses).toLocaleString(),
+        Math.round(r.netIncome).toLocaleString(),
+        r.feedConsumedBags.toLocaleString(),
+        r.remainingFeedBags.toLocaleString(),
+      ]),
+      csvSections: [
+        {
+          title: `TOP SUMMARY CARDS (${m.periodLabel} - ${unitLabel})`,
+          columns: ['Metric', 'Value', 'Details'],
+          rows: topCards.map((c) => [c.label, c.value, c.subtext || '']),
+        },
+        {
+          title: 'INCOME STATEMENT (PROFIT & LOSS)',
+          columns: ['Particulars', 'Basis / Details', 'Amount (PKR)', '% of Revenue'],
+          rows: [
+            ['Egg Sales Revenue', `${Math.round(m.cartonsSold)} ctns @ Rs. ${Math.round(m.avgCartonPrice)}/ctn`, Math.round(m.eggSalesRevenue), pctStr(m.eggSalesRevenue)],
+            ['Other Farm Sales', 'Manure, Feed Bags, Cull Birds & Misc.', Math.round(m.otherSalesRevenue), pctStr(m.otherSalesRevenue)],
+            ['Total Revenue (A)', `${m.salesCount} Bills`, Math.round(rev), rev > 0 ? '100.0%' : '0.0%'],
+            ['Feed Consumed Expenses', `${m.feedConsumedBags} bags consumed (${m.feedStockReceivedBags} purchased)`, Math.round(m.feedExpenses), pctStr(m.feedExpenses)],
+            ['Chicken / Flock Purchases (CAPEX)', 'Flock Placement / Acquisition', Math.round(m.chickenCapexExpenses), pctStr(m.chickenCapexExpenses)],
+            ['Medicine & Vaccines', 'Health & Biosecurity', Math.round(m.medicineVaccineExpenses), pctStr(m.medicineVaccineExpenses)],
+            ['Total Cost of Goods Sold (B)', 'Direct Bird & Feed Cost', Math.round(m.cogsExpenses), pctStr(m.cogsExpenses)],
+            ['Gross Profit / (Loss) (A - B)', '', Math.round(grossProfit), pctStr(grossProfit)],
+            ['Staff Salaries & Labor', 'Farm Crew & Management', Math.round(m.salariesExpenses), pctStr(m.salariesExpenses)],
+            ['Utilities, Electricity & Fuel (POL)', 'Power, Generator & Transport', Math.round(m.utilitiesPolExpenses), pctStr(m.utilitiesPolExpenses)],
+            ['Other Farm Overheads', 'Repairs, Packing, Rent & Admin', Math.round(otherOpEx), pctStr(otherOpEx)],
+            ['Total Operating Expenses (C)', 'Unit Operating Cost (Excl. Bird Cost)', Math.round(m.operatingExpenses), pctStr(m.operatingExpenses)],
+            ['Total Expenses (B + C)', `${m.expenseCount} Vouchers`, Math.round(m.totalExpenses), pctStr(m.totalExpenses)],
+            ['Net Income / (Net Loss)', `Operating Profit excl. CAPEX: ${Math.round(opProfitExclCapex)}`, Math.round(m.netIncome), `${m.netMarginPercent.toFixed(1)}%`],
+          ],
+        },
+        {
+          title: 'UNIT-WISE COMPARATIVE SUMMARY',
+          columns: [
+            'Unit',
+            'Active Birds',
+            'Production (Ctns)',
+            'Cartons Sold',
+            'Total Sale (PKR)',
+            'Total Expense (PKR)',
+            'Net Income (PKR)',
+            'Feed Consumed (Bags)',
+            'Rem. Production (Ctns)',
+            'Rem. Feed (Bags)',
+            'Avg Carton Price (PKR)',
+            'Cost / Bird (PKR)',
+          ],
+          rows: unitMatrixList.map(({ name, u }) => [
+            name,
+            u.activeBirds,
+            Math.round(u.totalCartonsProduced),
+            Math.round(u.cartonsSold),
+            Math.round(u.totalSalesRevenue),
+            Math.round(u.totalExpenses),
+            Math.round(u.netIncome),
+            u.feedConsumedBags,
+            Math.round(u.carriedNextCartons),
+            u.remainingFeedBags,
+            Math.round(u.avgCartonPrice),
+            Math.round(u.avgPerBirdCost),
+          ]),
+        },
+        ...(ceoMonthlyRows.length > 0
+          ? [
+              {
+                title: 'MONTHLY ROLLOVER SCHEDULE',
+                columns: [
+                  'Month',
+                  'C/F Prev (Ctns)',
+                  'Produced (Ctns)',
+                  'Sold (Ctns)',
+                  'Rem. Prod (Ctns)',
+                  'Total Sale (PKR)',
+                  'Total Expense (PKR)',
+                  'Net Income (PKR)',
+                  'Feed Consumed (Bags)',
+                  'Rem. Feed (Bags)',
+                  'Avg Carton Price (PKR)',
+                  'Cost / Bird (PKR)',
+                ],
+                rows: ceoMonthlyRows.map((r) => [
+                  r.monthLabel,
+                  Math.round(r.carriedPrevCartons),
+                  Math.round(r.totalCartonsProduced),
+                  Math.round(r.cartonsSold),
+                  Math.round(r.carriedNextCartons),
+                  Math.round(r.totalSales),
+                  Math.round(r.totalExpenses),
+                  Math.round(r.netIncome),
+                  r.feedConsumedBags,
+                  r.remainingFeedBags,
+                  Math.round(r.avgCartonPrice),
+                  Math.round(r.avgPerBirdCost),
+                ]),
+              },
+            ]
+          : []),
+        ...(bankSummary.banks.length > 0
+          ? [
+              {
+                title: 'BANK BALANCES LEDGER',
+                columns: [
+                  'Bank Name',
+                  'Account Title',
+                  'Account No',
+                  'Opening Date',
+                  'Opening Balance (PKR)',
+                  'Period Sales Added (PKR)',
+                  'Total Sales Added (PKR)',
+                  'Current Balance (PKR)',
+                ],
+                rows: bankSummary.banks.map((b) => [
+                  b.bank.bankName,
+                  b.bank.accountTitle,
+                  b.bank.accountNumber || '',
+                  b.bank.openingDate,
+                  Math.round(b.openingBalance),
+                  Math.round(b.salesInPeriod),
+                  Math.round(b.totalSalesAdded),
+                  Math.round(b.currentBalance),
+                ]),
+              },
+            ]
+          : []),
+      ],
+    };
+  };
+
+  const getActiveRecordsExportPayload = () => {
+    const unitLabel = selectedUnit === 'all' ? 'All_Units' : selectedUnit.replace(/\s+/g, '_');
+    const rangeLabel = fromDate || toDate ? `${fromDate || 'Start'} to ${toDate || 'Latest'}` : 'All Dates';
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    if (activeReport === 'egg-production') {
+      let sumMorning = 0;
+      let sumEvening = 0;
+      let sumTotal = 0;
+      let sumBroken = 0;
+      let sumRate = 0;
+      const pdfRows = filteredEggs.map((e) => {
+        const m = Number(e.morningEggs || 0);
+        const ev = Number(e.eveningEggs || 0);
+        const tot = Number(e.totalEggs || 0);
+        const brk = Number(e.damagedEggs || e.brokenEggs || 0);
+        sumMorning += m;
+        sumEvening += ev;
+        sumTotal += tot;
+        sumBroken += brk;
+        sumRate += Number(e.layingRatePercent || 0);
+        return [
+          `#${e.trackingId || e.id}`,
+          e.date,
+          e.flockName || 'Unit',
+          m.toLocaleString(),
+          ev.toLocaleString(),
+          tot.toLocaleString(),
+          (tot / 360).toFixed(1),
+          brk.toLocaleString(),
+          `${e.averageWeight || 60} g`,
+          `${e.layingRatePercent || 0}%`,
+        ];
+      });
+      const csvRows = filteredEggs.map((e) => [
+        e.trackingId || e.id,
+        e.date,
+        e.flockName || 'Unit',
+        Number(e.morningEggs || 0),
+        Number(e.eveningEggs || 0),
+        Number(e.totalEggs || 0),
+        Number(((e.totalEggs || 0) / 360).toFixed(2)),
+        Number(e.damagedEggs || e.brokenEggs || 0),
+        Number(e.averageWeight || 60),
+        `${e.layingRatePercent || 0}%`,
+      ]);
+      const avgRate = filteredEggs.length > 0 ? `${(sumRate / filteredEggs.length).toFixed(1)}%` : '0%';
+      return {
+        title: 'Egg Production Audit Records',
+        subtitle: `Unit: ${selectedUnit === 'all' ? 'All Units' : selectedUnit}  |  Range: ${rangeLabel}`,
+        filenameBase: `GreenOva_Egg_Production_Audit_${unitLabel}_${stamp}`,
+        columns: [
+          { header: 'ID', width: 16 },
+          { header: 'Date', width: 22 },
+          { header: 'Unit / Flock', width: 24 },
+          { header: 'Morning', align: 'right' as const, width: 24 },
+          { header: 'Evening', align: 'right' as const, width: 24 },
+          { header: 'Total Eggs', align: 'right' as const, width: 26 },
+          { header: 'Cartons', align: 'right' as const, width: 22 },
+          { header: 'Broken', align: 'right' as const, width: 20 },
+          { header: 'Avg Wt', align: 'right' as const, width: 20 },
+          { header: 'Laying %', align: 'right' as const, width: 22 },
+        ],
+        rows: pdfRows,
+        csvRows,
+        totalsRow: [
+          'TOTAL',
+          '',
+          '',
+          sumMorning.toLocaleString(),
+          sumEvening.toLocaleString(),
+          sumTotal.toLocaleString(),
+          (sumTotal / 360).toFixed(1),
+          sumBroken.toLocaleString(),
+          '',
+          avgRate,
+        ],
+      };
+    }
+
+    if (activeReport === 'sales-revenue') {
+      let sumQty = 0;
+      let sumOnline = 0;
+      let sumCash = 0;
+      let sumAmt = 0;
+      const pdfRows = filteredSales.map((s) => {
+        const qty = Number(s.quantity || 0);
+        const amt = Number(s.amount || 0);
+        const onl = Number(s.onlinePayment || (s.paymentMethod === 'Bank Transfer' ? amt : 0));
+        const csh = Number(s.cashPayment || (s.paymentMethod === 'Cash' ? amt : 0));
+        sumQty += qty;
+        sumOnline += onl;
+        sumCash += csh;
+        sumAmt += amt;
+        return [
+          `#${s.trackingId || s.id}`,
+          s.date,
+          s.flockName || s.flock || 'Unit',
+          s.category,
+          (qty / 360).toFixed(1),
+          Math.round((s.unitPrice || 0) * 360).toLocaleString(),
+          onl > 0 ? onl.toLocaleString() : '-',
+          csh > 0 ? csh.toLocaleString() : '-',
+          amt.toLocaleString(),
+          [s.vehicleNumber, s.challanNo ? `CH-${s.challanNo}` : ''].filter(Boolean).join(' • ') || '-',
+          s.notes || '-',
+        ];
+      });
+      const csvRows = filteredSales.map((s) => {
+        const qty = Number(s.quantity || 0);
+        const amt = Number(s.amount || 0);
+        const onl = Number(s.onlinePayment || (s.paymentMethod === 'Bank Transfer' ? amt : 0));
+        const csh = Number(s.cashPayment || (s.paymentMethod === 'Cash' ? amt : 0));
+        return [
+          s.trackingId || s.id,
+          s.date,
+          s.flockName || s.flock || 'Unit',
+          s.category,
+          Number((qty / 360).toFixed(2)),
+          Math.round((s.unitPrice || 0) * 360),
+          onl,
+          csh,
+          amt,
+          [s.vehicleNumber, s.challanNo].filter(Boolean).join('-'),
+          s.notes || '',
+        ];
+      });
+      return {
+        title: 'Sales & Revenue Audit Records',
+        subtitle: `Unit: ${selectedUnit === 'all' ? 'All Units' : selectedUnit}  |  Range: ${rangeLabel}`,
+        filenameBase: `GreenOva_Sales_Revenue_Audit_${unitLabel}_${stamp}`,
+        columns: [
+          { header: 'ID', width: 15 },
+          { header: 'Date', width: 20 },
+          { header: 'Unit / Flock', width: 20 },
+          { header: 'Category', width: 22 },
+          { header: 'Cartons', align: 'right' as const, width: 18 },
+          { header: 'Rate/Ctn', align: 'right' as const, width: 20 },
+          { header: 'Online (PKR)', align: 'right' as const, width: 24 },
+          { header: 'Cash (PKR)', align: 'right' as const, width: 24 },
+          { header: 'Total (PKR)', align: 'right' as const, width: 26 },
+          { header: 'Vehicle / Challan', width: 26 },
+          { header: 'Notes' },
+        ],
+        rows: pdfRows,
+        csvRows,
+        totalsRow: [
+          'TOTAL',
+          '',
+          '',
+          '',
+          (sumQty / 360).toFixed(1),
+          '',
+          sumOnline.toLocaleString(),
+          sumCash.toLocaleString(),
+          sumAmt.toLocaleString(),
+          '',
+          '',
+        ],
+      };
+    }
+
+    if (activeReport === 'stock-inventory') {
+      let sumBags = 0;
+      let sumAmt = 0;
+      const pdfRows = filteredStocks.map((r) => {
+        const bags = Number(r.quantity || 0);
+        const amt = Number(r.amount || 0);
+        sumBags += bags;
+        sumAmt += amt;
+        return [
+          `#${r.trackingId || r.id}`,
+          r.rawDate || r.date,
+          r.flockName,
+          r.head,
+          `Feed ${r.type}`,
+          bags.toLocaleString(),
+          (r.costPerBag || 0).toLocaleString(),
+          amt.toLocaleString(),
+          r.paymentType,
+          r.challanNo ? `CH-${r.challanNo}` : '-',
+          r.notes || '-',
+        ];
+      });
+      const csvRows = filteredStocks.map((r) => [
+        r.trackingId || r.id,
+        r.rawDate || r.date,
+        r.flockName,
+        r.head,
+        r.feedType,
+        Number(r.quantity || 0),
+        Number(r.costPerBag || 0),
+        Number(r.amount || 0),
+        r.paymentType,
+        r.challanNo || '',
+        r.notes || '',
+      ]);
+      const avgRate = sumBags > 0 ? Math.round(sumAmt / sumBags) : 0;
+      return {
+        title: 'Stock & Inventory Audit Records',
+        subtitle: `Unit: ${selectedUnit === 'all' ? 'All Units' : selectedUnit}  |  Range: ${rangeLabel}`,
+        filenameBase: `GreenOva_Stock_Inventory_Audit_${unitLabel}_${stamp}`,
+        columns: [
+          { header: 'ID', width: 15 },
+          { header: 'Date', width: 20 },
+          { header: 'Unit / Flock', width: 20 },
+          { header: 'Head', width: 18 },
+          { header: 'Feed Type', width: 22 },
+          { header: 'Qty (Bags)', align: 'right' as const, width: 20 },
+          { header: 'Rate/Bag', align: 'right' as const, width: 20 },
+          { header: 'Amount (PKR)', align: 'right' as const, width: 26 },
+          { header: 'Payment', width: 20 },
+          { header: 'Challan #', width: 22 },
+          { header: 'Notes' },
+        ],
+        rows: pdfRows,
+        csvRows,
+        totalsRow: [
+          'TOTAL',
+          '',
+          '',
+          '',
+          '',
+          sumBags.toLocaleString(),
+          avgRate.toLocaleString(),
+          sumAmt.toLocaleString(),
+          '',
+          '',
+          '',
+        ],
+      };
+    }
+
+    // flock-health mortality & health audit records
+    let sumCasualties = 0;
+    const pdfRows = filteredMortality.map((m) => {
+      const cnt = Number(m.count || 0);
+      sumCasualties += cnt;
+      return [
+        `#${m.id}`,
+        m.date,
+        m.flockName || 'Unit',
+        cnt.toLocaleString(),
+        m.cause || 'Natural / Routine',
+        m.symptoms || '-',
+        m.recordedBy || '-',
+      ];
+    });
+    const csvRows = filteredMortality.map((m) => [
+      m.id,
+      m.date,
+      m.flockName || 'Unit',
+      Number(m.count || 0),
+      m.cause || 'Natural / Routine',
+      m.symptoms || '',
+      m.recordedBy || '',
+    ]);
+    return {
+      title: 'Flock & Bird Health Audit Records',
+      subtitle: `Unit: ${selectedUnit === 'all' ? 'All Units' : selectedUnit}  |  Range: ${rangeLabel}`,
+      filenameBase: `GreenOva_Flock_Health_Audit_${unitLabel}_${stamp}`,
+      columns: [
+        { header: 'ID', width: 22 },
+        { header: 'Date', width: 24 },
+        { header: 'Unit / Flock', width: 28 },
+        { header: 'Mortality (Birds)', align: 'right' as const, width: 28 },
+        { header: 'Cause', width: 50 },
+        { header: 'Symptoms', width: 55 },
+        { header: 'Recorded By' },
+      ],
+      rows: pdfRows,
+      csvRows,
+      totalsRow: ['TOTAL', '', '', sumCasualties.toLocaleString(), '', '', ''],
+    };
   };
 
   const handleExportCSV = () => {
     if (activeReport === 'income-vs-expense') {
-      const m = activeCeoMetrics;
-      const lines: string[] = [
-        `GreenOva Income vs Expenses Executive Summary,${m.periodLabel},${selectedUnit === 'all' ? 'All Units Combined' : selectedUnit}`,
-        '',
-        'EXECUTIVE KPI SUMMARY',
-        'Metric,Value,Details',
-        `Total Productions (Cartons),${Math.round(m.totalCartonsProduced)},${m.totalEggsProduced} Eggs | ${m.brokenEggs} Broken | ${m.avgLayingRate.toFixed(1)}% Laying`,
-        `Total Cartons Sold,${Math.round(m.cartonsSold)},${m.eggsSold} Eggs | ${m.eggSalesCount} Egg Bills | Avg Rs. ${Math.round(m.avgCartonPrice)}/ctn`,
-        `Total Sale (PKR),${Math.round(m.totalSalesRevenue)},${m.salesCount} Bills | Egg Sales: ${Math.round(m.eggSalesRevenue)} | Other: ${Math.round(m.otherSalesRevenue)}`,
-        `Total Expense (PKR),${Math.round(m.totalExpenses)},${m.expenseCount} Vouchers | COGS: ${Math.round(m.cogsExpenses)} | OPEX: ${Math.round(m.operatingExpenses)}`,
-        `Net Income (PKR),${Math.round(m.netIncome)},Net Margin: ${m.netMarginPercent.toFixed(1)}% | Operating Margin Excl CAPEX: ${m.operatingMarginPercent.toFixed(1)}%`,
-        `Total Feed Consumption (Bags),${m.feedConsumedBags},${m.feedConsumedKg} kg | Consumed Feed Expense: Rs. ${Math.round(m.feedExpenses)} (Purchased: ${m.feedStockReceivedBags} bags / Rs. ${Math.round(m.feedStockReceivedAmount)})`,
-        `Remaining Production (Cartons),${Math.round(m.carriedNextCartons)},${m.carriedNextEggs} Eggs On Hand | Period Net: ${Math.round(m.periodRemainingCartons)} Ctns`,
-        `Remaining Feed (Bags),${m.remainingFeedBags},${m.remainingFeedKg} kg Remaining on Units`,
-        `Carried Forward From Previous Month (${m.prevPeriodLabel}),${Math.round(m.carriedPrevCartons)} Ctns Eggs,${m.carriedPrevFeedBags} Bags Feed | Opening Net Cash: Rs. ${Math.round(m.carriedPrevNetCash)}`,
-        `Carried Forward To Next Month (${m.nextPeriodLabel}),${Math.round(m.carriedNextCartons)} Ctns Eggs,${m.carriedNextFeedBags} Bags Feed | Closing Net Cash: Rs. ${Math.round(m.carriedNextNetCash)}`,
-        `Average Carton Price (PKR),${Math.round(m.avgCartonPrice)},Rs. ${m.avgEggPrice.toFixed(2)} per egg (${Math.round(m.cartonsSold)} ctns sold)`,
-        `Average Per Bird Cost (PKR),${Math.round(m.avgPerBirdCost)},Active Birds: ${m.activeBirds} | Rev/Bird: Rs. ${Math.round(m.avgPerBirdRevenue)} | Net/Bird: Rs. ${Math.round(m.avgPerBirdNet)}`,
-        '',
-        'BANK BALANCES LEDGER',
-        'Bank Name,Account Title,Account No,Opening Date,Opening Balance (PKR),Period Sales Added (PKR),Total Sales Added (PKR),Current Live Balance (PKR)',
-        ...bankSummary.banks.map(
-          (b) =>
-            `"${b.bank.bankName}","${b.bank.accountTitle}","${b.bank.accountNumber}","${b.bank.openingDate}",${Math.round(b.openingBalance)},${Math.round(b.salesInPeriod)},${Math.round(b.totalSalesAdded)},${Math.round(b.currentBalance)}`
-        ),
-        `Total All Banks,,,,${Math.round(bankSummary.totalOpeningBalance)},${Math.round(bankSummary.totalPeriodSalesAddedToBanks)},${Math.round(bankSummary.totalSalesAddedToBanks)},${Math.round(bankSummary.totalCurrentBankBalance)}`,
-        '',
-        'UNIT-WISE COMPARATIVE SUMMARY',
-        'Unit,Active Birds,Production (Ctns),Cartons Sold,Total Sale (PKR),Total Expense (PKR),Net Income (PKR),Feed Consumed (Bags),Rem Production (Ctns),Rem Feed (Bags),Avg Carton Price (PKR),Avg Cost Per Bird (PKR)',
-        ...[
-          { name: 'Unit 1', u: ceoUnit1Metrics },
-          { name: 'Unit 2', u: ceoUnit2Metrics },
-          { name: 'Unit 3', u: ceoUnit3Metrics },
-          { name: 'All Units Combined', u: ceoAllMetrics },
-        ].map(
-          ({ name, u }) =>
-            `${name},${u.activeBirds},${Math.round(u.totalCartonsProduced)},${Math.round(u.cartonsSold)},${Math.round(u.totalSalesRevenue)},${Math.round(u.totalExpenses)},${Math.round(u.netIncome)},${u.feedConsumedBags},${Math.round(u.carriedNextCartons)},${u.remainingFeedBags},${Math.round(u.avgCartonPrice)},${Math.round(u.avgPerBirdCost)}`
-        ),
-        '',
-        'MONTHLY ROLLOVER LEDGER',
-        'Month,C/F Prev (Ctns),Produced (Ctns),Sold (Ctns),Rem Prod Next (Ctns),Total Sale (PKR),Total Expense (PKR),Net Income (PKR),Feed Consumed (Bags),Rem Feed (Bags),Avg Carton Price (PKR),Avg Cost/Bird (PKR)',
-        ...ceoMonthlyRows.map(
-          (r) =>
-            `"${r.monthLabel}",${Math.round(r.carriedPrevCartons)},${Math.round(r.totalCartonsProduced)},${Math.round(r.cartonsSold)},${Math.round(r.carriedNextCartons)},${Math.round(r.totalSales)},${Math.round(r.totalExpenses)},${Math.round(r.netIncome)},${r.feedConsumedBags},${r.remainingFeedBags},${Math.round(r.avgCartonPrice)},${Math.round(r.avgPerBirdCost)}`
-        ),
-        '',
-        'SIMPLIFIED INCOME STATEMENT (PROFIT & LOSS)',
-        'Particulars,Amount (PKR),% of Revenue',
-        `Egg Sales Revenue,${Math.round(m.eggSalesRevenue)},${m.totalSalesRevenue > 0 ? ((m.eggSalesRevenue / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Other Farm Sales,${Math.round(m.otherSalesRevenue)},${m.totalSalesRevenue > 0 ? ((m.otherSalesRevenue / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Total Revenue (A),${Math.round(m.totalSalesRevenue)},${m.totalSalesRevenue > 0 ? '100.0%' : '0.0%'}`,
-        `Feed Consumed Expenses (${m.feedConsumedBags} bags consumed),${Math.round(m.feedExpenses)},${m.totalSalesRevenue > 0 ? ((m.feedExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Chicken / Flock Purchases (CAPEX),${Math.round(m.chickenCapexExpenses)},${m.totalSalesRevenue > 0 ? ((m.chickenCapexExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Medicine & Vaccines,${Math.round(m.medicineVaccineExpenses)},${m.totalSalesRevenue > 0 ? ((m.medicineVaccineExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Total Cost of Goods Sold (B),${Math.round(m.cogsExpenses)},${m.totalSalesRevenue > 0 ? ((m.cogsExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Gross Profit / (Loss) (A - B),${Math.round(m.totalSalesRevenue - m.cogsExpenses)},${m.totalSalesRevenue > 0 ? (((m.totalSalesRevenue - m.cogsExpenses) / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Staff Salaries & Labor,${Math.round(m.salariesExpenses)},${m.totalSalesRevenue > 0 ? ((m.salariesExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Utilities Electricity & Fuel (POL),${Math.round(m.utilitiesPolExpenses)},${m.totalSalesRevenue > 0 ? ((m.utilitiesPolExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Other Farm Overheads,${Math.round(Math.max(0, m.operatingExpenses - m.salariesExpenses - m.utilitiesPolExpenses))},${m.totalSalesRevenue > 0 ? ((Math.max(0, m.operatingExpenses - m.salariesExpenses - m.utilitiesPolExpenses) / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Total Operating Expenses (C),${Math.round(m.operatingExpenses)},${m.totalSalesRevenue > 0 ? ((m.operatingExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Total Expenses (B + C),${Math.round(m.totalExpenses)},${m.totalSalesRevenue > 0 ? ((m.totalExpenses / m.totalSalesRevenue) * 100).toFixed(1) : '0.0'}%`,
-        `Net Income / (Net Loss),${Math.round(m.netIncome)},${m.netMarginPercent.toFixed(1)}%`,
-      ];
-      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `GreenOva_Income_vs_Expense_Summary_${selectedUnit}_${selectedYear}_${selectedMonth}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else if (activeReport === 'egg-production') {
-      const headers =
-        'Tracking ID,Date,Flock/Unit,Morning Eggs,Evening Eggs,Total Eggs,Cartons (360/ctn),Damaged/Broken,Clean Trays (30s),Avg Weight (g),Laying Rate %\n';
-      const rows = filteredEggs
-        .map(
-          (e) =>
-            `${e.trackingId || e.id},"${e.date}","${e.flockName || 'Unit'}",${e.morningEggs || 0},${e.eveningEggs || 0},${e.totalEggs || 0},${((e.totalEggs || 0) / 360).toFixed(1)},${e.damagedEggs || e.brokenEggs || 0},${e.cleanTrays || 0},${e.averageWeight || 60},${e.layingRatePercent || 0}%`
-        )
-        .join('\n');
-      const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `GreenOva_Egg_Production_Report_${selectedUnit}_${fromDate || 'all'}_to_${toDate || 'latest'}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else if (activeReport === 'sales-revenue') {
-      const headers =
-        'Tracking ID,Date,Flock/Unit,Category,Cartons Sold,Total Eggs,Rate Per Carton (PKR),Unit Price Per Egg (PKR),Online Payment (PKR),Cash Payment (PKR),Total Amount (PKR),Vehicle/Challan,Buyer Notes\n';
-      const rows = filteredSales
-        .map(
-          (s) =>
-            `${s.trackingId || s.id},"${s.date}","${s.flockName || s.flock || 'Unit'}",${s.category},${(s.quantity / 360).toFixed(1)},${s.quantity || 0},${Math.round((s.unitPrice || 0) * 360)},${s.unitPrice || 0},${s.onlinePayment || 0},${s.cashPayment || 0},${s.amount || 0},"${s.vehicleNumber || '-'}-${s.challanNo || ''}","${(s.notes || '').replace(/"/g, '""')}"`
-        )
-        .join('\n');
-      const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `GreenOva_Sales_Revenue_Report_${selectedUnit}_${fromDate || 'all'}_to_${toDate || 'latest'}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else if (activeReport === 'stock-inventory') {
-      const headers =
-        'Tracking ID,Date,Type,Flock Name,Head,Quantity (Bags),Amount (PKR),Avg Rate/Bag,Payment Type,Challan No,Notes\n';
-      const rows = filteredStocks
-        .map(
-          (r) =>
-            `${r.trackingId},"${r.date}","${r.feedType}","${r.flockName}",${r.head},${r.quantity},${r.amount},${r.costPerBag},${r.paymentType},"${r.challanNo}","${(r.notes || '').replace(/"/g, '""')}"`
-        )
-        .join('\n');
-      const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `GreenOva_Stock_Inventory_Report_${selectedUnit}_${fromDate || 'all'}_to_${toDate || 'latest'}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else {
-      const headers = 'Date,Flock,Total Eggs,Damaged,Trays,Laying Rate\n';
-      const rows = filteredEggs
-        .map((e) => `"${e.date}","${e.flockName}",${e.totalEggs},${e.damagedEggs},${e.cleanTrays},${e.layingRatePercent}%`)
-        .join('\n');
-      const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `GreenOva_Flock_Audit_${fromDate || 'Start'}_to_${toDate || 'Latest'}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const payload = buildIncomeVsExpenseExports();
+      downloadStructuredCSV(payload.filenameBase, payload.csvSections);
+      return;
     }
+    const payload = getActiveRecordsExportPayload();
+    if (payload.rows.length === 0) return;
+    downloadRecordsCSV(payload);
   };
+
+  const handleExportPDF = () => {
+    if (activeReport === 'income-vs-expense') {
+      const payload = buildIncomeVsExpenseExports();
+      downloadIncomeStatementPDF(payload);
+      return;
+    }
+    const payload = getActiveRecordsExportPayload();
+    if (payload.rows.length === 0) return;
+    downloadRecordsPDF({ ...payload, orientation: 'landscape' });
+  };
+
+  const isRecordsTab = activeReport !== 'income-vs-expense';
+  const disableRecordsExport = isRecordsTab && currentDatasetLength === 0;
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <PageHeader
         title="Farm Analytics & Audit Reports"
-        subtitle="Comprehensive production yield registries, commercial sales ledger, and feed stock replenishment logs."
+        subtitle="Executive income statement, KPI summary cards, and precise audit registries."
         icon={FileBarChart2}
         iconColor="emerald"
         badge="Analytics Engine"
         actions={
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <UIButton
               variant="secondary"
               icon={Download}
               onClick={handleExportCSV}
+              disabled={disableRecordsExport}
             >
-              {activeReport === 'income-vs-expense'
-                ? 'Export Summary CSV'
-                : `Export CSV (${currentDatasetLength.toLocaleString()})`}
+              {isRecordsTab
+                ? `Export CSV (${currentDatasetLength.toLocaleString()})`
+                : 'Export CSV'}
             </UIButton>
             <UIButton
               variant="primary"
-              icon={Printer}
-              onClick={handlePrint}
+              icon={FileText}
+              onClick={handleExportPDF}
+              disabled={disableRecordsExport}
             >
-              Print Report
+              {isRecordsTab
+                ? `Download PDF (${currentDatasetLength.toLocaleString()})`
+                : 'Download PDF'}
             </UIButton>
-          </>
+          </div>
         }
       />
 
@@ -787,7 +1474,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 : 'bg-emerald-50 text-emerald-700'
             }`}
           >
-            Executive Summary
+            Income Statement
           </span>
         </button>
 
@@ -811,7 +1498,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 : 'bg-slate-100 text-slate-600'
             }`}
           >
-            413 Logs
+            {eggDataset.length.toLocaleString()} Logs
           </span>
         </button>
 
@@ -835,7 +1522,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 : 'bg-slate-100 text-slate-600'
             }`}
           >
-            938 Sales
+            {salesDataset.length.toLocaleString()} Sales
           </span>
         </button>
 
@@ -859,7 +1546,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 : 'bg-slate-100 text-slate-600'
             }`}
           >
-            157 Logs
+            {stockDataset.length.toLocaleString()} Logs
           </span>
         </button>
 
@@ -876,10 +1563,19 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         >
           <HeartPulse className="w-4 h-4" />
           <span>Flock &amp; Bird Health Audit</span>
+          <span
+            className={`ml-1 text-[10px] px-2 py-0.5 rounded-full ${
+              activeReport === 'flock-health'
+                ? 'bg-blue-700 text-white'
+                : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {mortalityLogs.length.toLocaleString()} Logs
+          </span>
         </button>
       </div>
 
-      {/* Quick Unit Filters with Real PDF Stats */}
+      {/* Quick Unit Filters with Live Dynamic Stats */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div className="flex items-center space-x-2">
@@ -902,13 +1598,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               ].map(({ key, label, data }) => {
                 const isSelected = selectedUnit === key;
                 const isProfit = data.netIncome >= 0;
-                const fmtM = (val: number) => {
-                  const sign = val < 0 ? '-' : '';
-                  const abs = Math.abs(val);
-                  return abs >= 1_000_000
-                    ? `${sign}Rs. ${(abs / 1_000_000).toFixed(2)}M`
-                    : `${sign}Rs. ${Math.round(abs).toLocaleString()}`;
-                };
 
                 return (
                   <button
@@ -942,14 +1631,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                       </span>
                     </div>
                     <div className="text-xs font-black mt-1">
-                      Net: {fmtM(data.netIncome)}
+                      Net: {fmtCompactReportPkr(data.netIncome)}
                     </div>
                     <div
                       className={`text-[10px] font-medium mt-0.5 ${
                         isSelected ? 'text-slate-300' : 'text-slate-500'
                       }`}
                     >
-                      Sale: {fmtM(data.totalSalesRevenue)} • Exp: {fmtM(data.totalExpenses)}
+                      Sale: {fmtCompactReportPkr(data.totalSalesRevenue)} • Exp: {fmtCompactReportPkr(data.totalExpenses)}
                     </div>
                   </button>
                 );
@@ -957,297 +1646,142 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </>
           ) : activeReport === 'egg-production' ? (
             <>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('all');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'all'
-                    ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-amber-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>All Units Combined</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'all' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    413 Logs
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  50,353 Cartons <span className="text-[10px] font-normal">(18.13M Eggs)</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 1');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 1'
-                    ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-amber-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 1</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 1' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    130 Logs
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  6,230 Cartons <span className="text-[10px] font-normal">(2.24M Eggs • 12.4%)</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 2');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 2'
-                    ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-amber-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 2</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 2' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    192 Logs
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  40,177 Cartons <span className="text-[10px] font-normal">(14.46M Eggs • 79.8%)</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 3');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 3'
-                    ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-amber-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 3</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 3' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    91 Logs
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  3,945 Cartons <span className="text-[10px] font-normal">(1.42M Eggs • 7.8%)</span>
-                </div>
-              </button>
+              {eggUnitCards.map((u) => {
+                const isSelected = selectedUnit === u.key;
+                return (
+                  <button
+                    key={u.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedUnit(u.key);
+                      setCurrentPage(1);
+                    }}
+                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                        : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-amber-400'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center text-[11px] font-bold">
+                      <span>{u.label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                        {u.count.toLocaleString()} Logs
+                      </span>
+                    </div>
+                    <div className="text-xs font-black mt-1">
+                      {u.cartons.toLocaleString()} Cartons{' '}
+                      <span className="text-[10px] font-normal">
+                        ({(u.eggs / 1_000_000).toFixed(2)}M Eggs{u.key !== 'all' ? ` • ${u.share}%` : ''})
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </>
           ) : activeReport === 'sales-revenue' ? (
             <>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('all');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'all'
-                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-emerald-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>All Units Combined</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'all' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    938 Sales
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  Rs. 329.69M <span className="text-[10px] font-normal">(49,893 Cartons / 17.96M Items)</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 1');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 1'
-                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-emerald-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 1</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 1' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    231 Sales
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  Rs. 34.95M <span className="text-[10px] font-normal">(6,071 Cartons / 10.6%)</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 2');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 2'
-                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-emerald-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 2</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 2' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    584 Sales
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  Rs. 273.82M <span className="text-[10px] font-normal">(40,068 Cartons / 83.1%)</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 3');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 3'
-                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-emerald-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 3</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 3' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    123 Sales
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  Rs. 20.92M <span className="text-[10px] font-normal">(3,754 Cartons / 6.3%)</span>
-                </div>
-              </button>
+              {salesUnitCards.map((u) => {
+                const isSelected = selectedUnit === u.key;
+                return (
+                  <button
+                    key={u.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedUnit(u.key);
+                      setCurrentPage(1);
+                    }}
+                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                        : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-emerald-400'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center text-[11px] font-bold">
+                      <span>{u.label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                        {u.count.toLocaleString()} Sales
+                      </span>
+                    </div>
+                    <div className="text-xs font-black mt-1">
+                      {fmtCompactReportPkr(u.amount)}{' '}
+                      <span className="text-[10px] font-normal">
+                        ({u.cartons.toLocaleString()} Ctns{u.key !== 'all' ? ` • ${u.share}%` : ''})
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </>
+          ) : activeReport === 'stock-inventory' ? (
+            <>
+              {stockUnitCards.map((u) => {
+                const isSelected = selectedUnit === u.key;
+                return (
+                  <button
+                    key={u.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedUnit(u.key);
+                      setCurrentPage(1);
+                    }}
+                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                        : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center text-[11px] font-bold">
+                      <span>{u.label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                        {u.count.toLocaleString()} Logs
+                      </span>
+                    </div>
+                    <div className="text-xs font-black mt-1">
+                      {u.bags.toLocaleString()}{' '}
+                      <span className="text-[10px] font-normal">
+                        Bags{u.key !== 'all' ? ` (${u.share}%)` : ''}
+                      </span>
+                    </div>
+                    <div className={`text-[11px] font-semibold mt-0.5 ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                      {fmtCompactReportPkr(u.amount)}
+                    </div>
+                  </button>
+                );
+              })}
             </>
           ) : (
             <>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('all');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'all'
-                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>All Units Combined</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'all' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    157 Logs
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  50,545 <span className="text-[10px] font-normal">Bags</span>
-                </div>
-                <div className={`text-[11px] font-semibold mt-0.5 ${selectedUnit === 'all' ? 'text-indigo-100' : 'text-slate-500'}`}>
-                  Rs. 294.62M
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 1');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 1'
-                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 1</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 1' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    54 Logs
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  8,640 <span className="text-[10px] font-normal">Bags (17.1%)</span>
-                </div>
-                <div className={`text-[11px] font-semibold mt-0.5 ${selectedUnit === 'Unit 1' ? 'text-indigo-100' : 'text-slate-500'}`}>
-                  Rs. 50.91M
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 2');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 2'
-                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 2</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 2' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    71 Logs
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  34,845 <span className="text-[10px] font-normal">Bags (68.9%)</span>
-                </div>
-                <div className={`text-[11px] font-semibold mt-0.5 ${selectedUnit === 'Unit 2' ? 'text-indigo-100' : 'text-slate-500'}`}>
-                  Rs. 202.97M
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 3');
-                  setCurrentPage(1);
-                }}
-                className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 3'
-                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 3</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedUnit === 'Unit 3' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
-                    32 Logs
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  7,060 <span className="text-[10px] font-normal">Bags (14.0%)</span>
-                </div>
-                <div className={`text-[11px] font-semibold mt-0.5 ${selectedUnit === 'Unit 3' ? 'text-indigo-100' : 'text-slate-500'}`}>
-                  Rs. 40.74M
-                </div>
-              </button>
+              {healthUnitCards.map((u) => {
+                const isSelected = selectedUnit === u.key;
+                return (
+                  <button
+                    key={u.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedUnit(u.key);
+                      setCurrentPage(1);
+                    }}
+                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                        : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-blue-400'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center text-[11px] font-bold">
+                      <span>{u.label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'}`}>
+                        {u.livability}% Live
+                      </span>
+                    </div>
+                    <div className="text-xs font-black mt-1">
+                      {u.activeBirds.toLocaleString()} <span className="text-[10px] font-normal">Birds</span>
+                    </div>
+                    <div className={`text-[11px] font-semibold mt-0.5 ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                      Mortality: {u.mortality.toLocaleString()} ({u.incidents} logs)
+                    </div>
+                  </button>
+                );
+              })}
             </>
           )}
         </div>
@@ -1328,7 +1862,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Eggs (Rs. 311.9M)
+                  Eggs
                 </button>
                 <button
                   type="button"
@@ -1423,14 +1957,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             />
 
             <StatCard
-              title="Total Cartons"
+              title="Clean Trays / Cartons"
               value={`${Math.round(eggTotals.cleanTrays / 12).toLocaleString()}`}
               unit="Cartons"
               icon={Package}
               color="emerald"
               valueColor="text-emerald-700"
-              badge={{ text: 'Avg: Rs. 6,606/ctn', color: 'emerald' }}
-              subtext="Average Carton Price: Rs. 6,606 / carton"
+              badge={{ text: `${eggTotals.cleanTrays.toLocaleString()} Trays`, color: 'emerald' }}
+              subtext="Clean packable cartons (12 trays / ctn)"
             />
 
             <StatCard
@@ -1874,11 +2408,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
             <StatCard
               title="Active Feed Units"
-              value="3 Sheds"
+              value={`${flocks.length} Sheds`}
               icon={Building2}
               color="amber"
-              badge={{ text: 'Units 1, 2, 3', color: 'amber' }}
-              subtext="Unit 2 received 70.8% of stock"
+              badge={{ text: selectedUnit === 'all' ? 'Units 1, 2, 3' : selectedUnit, color: 'amber' }}
+              subtext={
+                stockTotals.totalBags > 0
+                  ? `${stockTotals.count} deliveries • ${(stockTotals.totalBags * 50).toLocaleString()} kg`
+                  : 'No shipments in filtered range'
+              }
             />
           </div>
 
@@ -2203,6 +2741,92 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               })}
             </div>
           </div>
+
+          <TableCard
+            title="Mortality &amp; Bird Health Log Registry"
+            subtitle={`Showing logs ${filteredMortality.length === 0 ? 0 : startIndex + 1} to ${Math.min(startIndex + recordsPerPage, currentDatasetLength)} of ${currentDatasetLength} records (10 per page)`}
+            badge={
+              <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-900 text-xs font-bold">
+                {currentDatasetLength} Filtered Logs
+              </span>
+            }
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                  <tr>
+                    <th className="py-3 px-3"># ID</th>
+                    <th className="py-3 px-3">Date</th>
+                    <th className="py-3 px-3">Flock / Unit</th>
+                    <th className="py-3 px-3 text-right">Casualties</th>
+                    <th className="py-3 px-3">Cause</th>
+                    <th className="py-3 px-3">Symptoms</th>
+                    <th className="py-3 px-3">Recorded By</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginatedMortality.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-400">
+                        No bird health / mortality records match the selected filter criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedMortality.map((m) => (
+                      <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-3 font-mono font-bold text-slate-600">#{m.id}</td>
+                        <td className="py-3 px-3 font-medium text-slate-800 whitespace-nowrap">
+                          {m.date}
+                        </td>
+                        <td className="py-3 px-3 font-bold text-slate-900">
+                          {m.flockName || 'Unit'}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono font-bold text-rose-600">
+                          {(m.count || 0).toLocaleString()}
+                        </td>
+                        <td className="py-3 px-3 text-slate-700">{m.cause || 'Natural / Routine'}</td>
+                        <td className="py-3 px-3 text-slate-600">{m.symptoms || '-'}</td>
+                        <td className="py-3 px-3 text-slate-500 text-[11px] max-w-[200px] truncate">
+                          {m.recordedBy || '-'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {currentDatasetLength > recordsPerPage && (
+              <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <div className="text-slate-600">
+                  Showing <span className="font-bold">{startIndex + 1}</span> to{' '}
+                  <span className="font-bold">{Math.min(startIndex + recordsPerPage, currentDatasetLength)}</span> of{' '}
+                  <span className="font-bold">{currentDatasetLength}</span> records
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => handlePageChange(safeCurrentPage - 1)}
+                    disabled={safeCurrentPage === 1}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-100"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="px-3 py-1 font-bold bg-white border border-slate-200 rounded-lg">
+                    Page {safeCurrentPage} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handlePageChange(safeCurrentPage + 1)}
+                    disabled={safeCurrentPage >= totalPages}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-100"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </TableCard>
         </div>
       )}
     </div>
