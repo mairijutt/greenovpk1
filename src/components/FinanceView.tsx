@@ -2734,10 +2734,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                               <button
                                 type="button"
                                 onClick={async () => {
-                                  await onDeleteTransaction(fin);
-                                  setConfirmDeleteTxId(null);
-                                  setToastMessage(`Sale #${trackingId} deleted from database.`);
-                                  setTimeout(() => setToastMessage(null), 3500);
+                                  try {
+                                    await onDeleteTransaction(fin);
+                                    setConfirmDeleteTxId(null);
+                                    setToastMessage(`Sale #${trackingId} deleted from database.`);
+                                    setTimeout(() => setToastMessage(null), 3500);
+                                  } catch {
+                                    setConfirmDeleteTxId(null);
+                                  }
                                 }}
                                 className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
                               >
@@ -2862,10 +2866,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                             <button
                               type="button"
                               onClick={async () => {
-                                await onDeleteTransaction(fin);
-                                setConfirmDeleteTxId(null);
-                                setToastMessage(`Expense voucher #${trackingId} deleted from database.`);
-                                setTimeout(() => setToastMessage(null), 3500);
+                                try {
+                                  await onDeleteTransaction(fin);
+                                  setConfirmDeleteTxId(null);
+                                  setToastMessage(`Expense voucher #${trackingId} deleted from database.`);
+                                  setTimeout(() => setToastMessage(null), 3500);
+                                } catch {
+                                  setConfirmDeleteTxId(null);
+                                }
                               }}
                               className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
                             >
@@ -4112,8 +4120,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           record={editingTx}
           bankAccounts={bankAccounts}
           onClose={() => setEditingTx(null)}
-          onSave={(updated) => {
-            onEditTransaction?.(updated);
+          onSave={async (updated) => {
+            await onEditTransaction?.(updated);
             setEditingTx(null);
             const label = updated.type === 'Income' ? 'Sale record' : 'Expense voucher';
             setToastMessage(`${label} #${updated.trackingId || updated.id} updated.`);
@@ -4141,7 +4149,7 @@ interface EditTransactionModalProps {
   record: FinancialRecord;
   bankAccounts?: BankAccount[];
   onClose: () => void;
-  onSave: (updated: FinancialRecord) => void;
+  onSave: (updated: FinancialRecord) => Promise<void> | void;
 }
 
 const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
@@ -4169,6 +4177,7 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   const [vehicleNumber, setVehicleNumber] = useState<string>(s.vehicleNumber || '');
   const [bankId, setBankId] = useState<string>(s.bankId || '');
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const unitLabel =
     flockId === '8' ? 'Unit 1' : flockId === '9' ? 'Unit 2' : flockId === '10' ? 'Unit 3' : (record.flockName || 'Unit 1');
@@ -4192,8 +4201,9 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     setFormError(null);
     if (!date) {
       setFormError('Please select a date.');
@@ -4237,7 +4247,14 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
       updated.bankName = matchedBank?.bankName || undefined;
     }
 
-    onSave(updated as FinancialRecord);
+    setIsSaving(true);
+    try {
+      await onSave(updated as FinancialRecord);
+    } catch (err: any) {
+      setFormError(err?.message || 'Failed to save transaction changes to database.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -4475,9 +4492,10 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm cursor-pointer"
+              disabled={isSaving}
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold shadow-sm cursor-pointer"
             >
-              Save Changes
+              {isSaving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

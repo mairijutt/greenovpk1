@@ -2360,10 +2360,14 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                             <button
                               type="button"
                               onClick={async () => {
-                                await onDeleteSalaryDisbursal(sal.id);
-                                setConfirmDeleteSalId(null);
-                                setStaffToast(`Deleted salary record for ${sal.employeeName}`);
-                                setTimeout(() => setStaffToast(null), 3500);
+                                try {
+                                  await onDeleteSalaryDisbursal(sal.id);
+                                  setConfirmDeleteSalId(null);
+                                  setStaffToast(`Deleted salary record for ${sal.employeeName}`);
+                                  setTimeout(() => setStaffToast(null), 3500);
+                                } catch {
+                                  setConfirmDeleteSalId(null);
+                                }
                               }}
                               className="px-1.5 py-0.5 rounded bg-rose-600 text-white font-bold cursor-pointer"
                             >
@@ -2490,10 +2494,14 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                             <button
                               type="button"
                               onClick={async () => {
-                                await onDeleteAdvanceRecord(adv.id);
-                                setConfirmDeleteSalId(null);
-                                setStaffToast(`Deleted advance record for ${adv.employeeName}`);
-                                setTimeout(() => setStaffToast(null), 3500);
+                                try {
+                                  await onDeleteAdvanceRecord(adv.id);
+                                  setConfirmDeleteSalId(null);
+                                  setStaffToast(`Deleted advance record for ${adv.employeeName}`);
+                                  setTimeout(() => setStaffToast(null), 3500);
+                                } catch {
+                                  setConfirmDeleteSalId(null);
+                                }
                               }}
                               className="px-1.5 py-0.5 rounded bg-rose-600 text-white font-bold cursor-pointer"
                             >
@@ -2766,10 +2774,14 @@ export const SalariesView: React.FC<SalariesViewProps> = ({
                               <button
                                 type="button"
                                 onClick={async () => {
-                                  await onDeleteWorker(w.id);
-                                  setConfirmDeleteSalId(null);
-                                  setStaffToast(`Removed staff member ${w.name}`);
-                                  setTimeout(() => setStaffToast(null), 3500);
+                                  try {
+                                    await onDeleteWorker(w.id);
+                                    setConfirmDeleteSalId(null);
+                                    setStaffToast(`Removed staff member ${w.name}`);
+                                    setTimeout(() => setStaffToast(null), 3500);
+                                  } catch {
+                                    setConfirmDeleteSalId(null);
+                                  }
                                 }}
                                 className="px-1.5 py-0.5 rounded bg-rose-600 text-white font-bold cursor-pointer"
                               >

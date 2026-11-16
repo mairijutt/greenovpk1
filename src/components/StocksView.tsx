@@ -99,7 +99,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
     apiFetch('/api/stocks?limit=2000')
       .then((res) => {
         const items = res?.data?.items;
-        if (!active || !Array.isArray(items) || items.length === 0) return;
+        if (!active || !Array.isArray(items)) return;
         const mapped: StockRecord[] = items.map((r: any) => {
           const fid = String(r.flockId || 8);
           const fname =
@@ -420,7 +420,6 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
       if (onAddTransaction) {
         const expenseRecord: FinancialRecord = {
           id: `exp-stk-${Date.now()}`,
-          trackingId: newRecord.trackingId,
           type: 'Expense',
           category: formHead === 'FEED' ? 'FEED' : formHead === 'MEDICINE' ? 'MEDICINE' : formHead === 'VACCINE' ? 'VACCINE' : formHead,
           head: formHead === 'FEED' ? 'FEED' : formHead === 'MEDICINE' ? 'MEDICINE' : formHead === 'VACCINE' ? 'VACCINE' : formHead,

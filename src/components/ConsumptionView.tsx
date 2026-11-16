@@ -100,7 +100,7 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
     setEditNotes(log.notes || '');
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingLog) return;
     setEditFormError(null);
@@ -144,10 +144,14 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
       notes: editNotes.trim() || undefined,
     };
 
-    onEditConsumption?.(updatedLog);
-    setEditingLog(null);
-    setToastMessage(`Consumption record #${updatedLog.challanNo || updatedLog.trackingId || updatedLog.id.replace('c-', '')} updated.`);
-    setTimeout(() => setToastMessage(null), 3500);
+    try {
+      await onEditConsumption?.(updatedLog);
+      setEditingLog(null);
+      setToastMessage(`Consumption record #${updatedLog.challanNo || updatedLog.trackingId || updatedLog.id.replace('c-', '')} updated.`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err: any) {
+      setEditFormError(err?.message || 'Failed to update consumption record in database.');
+    }
   };
 
   const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
@@ -1492,10 +1496,14 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
                             <button
                               type="button"
                               onClick={async () => {
-                                await onDeleteConsumption(log);
-                                setConfirmDeleteId(null);
-                                setToastMessage('Feed consumption record deleted from database.');
-                                setTimeout(() => setToastMessage(null), 3500);
+                                try {
+                                  await onDeleteConsumption(log);
+                                  setConfirmDeleteId(null);
+                                  setToastMessage('Feed consumption record deleted from database.');
+                                  setTimeout(() => setToastMessage(null), 3500);
+                                } catch {
+                                  setConfirmDeleteId(null);
+                                }
                               }}
                               className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
                             >

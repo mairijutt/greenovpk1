@@ -17,9 +17,20 @@ function flockNameForId(fid: number): string {
   return `Unit ${fid}`;
 }
 
+const PG_INT_MAX = 2147483647;
+
+function safePgInt(val: any): number {
+  if (val === null || val === undefined || val === '' || typeof val === 'boolean') return 0;
+  const str = String(val).trim();
+  if (!/^\d+$/.test(str)) return 0;
+  const num = Number(str);
+  if (!Number.isSafeInteger(num) || num <= 0 || num > PG_INT_MAX) return 0;
+  return num;
+}
+
 export function flockIdFromInput(flockId?: any, flockName?: string): number {
-  const num = Number(flockId);
-  if (!isNaN(num) && num > 0) return num;
+  const num = safePgInt(flockId);
+  if (num > 0) return num;
   if (flockName) {
     const low = flockName.toLowerCase();
     if (low.includes('2')) return 9;
@@ -121,76 +132,81 @@ async function runInitialization(): Promise<void> {
     );
   `);
 
-  // 2. Non-destructive schema extensions on existing production tables
-  await pool.query(`
-    ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS "farmAssigned" text DEFAULT 'All Farm Complexes';
-    ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS "lastLogin" text;
+  // 2. Non-destructive schema extensions & sequence alignment (guarded once per schema version)
+  if (!(await hasMeta('schema_migrated_v2'))) {
+    await pool.query(`
+      ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS "farmAssigned" text DEFAULT 'All Farm Complexes';
+      ALTER TABLE public."user" ADD COLUMN IF NOT EXISTS "lastLogin" text;
 
-    ALTER TABLE public."Flock" ADD COLUMN IF NOT EXISTS "ageWeeks" integer;
-    ALTER TABLE public."Flock" ADD COLUMN IF NOT EXISTS "shedNumber" text;
+      ALTER TABLE public."Flock" ADD COLUMN IF NOT EXISTS "ageWeeks" integer;
+      ALTER TABLE public."Flock" ADD COLUMN IF NOT EXISTS "shedNumber" text;
 
-    ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS capacity integer DEFAULT 50000;
-    ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS "currentBirds" integer DEFAULT 0;
-    ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS "shedsCount" integer DEFAULT 1;
-    ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS manager text DEFAULT 'Farm Supervisor';
-    ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS temperature double precision DEFAULT 25;
-    ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS humidity double precision DEFAULT 56;
+      ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS capacity integer DEFAULT 50000;
+      ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS "currentBirds" integer DEFAULT 0;
+      ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS "shedsCount" integer DEFAULT 1;
+      ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS manager text DEFAULT 'Farm Supervisor';
+      ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS temperature double precision DEFAULT 25;
+      ALTER TABLE public."Farm" ADD COLUMN IF NOT EXISTS humidity double precision DEFAULT 56;
 
-    ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS cartons integer;
-    ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS trays integer;
-    ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS eggs integer;
-    ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS "morningEggs" integer;
-    ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS "eveningEggs" integer;
+      ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS "clientId" text;
+      ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS cartons integer;
+      ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS trays integer;
+      ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS eggs integer;
+      ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS "morningEggs" integer;
+      ALTER TABLE public."EggProduction" ADD COLUMN IF NOT EXISTS "eveningEggs" integer;
 
-    ALTER TABLE public."Expense" ADD COLUMN IF NOT EXISTS "clientId" text;
+      ALTER TABLE public."Expense" ADD COLUMN IF NOT EXISTS "clientId" text;
 
-    ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS "clientId" text;
-    ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS rate double precision;
-    ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS "bankId" text;
-    ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS "bankName" text;
-    ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS "paymentMethod" text;
-    ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS cartons integer;
-    ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS trays integer;
-    ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS "looseEggs" integer;
+      ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS "clientId" text;
+      ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS rate double precision;
+      ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS "bankId" text;
+      ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS "bankName" text;
+      ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS "paymentMethod" text;
+      ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS cartons integer;
+      ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS trays integer;
+      ALTER TABLE public."Sale" ADD COLUMN IF NOT EXISTS "looseEggs" integer;
 
-    ALTER TABLE public."Stock" ADD COLUMN IF NOT EXISTS "clientId" text;
+      ALTER TABLE public."Stock" ADD COLUMN IF NOT EXISTS "clientId" text;
 
-    ALTER TABLE public."BirdHealth" ADD COLUMN IF NOT EXISTS "clientId" text;
-    ALTER TABLE public."BirdHealth" ADD COLUMN IF NOT EXISTS cause text;
-    ALTER TABLE public."BirdHealth" ADD COLUMN IF NOT EXISTS symptoms text;
-    ALTER TABLE public."BirdHealth" ADD COLUMN IF NOT EXISTS "recordedBy" text;
+      ALTER TABLE public."BirdHealth" ADD COLUMN IF NOT EXISTS "clientId" text;
+      ALTER TABLE public."BirdHealth" ADD COLUMN IF NOT EXISTS cause text;
+      ALTER TABLE public."BirdHealth" ADD COLUMN IF NOT EXISTS symptoms text;
+      ALTER TABLE public."BirdHealth" ADD COLUMN IF NOT EXISTS "recordedBy" text;
 
-    ALTER TABLE public."DailyConsumption" ADD COLUMN IF NOT EXISTS "clientId" text;
-    ALTER TABLE public."DailyConsumption" ADD COLUMN IF NOT EXISTS bags integer;
-    ALTER TABLE public."DailyConsumption" ADD COLUMN IF NOT EXISTS "gramsPerBird" double precision;
-    ALTER TABLE public."DailyConsumption" ADD COLUMN IF NOT EXISTS "challanNo" text;
+      ALTER TABLE public."DailyConsumption" ADD COLUMN IF NOT EXISTS "clientId" text;
+      ALTER TABLE public."DailyConsumption" ADD COLUMN IF NOT EXISTS bags integer;
+      ALTER TABLE public."DailyConsumption" ADD COLUMN IF NOT EXISTS "gramsPerBird" double precision;
+      ALTER TABLE public."DailyConsumption" ADD COLUMN IF NOT EXISTS "challanNo" text;
 
-    ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "clientId" text;
-    ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "recordType" text DEFAULT 'salary';
-    ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS date text;
-    ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS month text;
-    ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "challanNo" text;
-    ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "paymentMode" text;
-    ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "bankName" text;
-    ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS deduction double precision DEFAULT 0;
-    ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "remainingBalance" double precision DEFAULT 0;
-    ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "repaymentStatus" text;
-  `);
+      ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "clientId" text;
+      ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "recordType" text DEFAULT 'salary';
+      ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS date text;
+      ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS month text;
+      ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "challanNo" text;
+      ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "paymentMode" text;
+      ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "bankName" text;
+      ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS deduction double precision DEFAULT 0;
+      ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "remainingBalance" double precision DEFAULT 0;
+      ALTER TABLE public."Salary" ADD COLUMN IF NOT EXISTS "repaymentStatus" text;
+    `);
 
-  // 3. Align sequences across all serial tables
-  await Promise.all([
-    alignSequence('Farm'),
-    alignSequence('Flock'),
-    alignSequence('EggProduction'),
-    alignSequence('Expense'),
-    alignSequence('Sale'),
-    alignSequence('Stock'),
-    alignSequence('Salary'),
-    alignSequence('BirdHealth'),
-    alignSequence('DailyConsumption'),
-    alignSequence('VaccineSchedule'),
-    alignSequence('user'),
-  ]);
+    // 3. Align sequences across all serial tables
+    await Promise.all([
+      alignSequence('Farm'),
+      alignSequence('Flock'),
+      alignSequence('EggProduction'),
+      alignSequence('Expense'),
+      alignSequence('Sale'),
+      alignSequence('Stock'),
+      alignSequence('Salary'),
+      alignSequence('BirdHealth'),
+      alignSequence('DailyConsumption'),
+      alignSequence('VaccineSchedule'),
+      alignSequence('user'),
+    ]);
+
+    await setMeta('schema_migrated_v2');
+  }
 
   // 4. One-Time Idempotent Seeding (only when empty & not previously seeded)
   // 4a. Users
@@ -636,6 +652,7 @@ export async function fetchAllEggProductions() {
     const birds = Number(r.birds || (fid === 8 ? 24786 : fid === 9 ? 31739 : 25189));
     return {
       id: r.id,
+      clientId: r.clientId || undefined,
       date: r.date ? new Date(r.date).toISOString() : new Date().toISOString(),
       totalEggs,
       brokenEggs,
@@ -660,16 +677,29 @@ export async function fetchAllEggProductions() {
   });
 }
 
-export async function upsertEggProduction(prod: any, explicitId?: number) {
+export async function upsertEggProduction(prod: any, explicitId?: number | string) {
   const validGrades = new Set(['started', 'medium', 'standard', 'jumbo']);
-  const id = explicitId ?? (Number(prod.id) > 0 ? Number(prod.id) : undefined);
+  const clientId =
+    prod.clientId ||
+    (explicitId !== undefined && safePgInt(explicitId) === 0 ? String(explicitId) : null) ||
+    (prod.id !== undefined && safePgInt(prod.id) === 0 ? String(prod.id) : null);
+
+  let targetId = explicitId !== undefined ? safePgInt(explicitId) : safePgInt(prod.trackingId ?? prod.id);
   let prev: any = {};
-  if (id) {
-    const prevRes = await pool.query('SELECT * FROM public."EggProduction" WHERE id = $1 LIMIT 1', [id]);
+  if (!targetId && clientId) {
+    const found = await pool.query('SELECT * FROM public."EggProduction" WHERE "clientId" = $1 LIMIT 1', [clientId]);
+    if (found.rows[0]) {
+      prev = found.rows[0];
+      targetId = prev.id;
+    }
+  } else if (targetId > 0) {
+    const prevRes = await pool.query('SELECT * FROM public."EggProduction" WHERE id = $1 LIMIT 1', [targetId]);
     prev = prevRes.rows[0] || {};
   }
+
   const merged = { ...prev, ...prod };
-  const rawGrade = String(merged.grade || merged.eggGrade || 'standard').toLowerCase();
+  let rawGrade = String(merged.grade || merged.eggGrade || 'standard').toLowerCase().trim();
+  if (rawGrade === 'starter') rawGrade = 'started';
   const grade = validGrades.has(rawGrade) ? rawGrade : 'standard';
   const fid = flockIdFromInput(merged.flockId, merged.flockName);
   const totalEggs = Number(
@@ -686,10 +716,10 @@ export async function upsertEggProduction(prod: any, explicitId?: number) {
   const morningEggs = prod.morningEggs !== undefined ? Number(prod.morningEggs) : prev.morningEggs !== undefined && prod.totalEggs === undefined ? Number(prev.morningEggs) : Math.round(totalEggs * 0.55);
   const eveningEggs = prod.eveningEggs !== undefined ? Number(prod.eveningEggs) : prev.eveningEggs !== undefined && prod.totalEggs === undefined ? Number(prev.eveningEggs) : Math.max(0, totalEggs - morningEggs);
 
-  if (id) {
+  if (targetId > 0) {
     const res = await pool.query(
-      `INSERT INTO public."EggProduction" (id, date, "totalEggs", notes, "averageWeight", "brokenEggs", "flockId", grade, birds, cartons, trays, eggs, "morningEggs", "eveningEggs", "createdAt", "updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::"EGG_GRADE",$9,$10,$11,$12,$13,$14,NOW(),NOW())
+      `INSERT INTO public."EggProduction" (id, "clientId", date, "totalEggs", notes, "averageWeight", "brokenEggs", "flockId", grade, birds, cartons, trays, eggs, "morningEggs", "eveningEggs", "createdAt", "updatedAt")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::"EGG_GRADE",$10,$11,$12,$13,$14,$15,NOW(),NOW())
        ON CONFLICT (id) DO UPDATE SET
          date = EXCLUDED.date,
          "totalEggs" = EXCLUDED."totalEggs",
@@ -704,25 +734,31 @@ export async function upsertEggProduction(prod: any, explicitId?: number) {
          eggs = EXCLUDED.eggs,
          "morningEggs" = EXCLUDED."morningEggs",
          "eveningEggs" = EXCLUDED."eveningEggs",
+         "clientId" = COALESCE(EXCLUDED."clientId", public."EggProduction"."clientId"),
          "updatedAt" = NOW()
        RETURNING *`,
-      [id, dateIso, totalEggs, merged.notes || '', avgWeight, brokenEggs, fid, grade, merged.birds ? Number(merged.birds) : null, cartons, trays, looseEggs, morningEggs, eveningEggs]
+      [targetId, clientId || prev.clientId || null, dateIso, totalEggs, merged.notes || '', avgWeight, brokenEggs, fid, grade, merged.birds ? Number(merged.birds) : null, cartons, trays, looseEggs, morningEggs, eveningEggs]
     );
     await alignSequence('EggProduction');
     return res.rows[0];
   } else {
     const res = await pool.query(
-      `INSERT INTO public."EggProduction" (date, "totalEggs", notes, "averageWeight", "brokenEggs", "flockId", grade, birds, cartons, trays, eggs, "morningEggs", "eveningEggs", "createdAt", "updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6,$7::"EGG_GRADE",$8,$9,$10,$11,$12,$13,NOW(),NOW())
+      `INSERT INTO public."EggProduction" ("clientId", date, "totalEggs", notes, "averageWeight", "brokenEggs", "flockId", grade, birds, cartons, trays, eggs, "morningEggs", "eveningEggs", "createdAt", "updatedAt")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::"EGG_GRADE",$9,$10,$11,$12,$13,$14,NOW(),NOW())
        RETURNING *`,
-      [dateIso, totalEggs, prod.notes || '', avgWeight, brokenEggs, fid, grade, prod.birds ? Number(prod.birds) : null, cartons, trays, looseEggs, morningEggs, eveningEggs]
+      [clientId, dateIso, totalEggs, prod.notes || '', avgWeight, brokenEggs, fid, grade, prod.birds ? Number(prod.birds) : null, cartons, trays, looseEggs, morningEggs, eveningEggs]
     );
     return res.rows[0];
   }
 }
 
-export async function deleteEggProduction(id: number) {
-  await pool.query('DELETE FROM public."EggProduction" WHERE id = $1', [id]);
+export async function deleteEggProduction(idOrClient: number | string) {
+  const num = safePgInt(idOrClient);
+  if (num > 0) {
+    await pool.query('DELETE FROM public."EggProduction" WHERE id = $1 OR "clientId" = $2', [num, String(idOrClient)]);
+  } else {
+    await pool.query('DELETE FROM public."EggProduction" WHERE "clientId" = $1', [String(idOrClient)]);
+  }
 }
 
 // ==========================================
@@ -769,10 +805,12 @@ export async function fetchAllExpenses() {
 }
 
 export async function upsertExpense(exp: any, explicitId?: number | string) {
-  const clientId = exp.clientId || (typeof exp.id === 'string' && isNaN(Number(exp.id)) ? exp.id : null);
+  const clientId =
+    exp.clientId ||
+    (explicitId !== undefined && safePgInt(explicitId) === 0 ? String(explicitId) : null) ||
+    (exp.id !== undefined && safePgInt(exp.id) === 0 ? String(exp.id) : null);
 
-  let targetId = explicitId !== undefined && !isNaN(Number(explicitId)) ? Number(explicitId) : Number(exp.trackingId || exp.id);
-  if (isNaN(targetId) || targetId <= 0) targetId = 0;
+  let targetId = explicitId !== undefined ? safePgInt(explicitId) : safePgInt(exp.trackingId ?? exp.id);
 
   let prev: any = {};
   if (!targetId && (clientId || explicitId)) {
@@ -826,9 +864,9 @@ export async function upsertExpense(exp: any, explicitId?: number | string) {
 }
 
 export async function deleteExpense(idOrClient: number | string) {
-  const num = Number(idOrClient);
-  if (!isNaN(num) && num > 0) {
-    await pool.query('DELETE FROM public."Expense" WHERE id = $1', [num]);
+  const num = safePgInt(idOrClient);
+  if (num > 0) {
+    await pool.query('DELETE FROM public."Expense" WHERE id = $1 OR "clientId" = $2', [num, String(idOrClient)]);
   } else {
     await pool.query('DELETE FROM public."Expense" WHERE "clientId" = $1', [String(idOrClient)]);
   }
@@ -900,10 +938,12 @@ export async function fetchAllSales() {
 }
 
 export async function upsertSale(sale: any, explicitId?: number | string) {
-  const clientId = sale.clientId || (typeof sale.id === 'string' && isNaN(Number(sale.id)) ? sale.id : null);
+  const clientId =
+    sale.clientId ||
+    (explicitId !== undefined && safePgInt(explicitId) === 0 ? String(explicitId) : null) ||
+    (sale.id !== undefined && safePgInt(sale.id) === 0 ? String(sale.id) : null);
 
-  let targetId = explicitId !== undefined && !isNaN(Number(explicitId)) ? Number(explicitId) : Number(sale.trackingId || sale.id);
-  if (isNaN(targetId) || targetId <= 0) targetId = 0;
+  let targetId = explicitId !== undefined ? safePgInt(explicitId) : safePgInt(sale.trackingId ?? sale.id);
 
   let prev: any = {};
   if (!targetId && (clientId || explicitId)) {
@@ -985,9 +1025,9 @@ export async function upsertSale(sale: any, explicitId?: number | string) {
 }
 
 export async function deleteSale(idOrClient: number | string) {
-  const num = Number(idOrClient);
-  if (!isNaN(num) && num > 0) {
-    await pool.query('DELETE FROM public."Sale" WHERE id = $1', [num]);
+  const num = safePgInt(idOrClient);
+  if (num > 0) {
+    await pool.query('DELETE FROM public."Sale" WHERE id = $1 OR "clientId" = $2', [num, String(idOrClient)]);
   } else {
     await pool.query('DELETE FROM public."Sale" WHERE "clientId" = $1', [String(idOrClient)]);
   }
@@ -1034,10 +1074,12 @@ export async function fetchAllStocks() {
 }
 
 export async function upsertStock(stock: any, explicitId?: number | string) {
-  const clientId = stock.clientId || (typeof stock.id === 'string' && isNaN(Number(stock.id)) ? stock.id : null);
+  const clientId =
+    stock.clientId ||
+    (explicitId !== undefined && safePgInt(explicitId) === 0 ? String(explicitId) : null) ||
+    (stock.id !== undefined && safePgInt(stock.id) === 0 ? String(stock.id) : null);
 
-  let targetId = explicitId !== undefined && !isNaN(Number(explicitId)) ? Number(explicitId) : Number(stock.trackingId || stock.id);
-  if (isNaN(targetId) || targetId <= 0) targetId = 0;
+  let targetId = explicitId !== undefined ? safePgInt(explicitId) : safePgInt(stock.trackingId ?? stock.id);
 
   let prev: any = {};
   if (!targetId && (clientId || explicitId)) {
@@ -1096,9 +1138,9 @@ export async function upsertStock(stock: any, explicitId?: number | string) {
 }
 
 export async function deleteStock(idOrClient: number | string) {
-  const num = Number(idOrClient);
-  if (!isNaN(num) && num > 0) {
-    await pool.query('DELETE FROM public."Stock" WHERE id = $1', [num]);
+  const num = safePgInt(idOrClient);
+  if (num > 0) {
+    await pool.query('DELETE FROM public."Stock" WHERE id = $1 OR "clientId" = $2', [num, String(idOrClient)]);
   } else {
     await pool.query('DELETE FROM public."Stock" WHERE "clientId" = $1', [String(idOrClient)]);
   }
@@ -1139,10 +1181,12 @@ export async function fetchAllConsumptions() {
 }
 
 export async function upsertConsumption(c: any, explicitId?: number | string) {
-  const clientId = c.clientId || (typeof c.id === 'string' && isNaN(Number(c.id)) ? c.id : null);
+  const clientId =
+    c.clientId ||
+    (explicitId !== undefined && safePgInt(explicitId) === 0 ? String(explicitId) : null) ||
+    (c.id !== undefined && safePgInt(c.id) === 0 ? String(c.id) : null);
 
-  let targetId = explicitId !== undefined && !isNaN(Number(explicitId)) ? Number(explicitId) : Number(c.trackingId || c.id);
-  if (isNaN(targetId) || targetId <= 0) targetId = 0;
+  let targetId = explicitId !== undefined ? safePgInt(explicitId) : safePgInt(c.trackingId ?? c.id);
 
   let prev: any = {};
   if (!targetId && (clientId || explicitId)) {
@@ -1197,9 +1241,9 @@ export async function upsertConsumption(c: any, explicitId?: number | string) {
 }
 
 export async function deleteConsumption(idOrClient: number | string) {
-  const num = Number(idOrClient);
-  if (!isNaN(num) && num > 0) {
-    await pool.query('DELETE FROM public."DailyConsumption" WHERE id = $1', [num]);
+  const num = safePgInt(idOrClient);
+  if (num > 0) {
+    await pool.query('DELETE FROM public."DailyConsumption" WHERE id = $1 OR "clientId" = $2', [num, String(idOrClient)]);
   } else {
     await pool.query('DELETE FROM public."DailyConsumption" WHERE "clientId" = $1', [String(idOrClient)]);
   }
@@ -1235,10 +1279,12 @@ export async function fetchAllBirdHealth() {
 }
 
 export async function upsertBirdHealth(h: any, explicitId?: number | string) {
-  const clientId = h.clientId || (typeof h.id === 'string' && isNaN(Number(h.id)) ? h.id : null);
+  const clientId =
+    h.clientId ||
+    (explicitId !== undefined && safePgInt(explicitId) === 0 ? String(explicitId) : null) ||
+    (h.id !== undefined && safePgInt(h.id) === 0 ? String(h.id) : null);
 
-  let targetId = explicitId !== undefined && !isNaN(Number(explicitId)) ? Number(explicitId) : Number(h.id);
-  if (isNaN(targetId) || targetId <= 0) targetId = 0;
+  let targetId = explicitId !== undefined ? safePgInt(explicitId) : safePgInt(h.trackingId ?? h.id);
 
   let prev: any = {};
   if (!targetId && (clientId || explicitId)) {
@@ -1294,9 +1340,9 @@ export async function upsertBirdHealth(h: any, explicitId?: number | string) {
 }
 
 export async function deleteBirdHealth(idOrClient: number | string) {
-  const num = Number(idOrClient);
-  if (!isNaN(num) && num > 0) {
-    await pool.query('DELETE FROM public."BirdHealth" WHERE id = $1', [num]);
+  const num = safePgInt(idOrClient);
+  if (num > 0) {
+    await pool.query('DELETE FROM public."BirdHealth" WHERE id = $1 OR "clientId" = $2', [num, String(idOrClient)]);
   } else {
     await pool.query('DELETE FROM public."BirdHealth" WHERE "clientId" = $1', [String(idOrClient)]);
   }
@@ -1404,10 +1450,12 @@ export async function fetchAllVaccines() {
 }
 
 export async function upsertVaccine(v: any, explicitId?: number | string) {
-  const clientId = v.clientId || (typeof v.id === 'string' && isNaN(Number(v.id)) ? v.id : null);
+  const clientId =
+    v.clientId ||
+    (explicitId !== undefined && safePgInt(explicitId) === 0 ? String(explicitId) : null) ||
+    (v.id !== undefined && safePgInt(v.id) === 0 ? String(v.id) : null);
 
-  let targetId = explicitId !== undefined && !isNaN(Number(explicitId)) ? Number(explicitId) : Number(v.dbId || v.id);
-  if (isNaN(targetId) || targetId <= 0) targetId = 0;
+  let targetId = explicitId !== undefined ? safePgInt(explicitId) : safePgInt(v.dbId ?? v.id);
 
   let prev: any = {};
   if (!targetId && (clientId || explicitId)) {
@@ -1468,9 +1516,9 @@ export async function upsertVaccine(v: any, explicitId?: number | string) {
 }
 
 export async function deleteVaccine(idOrClient: number | string) {
-  const num = Number(idOrClient);
-  if (!isNaN(num) && num > 0) {
-    await pool.query('DELETE FROM public."VaccineSchedule" WHERE id = $1', [num]);
+  const num = safePgInt(idOrClient);
+  if (num > 0) {
+    await pool.query('DELETE FROM public."VaccineSchedule" WHERE id = $1 OR "clientId" = $2', [num, String(idOrClient)]);
   } else {
     await pool.query('DELETE FROM public."VaccineSchedule" WHERE "clientId" = $1', [String(idOrClient)]);
   }
@@ -1517,9 +1565,11 @@ export async function fetchAllSalaries() {
 }
 
 export async function upsertSalary(s: any, explicitId?: number | string) {
-  const clientId = s.clientId || (typeof s.id === 'string' && isNaN(Number(s.id)) ? s.id : null);
-  let targetId = explicitId !== undefined && !isNaN(Number(explicitId)) ? Number(explicitId) : Number(s.dbId || s.id);
-  if (isNaN(targetId) || targetId <= 0) targetId = 0;
+  const clientId =
+    s.clientId ||
+    (explicitId !== undefined && safePgInt(explicitId) === 0 ? String(explicitId) : null) ||
+    (s.id !== undefined && safePgInt(s.id) === 0 ? String(s.id) : null);
+  let targetId = explicitId !== undefined ? safePgInt(explicitId) : safePgInt(s.dbId ?? s.id);
 
   let prev: any = {};
   if (!targetId && (clientId || explicitId)) {
@@ -1591,9 +1641,9 @@ export async function upsertSalary(s: any, explicitId?: number | string) {
 }
 
 export async function deleteSalary(idOrClient: number | string) {
-  const num = Number(idOrClient);
-  if (!isNaN(num) && num > 0) {
-    await pool.query('DELETE FROM public."Salary" WHERE id = $1', [num]);
+  const num = safePgInt(idOrClient);
+  if (num > 0) {
+    await pool.query('DELETE FROM public."Salary" WHERE id = $1 OR "clientId" = $2', [num, String(idOrClient)]);
   } else {
     await pool.query('DELETE FROM public."Salary" WHERE "clientId" = $1', [String(idOrClient)]);
   }

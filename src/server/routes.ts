@@ -477,6 +477,9 @@ apiRouter.put(
   ['/flock/:id', '/flocks/:id'],
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0 || id > 2147483647) {
+      return res.status(400).json({ message: 'Invalid flock ID.' });
+    }
     const existingList = await fetchAllFlocks();
     const existing = existingList.find((f) => f.id === id) || {};
     const saved = await upsertFlock({ ...existing, ...(req.body || {}), id }, id);
@@ -491,6 +494,9 @@ apiRouter.delete(
   ['/flock/:id', '/flocks/:id'],
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0 || id > 2147483647) {
+      return res.status(400).json({ message: 'Invalid flock ID.' });
+    }
     await deleteFlock(id);
     res.json({ message: 'success', data: { id } });
   })
@@ -552,7 +558,9 @@ apiRouter.put(
   '/farms/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
-    const saved = await upsertFarm({ ...(req.body || {}), id }, isNaN(id) ? undefined : id);
+    const validId = Number.isInteger(id) && id > 0 && id <= 2147483647 ? id : undefined;
+    if (!validId) return res.status(400).json({ message: 'Invalid farm ID.' });
+    const saved = await upsertFarm({ ...(req.body || {}), id: validId }, validId);
     res.json({ message: 'success', data: saved });
   })
 );
@@ -561,7 +569,10 @@ apiRouter.delete(
   '/farms/:id',
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
-    if (!isNaN(id)) await deleteFarm(id);
+    if (!Number.isInteger(id) || id <= 0 || id > 2147483647) {
+      return res.status(400).json({ message: 'Invalid farm ID.' });
+    }
+    await deleteFarm(id);
     res.json({ message: 'success', data: { id: req.params.id } });
   })
 );
@@ -933,8 +944,7 @@ apiRouter.post(
 apiRouter.put(
   ['/egg-production/:id', '/egg-productions/:id'],
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
-    const saved = await upsertEggProduction(req.body || {}, isNaN(id) ? undefined : id);
+    const saved = await upsertEggProduction(req.body || {}, req.params.id);
     res.json({ message: 'success', data: saved });
   })
 );
@@ -942,9 +952,8 @@ apiRouter.put(
 apiRouter.delete(
   ['/egg-production/:id', '/egg-productions/:id'],
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
-    await deleteEggProduction(id);
-    res.json({ message: 'success', data: { id } });
+    await deleteEggProduction(req.params.id);
+    res.json({ message: 'success', data: { id: req.params.id } });
   })
 );
 

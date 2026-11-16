@@ -1471,10 +1471,14 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                           <button
                             type="button"
                             onClick={async () => {
-                              await onDeleteEgg(entry.id);
-                              setConfirmDeleteId(null);
-                              setToastMessage(`Egg record #${entry.id} deleted from database.`);
-                              setTimeout(() => setToastMessage(null), 3500);
+                              try {
+                                await onDeleteEgg(entry.id);
+                                setConfirmDeleteId(null);
+                                setToastMessage(`Egg record #${entry.id} deleted from database.`);
+                                setTimeout(() => setToastMessage(null), 3500);
+                              } catch {
+                                setConfirmDeleteId(null);
+                              }
                             }}
                             className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
                           >
@@ -1649,8 +1653,8 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
           record={editingEgg}
           flocks={flocks}
           onClose={() => setEditingEgg(null)}
-          onSave={(updated) => {
-            onEditEgg?.(updated);
+          onSave={async (updated) => {
+            await onEditEgg?.(updated);
             setEditingEgg(null);
             setToastMessage(`Egg production record #${updated.id} updated.`);
             setTimeout(() => setToastMessage(null), 3500);
@@ -1665,8 +1669,16 @@ interface EditEggModalProps {
   record: EggProduction;
   flocks: Flock[];
   onClose: () => void;
-  onSave: (updated: EggProduction) => void;
+  onSave: (updated: EggProduction) => Promise<void> | void;
 }
+
+const normalizeEggGradeLabel = (raw?: string): string => {
+  const g = String(raw || '').trim().toLowerCase();
+  if (g === 'started' || g === 'starter') return 'Starter';
+  if (g === 'medium') return 'Medium';
+  if (g === 'jumbo' || g === 'extra large') return 'Jumbo';
+  return 'Standard';
+};
 
 const EditEggModal: React.FC<EditEggModalProps> = ({ record, flocks, onClose, onSave }) => {
   const [date, setDate] = useState(record.date ? record.date.split('T')[0] : '');
@@ -1675,9 +1687,10 @@ const EditEggModal: React.FC<EditEggModalProps> = ({ record, flocks, onClose, on
   const [eveningEggs, setEveningEggs] = useState<number>(record.eveningEggs || 0);
   const [damagedEggs, setDamagedEggs] = useState<number>(record.damagedEggs || 0);
   const [avgWeightGrams, setAvgWeightGrams] = useState<number>(record.avgWeightGrams || 60);
-  const [eggGrade, setEggGrade] = useState<string>(record.eggGrade || 'Standard');
+  const [eggGrade, setEggGrade] = useState<string>(normalizeEggGradeLabel(record.eggGrade));
   const [notes, setNotes] = useState<string>(record.notes || '');
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const totalEggs = Math.max(0, (Number(morningEggs) || 0) + (Number(eveningEggs) || 0));
   const cleanEggs = Math.max(0, totalEggs - (Number(damagedEggs) || 0));
@@ -1692,8 +1705,9 @@ const EditEggModal: React.FC<EditEggModalProps> = ({ record, flocks, onClose, on
   const birdCount = matchedFlock?.currentCount || 25000;
   const layingRatePercent = birdCount > 0 ? Number(((totalEggs / birdCount) * 100).toFixed(1)) : record.layingRatePercent;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     setFormError(null);
     if (!date) {
       setFormError('Please select a production date.');
@@ -1719,23 +1733,30 @@ const EditEggModal: React.FC<EditEggModalProps> = ({ record, flocks, onClose, on
       setFormError('Please select an egg grade.');
       return;
     }
-    onSave({
-      ...record,
-      date,
-      flockId: matchedFlock ? matchedFlock.id : flockId,
-      flockName: matchedFlock ? matchedFlock.name : record.flockName,
-      morningEggs: Number(morningEggs) || 0,
-      eveningEggs: Number(eveningEggs) || 0,
-      totalEggs,
-      damagedEggs: Number(damagedEggs) || 0,
-      cleanTrays,
-      layingRatePercent,
-      cartons,
-      looseEggs,
-      eggGrade,
-      avgWeightGrams: Number(avgWeightGrams) || 60,
-      notes: notes.trim() || undefined,
-    });
+    setIsSaving(true);
+    try {
+      await onSave({
+        ...record,
+        date,
+        flockId: matchedFlock ? matchedFlock.id : flockId,
+        flockName: matchedFlock ? matchedFlock.name : record.flockName,
+        morningEggs: Number(morningEggs) || 0,
+        eveningEggs: Number(eveningEggs) || 0,
+        totalEggs,
+        damagedEggs: Number(damagedEggs) || 0,
+        cleanTrays,
+        layingRatePercent,
+        cartons,
+        looseEggs,
+        eggGrade,
+        avgWeightGrams: Number(avgWeightGrams) || 60,
+        notes: notes.trim() || undefined,
+      });
+    } catch (err: any) {
+      setFormError(err?.message || 'Failed to save egg production changes to database.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -1832,10 +1853,10 @@ const EditEggModal: React.FC<EditEggModalProps> = ({ record, flocks, onClose, on
                 onChange={(e) => setEggGrade(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none bg-white"
               >
+                <option value="Starter">Starter</option>
+                <option value="Medium">Medium</option>
                 <option value="Standard">Standard</option>
-                <option value="Large">Large</option>
-                <option value="Extra Large">Extra Large</option>
-                <option value="Pullet">Pullet</option>
+                <option value="Jumbo">Jumbo</option>
               </select>
             </div>
             <div>
@@ -1888,9 +1909,10 @@ const EditEggModal: React.FC<EditEggModalProps> = ({ record, flocks, onClose, on
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-sm cursor-pointer"
+              disabled={isSaving}
+              className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white font-bold shadow-sm cursor-pointer"
             >
-              Save Changes
+              {isSaving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

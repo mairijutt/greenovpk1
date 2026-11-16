@@ -585,7 +585,7 @@ export default function App() {
       }
 
       // 4. Egg Productions
-      if (eggsRes.status === 'fulfilled' && Array.isArray(eggsRes.value?.data?.items) && eggsRes.value.data.items.length > 0) {
+      if (eggsRes.status === 'fulfilled' && Array.isArray(eggsRes.value?.data?.items)) {
         const mappedEggs: EggProduction[] = eggsRes.value.data.items.map((r: any) => {
           const fid = String(r.flockId || 8);
           const totalEggs = Number(r.totalEggs || 0);
@@ -615,7 +615,7 @@ export default function App() {
       }
 
       // 5. Daily Feed & Water Consumptions
-      if (consumptionsRes.status === 'fulfilled' && Array.isArray(consumptionsRes.value?.data?.items) && consumptionsRes.value.data.items.length > 0) {
+      if (consumptionsRes.status === 'fulfilled' && Array.isArray(consumptionsRes.value?.data?.items)) {
         const mappedFeed: FeedConsumption[] = consumptionsRes.value.data.items.map((r: any) => {
           const fid = String(r.flockId || 8);
           const bags = Number(r.bags ?? r.feedConsumed ?? 0);
@@ -819,22 +819,18 @@ export default function App() {
             month: s.month || '',
           }));
 
-        if (mappedDisbursals.length > 0) {
-          setSalaryDisbursals(mappedDisbursals);
-          try {
-            localStorage.setItem('greenova_salaries_v3', JSON.stringify(mappedDisbursals));
-          } catch {}
-        }
-        if (mappedAdv.length > 0) {
-          setAdvanceRecords(mappedAdv);
-          try {
-            localStorage.setItem('greenova_advances_v3', JSON.stringify(mappedAdv));
-          } catch {}
-        }
+        setSalaryDisbursals(mappedDisbursals);
+        try {
+          localStorage.setItem('greenova_salaries_v3', JSON.stringify(mappedDisbursals));
+        } catch {}
+        setAdvanceRecords(mappedAdv);
+        try {
+          localStorage.setItem('greenova_advances_v3', JSON.stringify(mappedAdv));
+        } catch {}
       }
 
       // 10. Staff Workers
-      if (workersRes.status === 'fulfilled' && Array.isArray(workersRes.value?.data?.items) && workersRes.value.data.items.length > 0) {
+      if (workersRes.status === 'fulfilled' && Array.isArray(workersRes.value?.data?.items)) {
         const mappedWorkers: Worker[] = workersRes.value.data.items;
         setWorkers(mappedWorkers);
         try {
@@ -858,6 +854,7 @@ export default function App() {
       const res = await apiFetch('/api/egg-production', {
         method: 'POST',
         body: JSON.stringify({
+          clientId: newEgg.id,
           date: newEgg.date,
           flockId: numFid,
           totalEggs: newEgg.totalEggs,
@@ -962,6 +959,7 @@ export default function App() {
       });
     } catch (err) {
       reportError(err, 'Failed to update feed consumption record.');
+      throw err;
     }
   };
 
@@ -1136,13 +1134,14 @@ export default function App() {
       } catch {}
     } catch (err) {
       reportError(err, 'Failed to update mortality record.');
+      throw err;
     }
   };
 
   const handleEditEgg = async (updatedEgg: EggProduction) => {
-    const resolvedId =
-      Number((updatedEgg as any).trackingId || String(updatedEgg.id).replace(/\D/g, '')) ||
-      updatedEgg.id;
+    const resolvedId = encodeURIComponent(
+      String((updatedEgg as any).trackingId || updatedEgg.id)
+    );
     try {
       await apiFetch(`/api/egg-production/${resolvedId}`, {
         method: 'PUT',
@@ -1157,11 +1156,12 @@ export default function App() {
       });
     } catch (err) {
       reportError(err, 'Failed to update egg production record.');
+      throw err;
     }
   };
 
   const handleDeleteEgg = async (id: string) => {
-    const resolvedId = Number(String(id).replace(/\D/g, '')) || id;
+    const resolvedId = encodeURIComponent(String(id));
     try {
       await apiFetch(`/api/egg-production/${resolvedId}`, { method: 'DELETE' });
       setEggProductions((prev) => {
@@ -1173,11 +1173,12 @@ export default function App() {
       });
     } catch (err) {
       reportError(err, 'Failed to delete egg production record.');
+      throw err;
     }
   };
 
   const handleDeleteFeed = async (log: FeedConsumption) => {
-    const resolvedId = log.trackingId || log.id;
+    const resolvedId = encodeURIComponent(String(log.trackingId || log.id));
     try {
       await apiFetch(`/api/daily-consumption/${resolvedId}`, { method: 'DELETE' });
       setConsumptionLogs((prev) => {
@@ -1189,6 +1190,7 @@ export default function App() {
       });
     } catch (err) {
       reportError(err, 'Failed to delete daily consumption record.');
+      throw err;
     }
   };
 
@@ -1200,7 +1202,7 @@ export default function App() {
       (String(log.flockId) === '9' && (f.name.includes('Unit 2') || f.shedNumber === 'Shed 2')) ||
       (String(log.flockId) === '10' && (f.name.includes('Unit 3') || f.shedNumber === 'Shed 3'));
     try {
-      await apiFetch(`/api/bird-health/${log.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/bird-health/${encodeURIComponent(String(log.id))}`, { method: 'DELETE' });
       const countToRestore = Number(log.count) || 0;
       if (countToRestore > 0) {
         const matched = flocks.find(isMatch);
@@ -1239,12 +1241,13 @@ export default function App() {
       });
     } catch (err) {
       reportError(err, 'Failed to delete mortality record.');
+      throw err;
     }
   };
 
   const handleEditTransaction = async (updatedTx: FinancialRecord) => {
     const isSale = updatedTx.type === 'Income';
-    const resolvedId = (updatedTx as any).trackingId || updatedTx.id;
+    const resolvedId = encodeURIComponent(String((updatedTx as any).trackingId || updatedTx.id));
     const endpoint = isSale ? `/api/sales/${resolvedId}` : `/api/expenses/${resolvedId}`;
 
     try {
@@ -1261,12 +1264,13 @@ export default function App() {
       });
     } catch (err) {
       reportError(err, 'Failed to update financial transaction.');
+      throw err;
     }
   };
 
   const handleDeleteTransaction = async (record: FinancialRecord) => {
     const isSale = record.type === 'Income';
-    const resolvedId = (record as any).trackingId || record.id;
+    const resolvedId = encodeURIComponent(String((record as any).trackingId || record.id));
     const endpoint = isSale ? `/api/sales/${resolvedId}` : `/api/expenses/${resolvedId}`;
 
     try {
@@ -1280,6 +1284,7 @@ export default function App() {
       });
     } catch (err) {
       reportError(err, 'Failed to delete financial transaction.');
+      throw err;
     }
   };
 
@@ -1347,12 +1352,13 @@ export default function App() {
       }
     } catch (err) {
       reportError(err, 'Failed to update vaccine schedule.');
+      throw err;
     }
   };
 
   const handleDeleteVaccine = async (id: string) => {
     try {
-      await apiFetch(`/api/vaccines/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/vaccines/${encodeURIComponent(String(id))}`, { method: 'DELETE' });
       setVaccines((prev) => {
         const next = prev.filter((v) => v.id !== id);
         try {
@@ -1365,6 +1371,7 @@ export default function App() {
       }
     } catch (err) {
       reportError(err, 'Failed to delete vaccine schedule.');
+      throw err;
     }
   };
 
@@ -1813,6 +1820,7 @@ export default function App() {
       });
     } catch (err) {
       reportError(err, 'Failed to delete staff member.');
+      throw err;
     }
   };
 
@@ -1872,6 +1880,7 @@ export default function App() {
       });
     } catch (err) {
       reportError(err, 'Failed to delete salary disbursal.');
+      throw err;
     }
   };
 
@@ -1925,6 +1934,7 @@ export default function App() {
       });
     } catch (err) {
       reportError(err, 'Failed to delete advance salary record.');
+      throw err;
     }
   };
 

@@ -67,6 +67,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
       await onDelete();
       setConfirmDelete(false);
       onClose();
+    } catch {
+      // Parent handler displays API error banner
     } finally {
       setIsDeleting(false);
     }

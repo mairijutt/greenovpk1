@@ -45,9 +45,9 @@ interface BirdHealthViewProps {
   flocks: Flock[];
   onOpenRecordModal: (type: 'mortality') => void;
   onToggleVaccine: (id: string) => void;
-  onAddVaccine?: (vaccine: VaccineLog) => void;
-  onEditVaccine?: (vaccine: VaccineLog) => void;
-  onDeleteVaccine?: (id: string) => void;
+  onAddVaccine?: (vaccine: VaccineLog) => Promise<void> | void;
+  onEditVaccine?: (vaccine: VaccineLog) => Promise<void> | void;
+  onDeleteVaccine?: (id: string) => Promise<void> | void;
   onEditMortality?: (log: MortalityLog) => Promise<void> | void;
   onDeleteMortality?: (log: MortalityLog) => Promise<void> | void;
   farms?: Farm[];
@@ -624,7 +624,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
   };
 
   // Handle Vaccine Scheduling or Update Form Submit
-  const handleScheduleVaccineSubmit = (e: React.FormEvent) => {
+  const handleScheduleVaccineSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setVaccineFormError(null);
     if (!targetFlockId) {
@@ -674,13 +674,17 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
         batchNumber,
         vetNotes,
       };
-      onEditVaccine?.(updatedVaccine);
-      setScheduleSuccess(true);
-      setTimeout(() => {
-        setScheduleSuccess(false);
-        setIsScheduleModalOpen(false);
-        setEditingVaccineId(null);
-      }, 700);
+      try {
+        await onEditVaccine?.(updatedVaccine);
+        setScheduleSuccess(true);
+        setTimeout(() => {
+          setScheduleSuccess(false);
+          setIsScheduleModalOpen(false);
+          setEditingVaccineId(null);
+        }, 700);
+      } catch (err: any) {
+        setVaccineFormError(err?.message || 'Failed to update vaccine schedule in database.');
+      }
       return;
     }
 
@@ -699,12 +703,15 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
       vetNotes,
     };
 
-    if (onAddVaccine) {
-      onAddVaccine(newVaccine);
+    try {
+      if (onAddVaccine) {
+        await onAddVaccine(newVaccine);
+      }
+      setScheduleSuccess(false);
+      setIsScheduleModalOpen(false);
+    } catch (err: any) {
+      setVaccineFormError(err?.message || 'Failed to save vaccine schedule to database.');
     }
-
-    setScheduleSuccess(false);
-    setIsScheduleModalOpen(false);
   };
 
   const openEditMortalityModal = (log: MortalityLog) => {
@@ -718,7 +725,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
     setMortFormRecordedBy(log.recordedBy || 'Farm Admin');
   };
 
-  const handleEditMortalitySubmit = (e: React.FormEvent) => {
+  const handleEditMortalitySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMortality) return;
     setMortFormError(null);
@@ -757,9 +764,13 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
       symptoms: mortFormSymptoms.trim(),
       recordedBy: mortFormRecordedBy.trim() || 'Farm Admin',
     };
-    onEditMortality?.(updatedLog);
-    setEditingMortality(null);
-    showToast(`Mortality record #${updatedLog.id.replace('m-', '')} updated.`);
+    try {
+      await onEditMortality?.(updatedLog);
+      setEditingMortality(null);
+      showToast(`Mortality record #${updatedLog.id.replace('m-', '')} updated.`);
+    } catch (err: any) {
+      setMortFormError(err?.message || 'Failed to save mortality changes to database.');
+    }
   };
 
   const activeTooltipData =
@@ -1279,9 +1290,13 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
                             <button
                               type="button"
                               onClick={async () => {
-                                await onDeleteMortality(log);
-                                setConfirmDeleteMortalityId(null);
-                                showToast('Mortality record deleted and flock count adjusted.');
+                                try {
+                                  await onDeleteMortality(log);
+                                  setConfirmDeleteMortalityId(null);
+                                  showToast('Mortality record deleted and flock count adjusted.');
+                                } catch {
+                                  setConfirmDeleteMortalityId(null);
+                                }
                               }}
                               className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
                             >
@@ -1473,10 +1488,14 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              onDeleteVaccine?.(v.id);
-                              setConfirmDeleteVaccineId(null);
-                              showToast(`Deleted schedule "${v.vaccineName}".`);
+                            onClick={async () => {
+                              try {
+                                await onDeleteVaccine?.(v.id);
+                                setConfirmDeleteVaccineId(null);
+                                showToast(`Deleted schedule "${v.vaccineName}".`);
+                              } catch {
+                                setConfirmDeleteVaccineId(null);
+                              }
                             }}
                             className="px-2 py-1 rounded bg-rose-600 text-white font-bold hover:bg-rose-700 cursor-pointer"
                           >
@@ -1896,8 +1915,8 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
           onEdit={() => openEditVaccineModal(viewingVaccine)}
           onDelete={
             onDeleteVaccine
-              ? () => {
-                  onDeleteVaccine(viewingVaccine.id);
+              ? async () => {
+                  await onDeleteVaccine(viewingVaccine.id);
                   showToast(`Deleted schedule "${viewingVaccine.vaccineName}".`);
                 }
               : undefined
