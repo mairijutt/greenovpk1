@@ -713,7 +713,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                   −{metrics.feedConsumedBags.toLocaleString()} bags
                 </div>
                 <div className="text-[10px] text-slate-500">
-                  {metrics.feedConsumedKg.toLocaleString()} kg fed
+                  {formatPkr(metrics.feedExpenses)} consumed • {metrics.feedConsumedKg.toLocaleString()} kg
                 </div>
               </td>
               <td
@@ -1112,8 +1112,13 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                     >
                       {formatPkr(row.netIncome)}
                     </td>
-                    <td className="py-3 px-3 text-right font-semibold text-slate-700">
-                      {row.feedConsumedBags.toLocaleString()} bags
+                    <td className="py-3 px-3 text-right">
+                      <div className="font-semibold text-slate-700">
+                        {row.feedConsumedBags.toLocaleString()} bags
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {formatPkr(row.feedConsumedExpense)}
+                      </div>
                     </td>
                     <td className="py-3 px-3 text-right font-bold text-indigo-700">
                       {row.remainingFeedBags.toLocaleString()} bags
@@ -1220,7 +1225,18 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                 </tr>
                 <tr className="hover:bg-slate-50/80">
                   <td className="py-2.5 px-4 pl-6 text-slate-700">
-                    Feed Expenses ({metrics.feedConsumedBags.toLocaleString()} bags consumed)
+                    Feed Consumed Expenses{' '}
+                    <span className="text-[11px] text-slate-400">
+                      ({metrics.feedConsumedBags.toLocaleString()} bags consumed
+                      {metrics.feedAvgCostPerBag > 0
+                        ? ` @ Rs. ${Math.round(metrics.feedAvgCostPerBag).toLocaleString()}/bag`
+                        : ''}
+                      {metrics.feedStockReceivedBags > 0 &&
+                      metrics.feedStockReceivedBags !== metrics.feedConsumedBags
+                        ? ` • ${metrics.feedStockReceivedBags.toLocaleString()} bags purchased`
+                        : ''}
+                      )
+                    </span>
                   </td>
                   <td className="py-2.5 px-4 text-right font-semibold text-slate-900">
                     {formatFullPkr(metrics.feedExpenses)}

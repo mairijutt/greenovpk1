@@ -117,6 +117,7 @@ export interface CeoSummaryMetrics {
   feedConsumedKg: number;
   feedStockReceivedBags: number;
   feedStockReceivedAmount: number;
+  feedAvgCostPerBag: number;
   warehouseReserveBags: number;
   warehouseReserveKg: number;
   remainingFeedBags: number;
@@ -153,6 +154,7 @@ export interface MonthlyCeoRow {
   cartonsSold: number;
   totalSales: number;
   totalExpenses: number;
+  feedConsumedExpense: number;
   netIncome: number;
   feedConsumedBags: number;
   feedReceivedBags: number;
@@ -163,6 +165,116 @@ export interface MonthlyCeoRow {
   carriedNextFeedBags: number;
   avgCartonPrice: number;
   avgPerBirdCost: number;
+}
+
+export function isFeedStockRecord(rec: any): boolean {
+  const h = String(rec?.head || rec?.category || '').trim().toUpperCase();
+  return !h || h === 'FEED';
+}
+
+function getConsumptionBags(rec: any): number {
+  const b = Number(rec?.bags);
+  if (!isNaN(b) && b > 0) return b;
+  const kg = Number(rec?.feedQuantityKg) || 0;
+  return kg > 0 ? Math.round(kg / 50) : 0;
+}
+
+function resolveFeedRatePerBag(
+  unitFeedStocks: StockRecord[],
+  allFeedStocks: StockRecord[],
+  fromDate: string,
+  toDate: string
+): number {
+  const inPeriod = (d: string) => {
+    const nd = normalizeDateStr(d);
+    if (fromDate && nd < fromDate) return false;
+    if (toDate && nd > toDate) return false;
+    return true;
+  };
+  const upToToDate = (d: string) => {
+    if (!toDate) return true;
+    const nd = normalizeDateStr(d);
+    return Boolean(nd) && nd <= toDate;
+  };
+
+  // 1. Unit's feed purchases inside the period
+  const uPeriod = unitFeedStocks.filter((k) => inPeriod(k.date));
+  const uPeriodBags = uPeriod.reduce((s, k) => s + (Number(k.quantity) || 0), 0);
+  const uPeriodAmt = uPeriod.reduce((s, k) => s + (Number(k.amount) || 0), 0);
+  if (uPeriodBags > 0) return uPeriodAmt / uPeriodBags;
+
+  // 2. Unit's cumulative feed purchases up to toDate
+  const uUpTo = unitFeedStocks.filter((k) => upToToDate(k.date));
+  const uUpToBags = uUpTo.reduce((s, k) => s + (Number(k.quantity) || 0), 0);
+  const uUpToAmt = uUpTo.reduce((s, k) => s + (Number(k.amount) || 0), 0);
+  if (uUpToBags > 0) return uUpToAmt / uUpToBags;
+
+  // 3. Farm-wide feed purchases inside the period
+  const fPeriod = allFeedStocks.filter((k) => inPeriod(k.date));
+  const fPeriodBags = fPeriod.reduce((s, k) => s + (Number(k.quantity) || 0), 0);
+  const fPeriodAmt = fPeriod.reduce((s, k) => s + (Number(k.amount) || 0), 0);
+  if (fPeriodBags > 0) return fPeriodAmt / fPeriodBags;
+
+  // 4. Unit's all-time feed purchases
+  const uAllBags = unitFeedStocks.reduce((s, k) => s + (Number(k.quantity) || 0), 0);
+  const uAllAmt = unitFeedStocks.reduce((s, k) => s + (Number(k.amount) || 0), 0);
+  if (uAllBags > 0) return uAllAmt / uAllBags;
+
+  // 5. Farm-wide all-time feed purchases
+  const fAllBags = allFeedStocks.reduce((s, k) => s + (Number(k.quantity) || 0), 0);
+  const fAllAmt = allFeedStocks.reduce((s, k) => s + (Number(k.amount) || 0), 0);
+  if (fAllBags > 0) return fAllAmt / fAllBags;
+
+  return 5500;
+}
+
+export function computeConsumedFeedCostForUnit(params: {
+  unitStocks: StockRecord[];
+  allFeedStocks: StockRecord[];
+  unitConsumptions: FeedConsumption[];
+  rawUnitFeedExpenses: number;
+  fromDate: string;
+  toDate: string;
+}): number {
+  const { unitStocks, allFeedStocks, unitConsumptions, rawUnitFeedExpenses, fromDate, toDate } = params;
+  const inBounds = (d: string) => {
+    const nd = normalizeDateStr(d);
+    if (fromDate && nd < fromDate) return false;
+    if (toDate && nd > toDate) return false;
+    return true;
+  };
+
+  // Fallback only if the unit has neither consumption nor stock records at all
+  if (unitConsumptions.length === 0 && unitStocks.length === 0) {
+    return rawUnitFeedExpenses;
+  }
+
+  const periodCons = unitConsumptions.filter((c) => inBounds(c.date));
+  if (periodCons.length === 0) return 0;
+
+  // Group by YYYY-MM so multi-month summaries equal the exact sum of monthly rows
+  const byMonth: Record<string, number> = {};
+  for (const c of periodCons) {
+    const nd = normalizeDateStr(c.date);
+    const monthKey = nd.length >= 7 ? nd.slice(0, 7) : 'unknown';
+    byMonth[monthKey] = (byMonth[monthKey] || 0) + getConsumptionBags(c);
+  }
+
+  let totalCost = 0;
+  for (const [monthKey, bags] of Object.entries(byMonth)) {
+    if (bags <= 0) continue;
+    let effFrom = fromDate;
+    let effTo = toDate;
+    if (/^\d{4}-\d{2}$/.test(monthKey)) {
+      const mStart = `${monthKey}-01`;
+      const mEnd = `${monthKey}-31`;
+      effFrom = !fromDate || mStart > fromDate ? mStart : fromDate;
+      effTo = !toDate || mEnd < toDate ? mEnd : toDate;
+    }
+    const rate = resolveFeedRatePerBag(unitStocks, allFeedStocks, effFrom, effTo);
+    totalCost += Math.round(bags * rate);
+  }
+  return totalCost;
 }
 
 export function computeCeoSummary(params: {
@@ -285,13 +397,32 @@ export function computeCeoSummary(params: {
     .filter((s) => isEggSaleRecord(s))
     .reduce((sum, s) => sum + (Number(s.quantity ?? (s as any).itemsSold) || 0), 0);
 
-  // Period Expenses
+  // Feed Consumption & Stock (All FEED stock records)
+  const allFeedStocks = stockRecords.filter((k) => isFeedStockRecord(k));
+  const unitFeedStocks = unitStocks.filter((k) => isFeedStockRecord(k));
+  const periodConsumptions = unitConsumptions.filter((c) => isInPeriod(c.date));
+  const prevConsumptions = unitConsumptions.filter((c) => isBeforePeriod(c.date));
+  const periodStocks = unitFeedStocks.filter((k) => isInPeriod(k.date));
+  const prevStocks = unitFeedStocks.filter((k) => isBeforePeriod(k.date));
+
+  const feedConsumedKg = periodConsumptions.reduce(
+    (sum, c) => sum + (Number(c.feedQuantityKg) || (Number(c.bags) || 0) * 50),
+    0
+  );
+  const feedConsumedBags = periodConsumptions.reduce((sum, c) => sum + getConsumptionBags(c), 0);
+
+  const feedStockReceivedBags = periodStocks.reduce((sum, k) => sum + (Number(k.quantity) || 0), 0);
+  const feedStockReceivedAmount = periodStocks.reduce((sum, k) => sum + (Number(k.amount) || 0), 0);
+
+  const prevFeedConsumedBags = prevConsumptions.reduce((sum, c) => sum + getConsumptionBags(c), 0);
+  const prevFeedReceivedBags = prevStocks.reduce((sum, k) => sum + (Number(k.quantity) || 0), 0);
+
+  // Period Expenses — Feed expense in Income vs Expense Summary reflects CONSUMED bags only
   const periodExpenses = unitExpenses.filter((x) => isInPeriod(x.date));
   const prevExpensesList = unitExpenses.filter((x) => isBeforePeriod(x.date));
 
-  let totalExpenses = 0;
-  let cogsExpenses = 0;
-  let feedExpenses = 0;
+  let nonFeedExpenses = 0;
+  let rawFeedExpenses = 0;
   let salariesExpenses = 0;
   let medicineVaccineExpenses = 0;
   let utilitiesPolExpenses = 0;
@@ -300,18 +431,105 @@ export function computeCeoSummary(params: {
 
   for (const x of periodExpenses) {
     const amt = Number(x.amount ?? (x as any).expenseCost) || 0;
-    totalExpenses += amt;
     const head = String(x.head || x.category || 'OTHER').toUpperCase().replace(/\s+/g, '_');
-    expHeadMap[head] = (expHeadMap[head] || 0) + amt;
-    if (COGS_CATEGORIES.has(head)) cogsExpenses += amt;
-    if (head === 'FEED') feedExpenses += amt;
+    if (head === 'FEED') {
+      rawFeedExpenses += amt;
+    } else {
+      nonFeedExpenses += amt;
+      expHeadMap[head] = (expHeadMap[head] || 0) + amt;
+    }
     if (head === 'SALARIES_PAYMENTS') salariesExpenses += amt;
     if (head === 'MEDICINE' || head === 'VACCINE') medicineVaccineExpenses += amt;
     if (head === 'UTILITIES' || head === 'POL' || head === 'POWER_ELECTRIC') utilitiesPolExpenses += amt;
     if (head === 'CHICKEN') chickenCapexExpenses += amt;
   }
+
+  // Compute consumed feed cost per unit so "All Units" reconciles with sum of individual units
+  let feedExpenses = 0;
+  if (selectedUnit === 'all') {
+    const unitNames = new Set<string>(['Unit 1', 'Unit 2', 'Unit 3']);
+    consumptionLogs.forEach((c) => unitNames.add(getUnitFromRecord(c)));
+    allFeedStocks.forEach((k) => unitNames.add(getUnitFromRecord(k)));
+    for (const uName of unitNames) {
+      const uRawFeed = periodExpenses
+        .filter((x) => getUnitFromRecord(x).toLowerCase() === uName.toLowerCase() && String(x.head || x.category || '').toUpperCase() === 'FEED')
+        .reduce((s, x) => s + (Number(x.amount ?? (x as any).expenseCost) || 0), 0);
+      feedExpenses += computeConsumedFeedCostForUnit({
+        unitStocks: allFeedStocks.filter((k) => getUnitFromRecord(k).toLowerCase() === uName.toLowerCase()),
+        allFeedStocks,
+        unitConsumptions: consumptionLogs.filter((c) => getUnitFromRecord(c).toLowerCase() === uName.toLowerCase()),
+        rawUnitFeedExpenses: uRawFeed,
+        fromDate,
+        toDate,
+      });
+    }
+  } else {
+    feedExpenses = computeConsumedFeedCostForUnit({
+      unitStocks: unitFeedStocks,
+      allFeedStocks,
+      unitConsumptions,
+      rawUnitFeedExpenses: rawFeedExpenses,
+      fromDate,
+      toDate,
+    });
+  }
+
+  if (feedExpenses > 0) {
+    expHeadMap['FEED'] = feedExpenses;
+  }
+
+  const totalExpenses = nonFeedExpenses + feedExpenses;
+  const cogsExpenses = Object.entries(expHeadMap).reduce(
+    (sum, [head, amt]) => (COGS_CATEGORIES.has(head) ? sum + amt : sum),
+    0
+  );
   const operatingExpenses = Math.max(0, totalExpenses - cogsExpenses);
-  const prevExpensesTotal = prevExpensesList.reduce((sum, x) => sum + (Number(x.amount ?? (x as any).expenseCost) || 0), 0);
+
+  // Prior period expenses also on consumed-feed basis for consistent cash rollover
+  const prevNonFeedExpenses = prevExpensesList
+    .filter((x) => String(x.head || x.category || '').toUpperCase().replace(/\s+/g, '_') !== 'FEED')
+    .reduce((sum, x) => sum + (Number(x.amount ?? (x as any).expenseCost) || 0), 0);
+
+  let prevFeedExpenses = 0;
+  if (fromDate) {
+    const prevToDate = (() => {
+      const d = new Date(`${fromDate}T00:00:00Z`);
+      if (isNaN(d.getTime())) return fromDate;
+      d.setUTCDate(d.getUTCDate() - 1);
+      return d.toISOString().slice(0, 10);
+    })();
+    if (selectedUnit === 'all') {
+      const unitNames = new Set<string>(['Unit 1', 'Unit 2', 'Unit 3']);
+      consumptionLogs.forEach((c) => unitNames.add(getUnitFromRecord(c)));
+      allFeedStocks.forEach((k) => unitNames.add(getUnitFromRecord(k)));
+      for (const uName of unitNames) {
+        const uRawPrev = prevExpensesList
+          .filter((x) => getUnitFromRecord(x).toLowerCase() === uName.toLowerCase() && String(x.head || x.category || '').toUpperCase() === 'FEED')
+          .reduce((s, x) => s + (Number(x.amount ?? (x as any).expenseCost) || 0), 0);
+        prevFeedExpenses += computeConsumedFeedCostForUnit({
+          unitStocks: allFeedStocks.filter((k) => getUnitFromRecord(k).toLowerCase() === uName.toLowerCase()),
+          allFeedStocks,
+          unitConsumptions: consumptionLogs.filter((c) => getUnitFromRecord(c).toLowerCase() === uName.toLowerCase()),
+          rawUnitFeedExpenses: uRawPrev,
+          fromDate: '',
+          toDate: prevToDate,
+        });
+      }
+    } else {
+      const rawPrev = prevExpensesList
+        .filter((x) => String(x.head || x.category || '').toUpperCase() === 'FEED')
+        .reduce((s, x) => s + (Number(x.amount ?? (x as any).expenseCost) || 0), 0);
+      prevFeedExpenses = computeConsumedFeedCostForUnit({
+        unitStocks: unitFeedStocks,
+        allFeedStocks,
+        unitConsumptions,
+        rawUnitFeedExpenses: rawPrev,
+        fromDate: '',
+        toDate: prevToDate,
+      });
+    }
+  }
+  const prevExpensesTotal = prevNonFeedExpenses + prevFeedExpenses;
 
   const expenseByHead = Object.entries(expHeadMap)
     .map(([head, amount]) => ({
@@ -331,20 +549,12 @@ export function computeCeoSummary(params: {
     }))
     .sort((a, b) => b.amount - a.amount);
 
-  // Feed Consumption & Stock
-  const periodConsumptions = unitConsumptions.filter((c) => isInPeriod(c.date));
-  const prevConsumptions = unitConsumptions.filter((c) => isBeforePeriod(c.date));
-  const periodStocks = unitStocks.filter((k) => isInPeriod(k.date));
-  const prevStocks = unitStocks.filter((k) => isBeforePeriod(k.date));
-
-  const feedConsumedKg = periodConsumptions.reduce((sum, c) => sum + (Number(c.feedQuantityKg) || (Number(c.bags) || 0) * 50), 0);
-  const feedConsumedBags = periodConsumptions.reduce((sum, c) => sum + (Number(c.bags) || Math.round((Number(c.feedQuantityKg) || 0) / 50)), 0);
-
-  const feedStockReceivedBags = periodStocks.reduce((sum, k) => sum + (Number(k.quantity) || 0), 0);
-  const feedStockReceivedAmount = periodStocks.reduce((sum, k) => sum + (Number(k.amount) || 0), 0);
-
-  const prevFeedConsumedBags = prevConsumptions.reduce((sum, c) => sum + (Number(c.bags) || Math.round((Number(c.feedQuantityKg) || 0) / 50)), 0);
-  const prevFeedReceivedBags = prevStocks.reduce((sum, k) => sum + (Number(k.quantity) || 0), 0);
+  const feedAvgCostPerBag =
+    feedConsumedBags > 0
+      ? feedExpenses / feedConsumedBags
+      : feedStockReceivedBags > 0
+      ? feedStockReceivedAmount / feedStockReceivedBags
+      : 0;
 
   // Waterfall / Rollover calculations
   const netIncome = totalSalesRevenue - totalExpenses;
@@ -419,6 +629,7 @@ export function computeCeoSummary(params: {
     feedConsumedKg,
     feedStockReceivedBags,
     feedStockReceivedAmount,
+    feedAvgCostPerBag,
     warehouseReserveBags: unitWarehouseBags,
     warehouseReserveKg: unitWarehouseKg,
     remainingFeedBags,
@@ -502,6 +713,11 @@ export function computeMonthlyBreakdown(params: {
   const warehouseReserveKg = 0;
   const unitWarehouseBags = 0;
 
+  const allFeedStocks = stockRecords.filter((k) => isFeedStockRecord(k));
+  const unitNamesForAll = new Set<string>(['Unit 1', 'Unit 2', 'Unit 3']);
+  consumptionLogs.forEach((c) => unitNamesForAll.add(getUnitFromRecord(c)));
+  allFeedStocks.forEach((k) => unitNamesForAll.add(getUnitFromRecord(k)));
+
   let runningEggsBalance = 0;
   let runningFeedBalance = 0;
 
@@ -511,6 +727,8 @@ export function computeMonthlyBreakdown(params: {
       month: 'short',
       year: 'numeric',
     });
+    const mFrom = `${monthKey}-01`;
+    const mTo = `${monthKey}-31`;
 
     const mEggs = eggProductions.filter(
       (e) => matchesSelectedUnit(e, selectedUnit) && normalizeDateStr(e.date).startsWith(monthKey)
@@ -524,7 +742,7 @@ export function computeMonthlyBreakdown(params: {
     const mConsumptions = consumptionLogs.filter(
       (c) => matchesSelectedUnit(c, selectedUnit) && normalizeDateStr(c.date).startsWith(monthKey)
     );
-    const mStocks = stockRecords.filter(
+    const mStocks = allFeedStocks.filter(
       (k) => matchesSelectedUnit(k, selectedUnit) && normalizeDateStr(k.date).startsWith(monthKey)
     );
 
@@ -533,11 +751,42 @@ export function computeMonthlyBreakdown(params: {
     const eggsSold = eggSales.reduce((s, x) => s + (Number(x.quantity ?? (x as any).itemsSold) || 0), 0);
     const eggRevenue = eggSales.reduce((s, x) => s + (Number(x.amount ?? x.totalAmount) || 0), 0);
     const totalSales = mSales.reduce((s, x) => s + (Number(x.amount ?? x.totalAmount) || 0), 0);
-    const totalExpenses = mExpenses.reduce((s, x) => s + (Number(x.amount ?? (x as any).expenseCost) || 0), 0);
-    const feedConsumedBags = mConsumptions.reduce(
-      (s, c) => s + (Number(c.bags) || Math.round((Number(c.feedQuantityKg) || 0) / 50)),
-      0
-    );
+
+    const nonFeedMonthExpenses = mExpenses
+      .filter((x) => String(x.head || x.category || '').toUpperCase().replace(/\s+/g, '_') !== 'FEED')
+      .reduce((s, x) => s + (Number(x.amount ?? (x as any).expenseCost) || 0), 0);
+
+    let feedConsumedExpense = 0;
+    if (selectedUnit === 'all') {
+      for (const uName of unitNamesForAll) {
+        const uRawFeed = mExpenses
+          .filter((x) => getUnitFromRecord(x).toLowerCase() === uName.toLowerCase() && String(x.head || x.category || '').toUpperCase() === 'FEED')
+          .reduce((s, x) => s + (Number(x.amount ?? (x as any).expenseCost) || 0), 0);
+        feedConsumedExpense += computeConsumedFeedCostForUnit({
+          unitStocks: allFeedStocks.filter((k) => getUnitFromRecord(k).toLowerCase() === uName.toLowerCase()),
+          allFeedStocks,
+          unitConsumptions: consumptionLogs.filter((c) => getUnitFromRecord(c).toLowerCase() === uName.toLowerCase()),
+          rawUnitFeedExpenses: uRawFeed,
+          fromDate: mFrom,
+          toDate: mTo,
+        });
+      }
+    } else {
+      const rawFeed = mExpenses
+        .filter((x) => String(x.head || x.category || '').toUpperCase() === 'FEED')
+        .reduce((s, x) => s + (Number(x.amount ?? (x as any).expenseCost) || 0), 0);
+      feedConsumedExpense = computeConsumedFeedCostForUnit({
+        unitStocks: allFeedStocks.filter((k) => matchesSelectedUnit(k, selectedUnit)),
+        allFeedStocks,
+        unitConsumptions: consumptionLogs.filter((c) => matchesSelectedUnit(c, selectedUnit)),
+        rawUnitFeedExpenses: rawFeed,
+        fromDate: mFrom,
+        toDate: mTo,
+      });
+    }
+
+    const totalExpenses = nonFeedMonthExpenses + feedConsumedExpense;
+    const feedConsumedBags = mConsumptions.reduce((s, c) => s + getConsumptionBags(c), 0);
     const feedReceivedBags = mStocks.reduce((s, k) => s + (Number(k.quantity) || 0), 0);
 
     const carriedPrevCartons = Math.max(0, runningEggsBalance) / 360;
@@ -559,6 +808,7 @@ export function computeMonthlyBreakdown(params: {
       cartonsSold,
       totalSales,
       totalExpenses,
+      feedConsumedExpense,
       netIncome: totalSales - totalExpenses,
       feedConsumedBags,
       feedReceivedBags,
