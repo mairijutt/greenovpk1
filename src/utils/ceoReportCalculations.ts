@@ -220,11 +220,9 @@ export function computeCeoSummary(params: {
     return Boolean(nd) && nd < fromDate;
   };
 
-  // Warehouse feed reserve from inventory
-  const warehouseReserveKg = inventory
-    .filter((i) => i.category === 'Feed')
-    .reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
-  const warehouseReserveBags = Math.round(warehouseReserveKg / 50);
+  // All stocks assign directly to production units (no central warehouse)
+  const warehouseReserveKg = 0;
+  const warehouseReserveBags = 0;
 
   // Filter unit-scoped datasets first
   const unitEggs = eggProductions.filter((e) => matchesSelectedUnit(e, selectedUnit));
@@ -500,12 +498,9 @@ export function computeMonthlyBreakdown(params: {
 
   const sortedMonths = Array.from(monthSet).sort();
 
-  const warehouseReserveKg = inventory
-    .filter((i) => i.category === 'Feed')
-    .reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
-  const unitShareRatio =
-    selectedUnit === 'Unit 1' ? 0.25 : selectedUnit === 'Unit 2' ? 0.50 : selectedUnit === 'Unit 3' ? 0.25 : 1;
-  const unitWarehouseBags = Math.round((warehouseReserveKg / 50) * unitShareRatio);
+  // All stocks assign directly to production units (no central warehouse)
+  const warehouseReserveKg = 0;
+  const unitWarehouseBags = 0;
 
   let runningEggsBalance = 0;
   let runningFeedBalance = 0;

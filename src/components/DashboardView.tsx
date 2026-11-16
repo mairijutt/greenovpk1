@@ -383,15 +383,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return { bags, feedKg, waterL, fcr: avgFcr, intakeGrams: avgGrams };
   }, [selectedFlock, consumptionLogs, fromDate, toDate]);
 
-  // 4. Stock Metrics
+  // 4. Stock Metrics (unit-direct assignments, no warehouse)
   const dynamicStock = useMemo(() => {
     const totalBags = activeStocks.reduce((sum, s) => sum + (s.quantity || 0), 0);
     const totalAmount = activeStocks.reduce((sum, s) => sum + (s.amount || 0), 0);
+    const avgCostPerBag = totalBags > 0 ? Math.round(totalAmount / totalBags) : 0;
     return {
       bags: totalBags,
       amount: totalAmount,
       shipments: activeStocks.length,
-      warehouseBuffer: 2150,
+      avgCostPerBag,
       traysBuffer: 42500,
     };
   }, [activeStocks]);
@@ -2135,14 +2136,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs hover:border-amber-400 hover:shadow-md transition-all cursor-pointer block group"
           >
             <div className="flex justify-between items-center text-[11px] font-bold uppercase text-slate-500 group-hover:text-amber-700">
-              <span>Warehouse Safety Buffer</span>
+              <span>Unit-Direct Avg Rate</span>
               <ExternalLink className="w-3.5 h-3.5 opacity-60" />
             </div>
             <div className="text-2xl font-black text-amber-700 font-mono mt-1">
-              2,150 Bags
+              Rs. {dynamicStock.avgCostPerBag.toLocaleString()}
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
-              ~16 Days Safety Reserve on Site
+              Per Bag/Unit • Assigned Directly to Units
             </div>
           </a>
 

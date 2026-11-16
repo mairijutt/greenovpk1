@@ -1117,18 +1117,6 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
         console.warn('LocalStorage error:', err);
       }
 
-      if (onRestock && qty > 0) {
-        const match = inventory.find(
-          (item) =>
-            item.category.toLowerCase() === formHead.toLowerCase() ||
-            item.name.toLowerCase().includes(formStockType.toLowerCase()) ||
-            (formHead === 'FEED' && item.name.toLowerCase().includes('feed'))
-        );
-        if (match) {
-          onRestock(match.id, qty);
-        }
-      }
-
       if (onAddTransaction) {
         const expenseRecord: FinancialRecord = {
           id: `exp-stk-${Date.now()}`,
@@ -1317,7 +1305,6 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
                 <option value="Unit 1">Unit 1</option>
                 <option value="Unit 2">Unit 2</option>
                 <option value="Unit 3">Unit 3</option>
-                <option value="Warehouse">Warehouse / All Units</option>
               </select>
             </div>
           </div>

@@ -38,14 +38,14 @@ import { getInitialUrlFilters } from '../utils/urlFilters.ts';
 import { apiFetch } from '../services/api.ts';
 
 interface StocksViewProps {
-  inventory: InventoryItem[];
-  onRestock: (id: string, amount: number) => void;
+  inventory?: InventoryItem[];
+  onRestock?: (id: string, amount: number) => void;
   onAddTransaction?: (record: FinancialRecord) => Promise<void> | void;
 }
 
-export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, onAddTransaction }) => {
+export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
   const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
-  const [activeTab, setActiveTab] = useState<'shipments' | 'add-stock' | 'warehouse'>('shipments');
+  const [activeTab, setActiveTab] = useState<'shipments' | 'add-stock'>('shipments');
   const [selectedUnit, setSelectedUnit] = useState<string>(() => initialUrlFilters.unit);
   const [selectedFeedType, setSelectedFeedType] = useState<string>('all');
   const [selectedPayment, setSelectedPayment] = useState<string>('all');
@@ -416,19 +416,6 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
         console.warn('LocalStorage error:', err);
       }
 
-      // Auto-restock warehouse inventory item if applicable
-      if (onRestock && qty > 0) {
-        const match = inventory.find(
-          (item) =>
-            item.category.toLowerCase() === formHead.toLowerCase() ||
-            item.name.toLowerCase().includes(formStockType.toLowerCase()) ||
-            (formHead === 'FEED' && item.name.toLowerCase().includes('feed'))
-        );
-        if (match) {
-          onRestock(match.id, qty);
-        }
-      }
-
       // Automatically create corresponding Farm Expense transaction so cost reflects dynamically everywhere
       if (onAddTransaction) {
         const expenseRecord: FinancialRecord = {
@@ -580,24 +567,6 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
     URL.revokeObjectURL(url);
   };
 
-  // Warehouse SKU filters
-  const [warehouseSearch, setWarehouseSearch] = useState('');
-  const [warehouseCategory, setWarehouseCategory] = useState('all');
-
-  const filteredWarehouse = useMemo(() => {
-    return inventory.filter((item) => {
-      const matchesSearch =
-        item.name.toLowerCase().includes(warehouseSearch.toLowerCase()) ||
-        item.category.toLowerCase().includes(warehouseSearch.toLowerCase()) ||
-        item.location.toLowerCase().includes(warehouseSearch.toLowerCase());
-      const matchesCat = warehouseCategory === 'all' || item.category === warehouseCategory;
-      return matchesSearch && matchesCat;
-    });
-  }, [inventory, warehouseSearch, warehouseCategory]);
-
-  const lowStockCount = inventory.filter((item) => item.quantity <= item.minAlertThreshold).length;
-  const totalValuation = inventory.reduce((acc, curr) => acc + curr.quantity * curr.costPerUnit, 0);
-
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -611,10 +580,10 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
       {/* Page Header */}
       <PageHeader
         title="Inventory & Stock Store"
-        subtitle="Manage commercial feed replenishment ledger, grain silos, and warehouse cold-chain supplies."
+        subtitle="Manage unit-assigned commercial feed replenishments, medicine, vaccines, and farm supplies."
         icon={Boxes}
         iconColor="indigo"
-        badge="Live Warehouse Tracking"
+        badge="Unit-Direct Stock Ledger"
         actions={
           <>
             <UIButton
@@ -665,32 +634,13 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
           }`}
         >
           <Truck className="w-4 h-4" />
-          <span>Feed Stock Replenishments</span>
+          <span>Unit Stock Replenishments</span>
           <span
             className={`ml-1 text-[10px] px-2 py-0.5 rounded-full ${
               activeTab === 'shipments' ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-600'
             }`}
           >
             {allStockRecords.length} Shipments
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('warehouse')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
-            activeTab === 'warehouse'
-              ? 'bg-slate-800 text-white shadow-sm ring-2 ring-slate-800/20'
-              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-          }`}
-        >
-          <Boxes className="w-4 h-4" />
-          <span>Warehouse Supplies &amp; Reorder Safety (SKUs)</span>
-          <span
-            className={`ml-1 text-[10px] px-2 py-0.5 rounded-full ${
-              activeTab === 'warehouse' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'
-            }`}
-          >
-            {inventory.length} SKUs
           </span>
         </button>
       </div>
@@ -830,7 +780,6 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
                     <option value="Unit 1">Unit 1</option>
                     <option value="Unit 2">Unit 2</option>
                     <option value="Unit 3">Unit 3</option>
-                    <option value="Warehouse">Warehouse / All Units</option>
                   </select>
                 </div>
               </div>
@@ -1568,160 +1517,6 @@ export const StocksView: React.FC<StocksViewProps> = ({ inventory, onRestock, on
               </div>
             </div>
           </TableCard>
-        </div>
-      )}
-
-      {/* --- TAB 2: WAREHOUSE INVENTORY & REORDER SAFETY (SKUS) --- */}
-      {activeTab === 'warehouse' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              title="Total Inventory Items"
-              value={inventory.length}
-              unit="SKUs"
-              icon={Boxes}
-              color="indigo"
-              badge={{ text: 'Catalogued', color: 'blue' }}
-              subtext="Supplies, vaccines & packaging"
-            />
-
-            <StatCard
-              title="Low Stock Alerts"
-              value={lowStockCount}
-              unit="Items"
-              icon={AlertTriangle}
-              color="amber"
-              valueColor={lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900'}
-              badge={{
-                text: lowStockCount > 0 ? 'Reorder Needed' : 'All Stocked',
-                color: lowStockCount > 0 ? 'amber' : 'emerald',
-              }}
-              subtext="Items below minimum safety threshold"
-            />
-
-            <StatCard
-              title="Total Store Valuation"
-              value={`Rs. ${totalValuation.toLocaleString()}`}
-              icon={DollarSign}
-              color="emerald"
-              valueColor="text-emerald-700"
-              badge={{ text: 'Current Asset', color: 'emerald' }}
-              subtext="Cumulative warehouse inventory value"
-            />
-
-            <StatCard
-              title="Warehouse Facility"
-              value="2 Units"
-              unit="Active"
-              icon={Package}
-              color="blue"
-              badge={{ text: 'Cold Chain OK', color: 'teal' }}
-              subtext="Central dry feed & vaccine chilling room"
-            />
-          </div>
-
-          {/* Filter Bar */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative min-w-[220px]">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search item, category, location..."
-                  value={warehouseSearch}
-                  onChange={(e) => setWarehouseSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-                />
-              </div>
-
-              <select
-                value={warehouseCategory}
-                onChange={(e) => setWarehouseCategory(e.target.value)}
-                className="py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-              >
-                <option value="all">All Categories</option>
-                <option value="Feed">Feed Formulations</option>
-                <option value="Packaging">Packaging &amp; Trays</option>
-                <option value="Medication">Medications &amp; Vaccines</option>
-                <option value="Sanitation">Sanitation &amp; Disinfectant</option>
-              </select>
-            </div>
-
-            <div className="text-xs text-slate-500 font-medium">
-              Showing <span className="font-bold text-slate-800">{filteredWarehouse.length}</span> inventory items
-            </div>
-          </div>
-
-          {/* Stock Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {filteredWarehouse.map((item) => {
-              const isLow = item.quantity <= item.minAlertThreshold;
-              return (
-                <div
-                  key={item.id}
-                  className={`bg-white rounded-xl p-5 border shadow-xs transition-colors flex flex-col justify-between ${
-                    isLow
-                      ? 'border-amber-300 ring-1 ring-amber-200'
-                      : 'border-slate-200 hover:border-emerald-300'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                        {item.category}
-                      </span>
-                      {isLow ? (
-                        <span className="flex items-center text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/50">
-                          <AlertTriangle className="w-3 h-3 mr-1" />
-                          Low Stock
-                        </span>
-                      ) : (
-                        <span className="flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/50">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Adequate
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="text-sm font-bold text-slate-900 mt-2">{item.name}</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">{item.location}</p>
-
-                    <div className="mt-4 pt-3 border-t border-slate-100 space-y-1.5">
-                      <div className="text-2xl font-black text-slate-900">
-                        {item.quantity.toLocaleString()}{' '}
-                        <span className="text-xs font-semibold text-slate-400">{item.unit}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px] text-slate-500">
-                        <span>Min Threshold:</span>
-                        <span className="font-semibold text-slate-700">
-                          {item.minAlertThreshold} {item.unit}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-[11px] text-slate-500">
-                        <span>Est. Unit Cost:</span>
-                        <span className="font-semibold text-emerald-700">
-                          Rs. {item.costPerUnit.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-100">
-                    <UIButton
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="w-full text-xs font-bold"
-                      icon={Plus}
-                      onClick={() => onRestock(item.id, 50)}
-                    >
-                      Quick Restock (+50 {item.unit})
-                    </UIButton>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 

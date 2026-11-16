@@ -276,7 +276,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     return liveStockRecords;
   }, []);
 
-  // Warehouse inventory dataset
+  // Unit supply inventory dataset
   const inventoryDataset: InventoryItem[] = useMemo(() => {
     if (inventory && inventory.length > 0) return inventory;
     try {
@@ -614,7 +614,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         `Net Income (PKR),${Math.round(m.netIncome)},Net Margin: ${m.netMarginPercent.toFixed(1)}% | Operating Margin Excl CAPEX: ${m.operatingMarginPercent.toFixed(1)}%`,
         `Total Feed Consumption (Bags),${m.feedConsumedBags},${m.feedConsumedKg} kg | Feed Expense: Rs. ${Math.round(m.feedExpenses)}`,
         `Remaining Production (Cartons),${Math.round(m.carriedNextCartons)},${m.carriedNextEggs} Eggs On Hand | Period Net: ${Math.round(m.periodRemainingCartons)} Ctns`,
-        `Remaining Feed (Bags),${m.remainingFeedBags},${m.remainingFeedKg} kg Remaining (incl. ${m.warehouseReserveBags} warehouse reserve bags)`,
+        `Remaining Feed (Bags),${m.remainingFeedBags},${m.remainingFeedKg} kg Remaining on Units`,
         `Carried Forward From Previous Month (${m.prevPeriodLabel}),${Math.round(m.carriedPrevCartons)} Ctns Eggs,${m.carriedPrevFeedBags} Bags Feed | Opening Net Cash: Rs. ${Math.round(m.carriedPrevNetCash)}`,
         `Carried Forward To Next Month (${m.nextPeriodLabel}),${Math.round(m.carriedNextCartons)} Ctns Eggs,${m.carriedNextFeedBags} Bags Feed | Closing Net Cash: Rs. ${Math.round(m.carriedNextNetCash)}`,
         `Average Carton Price (PKR),${Math.round(m.avgCartonPrice)},Rs. ${m.avgEggPrice.toFixed(2)} per egg (${Math.round(m.cartonsSold)} ctns sold)`,

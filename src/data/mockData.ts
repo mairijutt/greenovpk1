@@ -232,7 +232,7 @@ export const initialInventory: InventoryItem[] = [
     unit: 'Bags',
     minAlertThreshold: 100,
     costPerUnit: 4800,
-    location: 'Warehouse Shed A',
+    location: 'Unit 1 Feed Store',
     lastUpdated: '2026-10-11',
   },
   {
@@ -243,7 +243,7 @@ export const initialInventory: InventoryItem[] = [
     unit: 'Bags',
     minAlertThreshold: 120,
     costPerUnit: 5200,
-    location: 'Warehouse Shed B',
+    location: 'Unit 2 Feed Store',
     lastUpdated: '2026-10-12',
   },
   {
@@ -254,7 +254,7 @@ export const initialInventory: InventoryItem[] = [
     unit: 'Pieces',
     minAlertThreshold: 3000,
     costPerUnit: 18,
-    location: 'Packing Station',
+    location: 'Unit 1-3 Packing Bay',
     lastUpdated: '2026-10-10',
   },
   {
@@ -265,7 +265,7 @@ export const initialInventory: InventoryItem[] = [
     unit: 'Kg',
     minAlertThreshold: 20,
     costPerUnit: 2400,
-    location: 'Dispensary Cold Storage',
+    location: 'Unit Dispensary Cold Storage',
     lastUpdated: '2026-10-09',
   },
 ];
