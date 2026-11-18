@@ -228,7 +228,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Floating Immediate Prompt Toast on scheduling */}
               {showPromptToast && latestPrompt && (
-                <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-slate-900/95 text-white p-3.5 rounded-2xl shadow-2xl border border-amber-500/40 z-50 animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-md">
+                <div className="fixed left-1/2 -translate-x-1/2 top-[68px] w-[calc(100vw-1.5rem)] max-w-sm sm:absolute sm:left-auto sm:right-0 sm:top-full sm:translate-x-0 sm:mt-2 sm:w-80 sm:max-w-none bg-slate-900/95 text-white p-3.5 rounded-2xl shadow-2xl border border-amber-500/40 z-50 animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-md">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center space-x-2">
                       <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -295,7 +295,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Full Scheduled Reminders Dropdown Popover */}
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200/90 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="fixed left-1/2 -translate-x-1/2 top-[68px] w-[calc(100vw-1.5rem)] max-w-sm sm:absolute sm:left-auto sm:right-0 sm:top-full sm:translate-x-0 sm:mt-2 sm:w-96 sm:max-w-none bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200/90 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
                   {/* Dropdown Header */}
                   <div className="p-3.5 bg-gradient-to-r from-emerald-950 to-slate-900 text-white flex items-center justify-between border-b border-emerald-900">
                     <div className="flex items-center space-x-2">

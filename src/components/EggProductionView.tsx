@@ -18,7 +18,6 @@ import {
   Info,
   Calendar,
   Scale,
-  DollarSign,
   ChevronDown,
   Eye,
   Edit,
@@ -259,12 +258,6 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
     }
     return filtered.length === 0 ? '0.0' : '61.4';
   }, [filtered]);
-
-  const avgEggPrice = useMemo(() => {
-    if (filtered.length === 0) return 0;
-    if (preset === 'today') return 16.30;
-    return 18.35;
-  }, [filtered.length, preset]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
@@ -815,15 +808,17 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 2ND PLACE: TOTAL EGGS COLLECTED & COMMERCIAL KPI STATS CARDS */}
+      {/* 2ND PLACE: TOTAL EGGS COLLECTED & PRODUCTION KPI STATS CARDS */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5 sm:gap-4">
         <StatCard
           title="Total Eggs Collected"
           value={totalEggs.toLocaleString()}
           unit="Eggs"
           icon={Egg}
           color="amber"
+          badge={{ text: `${filtered.length.toLocaleString()} Logs`, color: 'amber' }}
+          subtext="Morning & evening collections"
         />
 
         <StatCard
@@ -834,10 +829,10 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
           color="emerald"
           valueColor="text-emerald-700"
           badge={{
-            text: `Avg: Rs. ${(avgEggPrice * 360).toLocaleString(undefined, { maximumFractionDigits: 0 })}/ctn`,
+            text: `${totalTrays.toLocaleString()} Trays`,
             color: 'emerald',
           }}
-          subtext={`Average Carton Price: Rs. ${(avgEggPrice * 360).toLocaleString(undefined, { maximumFractionDigits: 0 })} / carton`}
+          subtext="12 trays (360 clean eggs) per carton"
         />
 
         <StatCard
@@ -871,20 +866,6 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
           color="purple"
           badge={{ text: 'Standard', color: 'purple' }}
           subtext="Commercial layer target 58–65g"
-        />
-
-        <StatCard
-          title="Avg Egg Price"
-          value={`Rs. ${avgEggPrice.toFixed(2)}`}
-          unit="/ egg"
-          icon={DollarSign}
-          color="teal"
-          valueColor="text-teal-700"
-          badge={{
-            text: `Rs. ${(avgEggPrice * 360).toLocaleString(undefined, { maximumFractionDigits: 0 })}/ctn`,
-            color: 'teal',
-          }}
-          subtext={`Rs. ${(avgEggPrice * 30).toFixed(0)} per 30-egg tray`}
         />
       </div>
 

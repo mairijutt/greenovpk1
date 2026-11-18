@@ -14,7 +14,7 @@ interface StatCardProps {
     text: string;
     color?: StatColor;
   };
-  subtext?: string;
+  subtext?: React.ReactNode;
   trend?: {
     value: string;
     isUp?: boolean;

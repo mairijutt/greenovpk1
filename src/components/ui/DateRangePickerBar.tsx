@@ -224,14 +224,14 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
 
   return (
     <div
-      className={`bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 ${className}`}
+      className={`bg-white p-2.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:flex-wrap items-center justify-center sm:justify-between gap-2.5 sm:gap-3 ${className}`}
     >
       {/* Left Controls: Farm, Flock, Month & Year, optional LeftSlot, From & To Dates */}
-      <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-3 w-full sm:w-auto">
         {/* 0. Farm Selector */}
         {showFarmSelector && farms && farms.length > 0 && (
           <div className="relative flex items-center">
-            <div className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:border-emerald-300 transition-colors">
+            <div className="flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:border-emerald-300 transition-colors">
               <Building2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
               <select
                 value={selectedFarm && selectedFarm !== 'all' ? selectedFarm : farms[0]?.id || 'farm-1'}
@@ -240,7 +240,7 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
                   if (onSelectFlock) onSelectFlock('all');
                 }}
                 aria-label="Filter by Farm"
-                className="appearance-none bg-transparent pr-5 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[140px] sm:max-w-[180px] truncate"
+                className="appearance-none bg-transparent pr-5 text-[11px] sm:text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[130px] sm:max-w-[180px] truncate"
               >
                 {farms.map((f) => (
                   <option key={f.id} value={f.id}>
@@ -256,13 +256,13 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
         {/* 1. Flock / Unit Selector */}
         {showFlockSelector && (
           <div className="relative flex items-center">
-            <div className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:border-emerald-300 transition-colors">
-              <span className="text-sm select-none leading-none">🐔</span>
+            <div className="flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:border-emerald-300 transition-colors">
+              <span className="text-xs sm:text-sm select-none leading-none">🐔</span>
               <select
                 value={selectedFlock}
                 onChange={(e) => onSelectFlock?.(e.target.value)}
                 aria-label="Filter by Flock"
-                className="appearance-none bg-transparent pr-5 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[145px] sm:max-w-[175px] truncate"
+                className="appearance-none bg-transparent pr-5 text-[11px] sm:text-xs font-bold text-slate-800 focus:outline-none cursor-pointer max-w-[135px] sm:max-w-[175px] truncate"
               >
                 <option value="all">All Flocks Combined</option>
                 {flocks.map((f) => (
@@ -277,75 +277,83 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
         )}
 
         {/* 2. Unified Report-Style Month & Year Selectors */}
-        <div className="flex items-center space-x-2 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
-          <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <span className="text-slate-500 font-semibold">Month:</span>
-          <select
-            value={effectiveMonth}
-            onChange={(e) => handleMonthSelect(e.target.value)}
-            aria-label="Select Month"
-            className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer py-0.5"
-          >
-            {effectiveMonth === 'custom' && <option value="custom">Custom Range</option>}
-            {MONTH_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center justify-center gap-x-1.5 sm:gap-x-2 gap-y-1 text-[11px] sm:text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 sm:px-2.5 py-1 max-w-full">
+          <div className="flex items-center gap-1 min-w-0">
+            <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600 shrink-0" />
+            <span className="text-slate-500 font-semibold">Month:</span>
+            <select
+              value={effectiveMonth}
+              onChange={(e) => handleMonthSelect(e.target.value)}
+              aria-label="Select Month"
+              className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer py-0.5 text-[11px] sm:text-xs min-w-0"
+            >
+              {effectiveMonth === 'custom' && <option value="custom">Custom Range</option>}
+              {MONTH_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <span className="text-slate-300">|</span>
-          <span className="text-slate-500 font-semibold">Year:</span>
-          <select
-            value={effectiveYear}
-            onChange={(e) => handleYearSelect(e.target.value)}
-            aria-label="Select Year"
-            className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer py-0.5"
-          >
-            <option value="all">All Years</option>
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-1 min-w-0">
+            <span className="text-slate-500 font-semibold">Year:</span>
+            <select
+              value={effectiveYear}
+              onChange={(e) => handleYearSelect(e.target.value)}
+              aria-label="Select Year"
+              className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer py-0.5 text-[11px] sm:text-xs min-w-0"
+            >
+              <option value="all">All Years</option>
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Optional contextual controls (e.g. Reports search / category tabs) */}
         {leftSlot}
 
         {/* 3. From & To Date Inputs */}
-        <div className="flex items-center space-x-2 text-xs">
-          <span className="text-slate-500 font-medium">From:</span>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => {
-              onDateChange(e.target.value, toDate);
-              onPresetChange?.('custom');
-            }}
-            aria-label="From Date"
-            className="py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
-          />
-          <span className="text-slate-500 font-medium">To:</span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => {
-              onDateChange(fromDate, e.target.value);
-              onPresetChange?.('custom');
-            }}
-            aria-label="To Date"
-            className="py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
-          />
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 sm:gap-2 text-[11px] sm:text-xs w-full sm:w-auto">
+          <div className="flex items-center gap-1">
+            <span className="text-slate-500 font-medium">From:</span>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                onDateChange(e.target.value, toDate);
+                onPresetChange?.('custom');
+              }}
+              aria-label="From Date"
+              className="py-1 px-1.5 sm:px-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white max-w-[130px] sm:max-w-none"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-slate-500 font-medium">To:</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => {
+                onDateChange(fromDate, e.target.value);
+                onPresetChange?.('custom');
+              }}
+              aria-label="To Date"
+              className="py-1 px-1.5 sm:px-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white max-w-[130px] sm:max-w-none"
+            />
+          </div>
         </div>
       </div>
 
       {/* Right Presets: Current Month, Full Year, All Time, Last 30 Days, Today, Reset */}
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="flex flex-wrap items-center justify-center sm:justify-end gap-1 w-full sm:w-auto">
         <button
           type="button"
           onClick={() => handlePresetButton('month')}
-          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+          className={`px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs rounded-lg font-medium transition-colors cursor-pointer ${
             isCurrentMonthActive
               ? 'bg-emerald-600 text-white font-bold'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -357,7 +365,7 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
         <button
           type="button"
           onClick={() => handlePresetButton('year')}
-          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+          className={`px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs rounded-lg font-medium transition-colors cursor-pointer ${
             isFullYearActive
               ? 'bg-emerald-600 text-white font-bold'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -369,7 +377,7 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
         <button
           type="button"
           onClick={() => handlePresetButton('all')}
-          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+          className={`px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs rounded-lg font-medium transition-colors cursor-pointer ${
             isAllTimeActive
               ? 'bg-emerald-600 text-white font-bold'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -381,7 +389,7 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
         <button
           type="button"
           onClick={() => handlePresetButton('30d')}
-          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+          className={`px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs rounded-lg font-medium transition-colors cursor-pointer ${
             is30dActive
               ? 'bg-emerald-600 text-white font-bold'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -393,7 +401,7 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
         <button
           type="button"
           onClick={() => handlePresetButton('today')}
-          className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors cursor-pointer ${
+          className={`px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs rounded-lg font-medium transition-colors cursor-pointer ${
             isTodayActive
               ? 'bg-emerald-600 text-white font-bold'
               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -406,7 +414,7 @@ export const DateRangePickerBar: React.FC<DateRangePickerBarProps> = ({
           type="button"
           onClick={handleResetClick}
           title="Reset filters"
-          className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs rounded-lg font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer ml-1"
+          className="inline-flex items-center space-x-1 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs rounded-lg font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors cursor-pointer ml-0.5 sm:ml-1"
         >
           <RefreshCw className="w-3 h-3" />
           <span>Reset</span>
