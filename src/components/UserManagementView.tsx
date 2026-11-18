@@ -112,14 +112,7 @@ interface UserManagementViewProps {
 }
 
 export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentUser }) => {
-  const isSuperAdmin = Boolean(
-    currentUser?.isSuperAdmin ||
-    currentUser?.role === 'super_admin' ||
-    currentUser?.email?.toLowerCase() === 'aaglobal500@gmail.com' ||
-    currentUser?.email?.toLowerCase().includes('aaglobal') ||
-    currentUser?.role?.toLowerCase().includes('managing director') ||
-    currentUser?.role?.toLowerCase().includes('super admin')
-  );
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   const [users, setUsers] = useState<UserRecord[]>(() => {
     const saved = localStorage.getItem('greenova_users_v2');
@@ -389,7 +382,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   };
 
   const confirmDeleteUser = async () => {
-    if (!deleteConfirmUser) return;
+    if (!isSuperAdmin || !deleteConfirmUser) return;
     setIsSaving(true);
     try {
       await apiFetch(`/api/user/${deleteConfirmUser.id}`, {
@@ -453,7 +446,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
 
         <StatCard
           title="Super Administrators"
-          value={users.filter((u) => u.role === 'super_admin' || u.role === 'admin').length}
+          value={users.filter((u) => u.role === 'super_admin').length}
           unit="Admins"
           icon={ShieldCheck}
           color="emerald"
@@ -625,7 +618,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       </TableCard>
 
       {/* Add User Modal */}
-      {showAddModal && (
+      {isSuperAdmin && showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -739,7 +732,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       )}
 
       {/* Edit User Modal */}
-      {editingUser && (
+      {isSuperAdmin && editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -830,13 +823,18 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => handleDeleteUser(editingUser.id)}
-                  className="text-rose-600 hover:text-rose-800 font-bold text-xs cursor-pointer"
-                >
-                  Delete Account
-                </button>
+                {editingUser.email?.toLowerCase() !== 'aaglobal500@gmail.com' &&
+                editingUser.email?.toLowerCase() !== currentUser?.email?.toLowerCase() ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteUser(editingUser.id)}
+                    className="text-rose-600 hover:text-rose-800 font-bold text-xs cursor-pointer"
+                  >
+                    Delete Account
+                  </button>
+                ) : (
+                  <span />
+                )}
                 <div className="flex space-x-2">
                   <UIButton
                     type="button"
@@ -856,7 +854,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       )}
 
       {/* Change Password Modal (Super Admin Exclusive) */}
-      {passwordModalUser && (
+      {isSuperAdmin && passwordModalUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -962,7 +960,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       )}
 
       {/* Delete Confirmation Modal */}
-      {deleteConfirmUser && (
+      {isSuperAdmin && deleteConfirmUser && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
             <div className="flex items-center space-x-3">
@@ -1009,9 +1007,19 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             { label: 'Account Status', value: viewingUser.status, highlight: viewingUser.status === 'Active' },
             { label: 'Last Sign-In', value: viewingUser.lastLogin || 'Never', fullWidth: true },
           ]}
-          onEdit={isSuperAdmin ? () => handleOpenEdit(viewingUser) : undefined}
+          onEdit={
+            isSuperAdmin
+              ? () => {
+                  const target = viewingUser;
+                  setViewingUser(null);
+                  handleOpenEdit(target);
+                }
+              : undefined
+          }
           onDelete={
-            isSuperAdmin && viewingUser.email !== 'aaglobal500@gmail.com'
+            isSuperAdmin &&
+            viewingUser.email?.toLowerCase() !== 'aaglobal500@gmail.com' &&
+            viewingUser.email?.toLowerCase() !== currentUser?.email?.toLowerCase()
               ? () => {
                   handleDeleteUser(viewingUser.id);
                 }

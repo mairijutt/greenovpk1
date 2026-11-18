@@ -480,7 +480,7 @@ export default function App() {
               name: verifiedUser.name || prev.name,
               email: verifiedUser.email || prev.email,
               role: verifiedUser.role || prev.role,
-              isSuperAdmin: Boolean(verifiedUser.isSuperAdmin || verifiedUser.role === 'super_admin'),
+              isSuperAdmin: verifiedUser.role === 'super_admin',
             };
             try {
               localStorage.setItem('greenova_user', JSON.stringify(updated));
@@ -2065,7 +2065,18 @@ export default function App() {
     isSuperAdmin?: boolean;
   }) => {
     setCurrentUser((prev) => {
-      const next = prev ? { ...prev, ...updated } : { ...updated };
+      const preservedRole = prev?.role || updated.role;
+      const next = prev
+        ? {
+            ...prev,
+            ...updated,
+            role: preservedRole,
+            isSuperAdmin: preservedRole === 'super_admin',
+          }
+        : {
+            ...updated,
+            isSuperAdmin: updated.role === 'super_admin',
+          };
       try {
         localStorage.setItem('greenova_user', JSON.stringify(next));
       } catch (e) {}
@@ -2073,14 +2084,7 @@ export default function App() {
     });
   };
 
-  const isSuperAdmin = Boolean(
-    currentUser?.isSuperAdmin ||
-    currentUser?.role === 'super_admin' ||
-    currentUser?.email?.toLowerCase() === 'aaglobal500@gmail.com' ||
-    currentUser?.email?.toLowerCase().includes('aaglobal') ||
-    currentUser?.role?.toLowerCase().includes('managing director') ||
-    currentUser?.role?.toLowerCase().includes('super admin')
-  );
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   // Health notifications derived strictly from scheduled vaccines & medications (unconditionally declared at top level)
   const healthNotifications: HealthNotification[] = useMemo(() => {
@@ -2115,11 +2119,7 @@ export default function App() {
     return (
       <LoginView
         onLoginSuccess={(user) => {
-          const isSuper = Boolean(
-            user.isSuperAdmin ||
-            user.role === 'super_admin' ||
-            user.email?.toLowerCase().includes('aaglobal')
-          );
+          const isSuper = user.role === 'super_admin';
           const profile = {
             name: user.name || (isSuper ? 'Ahsan Nawaz' : 'Farm Supervisor'),
             email: user.email,
@@ -2332,11 +2332,7 @@ export default function App() {
           <div className="relative max-w-md w-full">
             <LoginView
               onLoginSuccess={(user) => {
-                const isSuper = Boolean(
-                  user.isSuperAdmin ||
-                  user.role === 'super_admin' ||
-                  user.email?.toLowerCase().includes('aaglobal')
-                );
+                const isSuper = user.role === 'super_admin';
                 const profile = {
                   name: user.name || (isSuper ? 'Ahsan Nawaz' : 'Farm Supervisor'),
                   email: user.email,

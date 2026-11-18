@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   FileBarChart2,
   FileText,
-  Download,
   TrendingUp,
   Award,
   Egg,
@@ -39,9 +38,7 @@ import { liveExpenseRecords, liveConsumptionRecords } from '../data/productionDa
 import { CeoIncomeExpenseReport } from './CeoIncomeExpenseReport.tsx';
 import { apiFetch } from '../services/api.ts';
 import {
-  downloadRecordsCSV,
   downloadRecordsPDF,
-  downloadStructuredCSV,
   downloadIncomeStatementPDF,
   PdfKpiCard,
   PdfIncomeStatementLine,
@@ -993,126 +990,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         r.feedConsumedBags.toLocaleString(),
         r.remainingFeedBags.toLocaleString(),
       ]),
-      csvSections: [
-        {
-          title: `TOP SUMMARY CARDS (${m.periodLabel} - ${unitLabel})`,
-          columns: ['Metric', 'Value', 'Details'],
-          rows: topCards.map((c) => [c.label, c.value, c.subtext || '']),
-        },
-        {
-          title: 'INCOME STATEMENT (PROFIT & LOSS)',
-          columns: ['Particulars', 'Basis / Details', 'Amount (PKR)', '% of Revenue'],
-          rows: [
-            ['Egg Sales Revenue', `${Math.round(m.cartonsSold)} ctns @ Rs. ${Math.round(m.avgCartonPrice)}/ctn`, Math.round(m.eggSalesRevenue), pctStr(m.eggSalesRevenue)],
-            ['Other Farm Sales', 'Manure, Feed Bags, Cull Birds & Misc.', Math.round(m.otherSalesRevenue), pctStr(m.otherSalesRevenue)],
-            ['Total Revenue (A)', `${m.salesCount} Bills`, Math.round(rev), rev > 0 ? '100.0%' : '0.0%'],
-            ['Feed Consumed Expenses', `${m.feedConsumedBags} bags consumed (${m.feedStockReceivedBags} purchased)`, Math.round(m.feedExpenses), pctStr(m.feedExpenses)],
-            ['Chicken / Flock Purchases (CAPEX)', 'Flock Placement / Acquisition', Math.round(m.chickenCapexExpenses), pctStr(m.chickenCapexExpenses)],
-            ['Medicine & Vaccines', 'Health & Biosecurity', Math.round(m.medicineVaccineExpenses), pctStr(m.medicineVaccineExpenses)],
-            ['Total Cost of Goods Sold (B)', 'Direct Bird & Feed Cost', Math.round(m.cogsExpenses), pctStr(m.cogsExpenses)],
-            ['Gross Profit / (Loss) (A - B)', '', Math.round(grossProfit), pctStr(grossProfit)],
-            ['Staff Salaries & Labor', 'Farm Crew & Management', Math.round(m.salariesExpenses), pctStr(m.salariesExpenses)],
-            ['Utilities, Electricity & Fuel (POL)', 'Power, Generator & Transport', Math.round(m.utilitiesPolExpenses), pctStr(m.utilitiesPolExpenses)],
-            ['Other Farm Overheads', 'Repairs, Packing, Rent & Admin', Math.round(otherOpEx), pctStr(otherOpEx)],
-            ['Total Operating Expenses (C)', 'Unit Operating Cost (Excl. Bird Cost)', Math.round(m.operatingExpenses), pctStr(m.operatingExpenses)],
-            ['Total Expenses (B + C)', `${m.expenseCount} Vouchers`, Math.round(m.totalExpenses), pctStr(m.totalExpenses)],
-            ['Net Income / (Net Loss)', `Operating Profit excl. CAPEX: ${Math.round(opProfitExclCapex)}`, Math.round(m.netIncome), `${m.netMarginPercent.toFixed(1)}%`],
-          ],
-        },
-        {
-          title: 'UNIT-WISE COMPARATIVE SUMMARY',
-          columns: [
-            'Unit',
-            'Active Birds',
-            'Production (Ctns)',
-            'Cartons Sold',
-            'Total Sale (PKR)',
-            'Total Expense (PKR)',
-            'Net Income (PKR)',
-            'Feed Consumed (Bags)',
-            'Rem. Production (Ctns)',
-            'Rem. Feed (Bags)',
-            'Avg Carton Price (PKR)',
-            'Cost / Bird (PKR)',
-          ],
-          rows: unitMatrixList.map(({ name, u }) => [
-            name,
-            u.activeBirds,
-            Math.round(u.totalCartonsProduced),
-            Math.round(u.cartonsSold),
-            Math.round(u.totalSalesRevenue),
-            Math.round(u.totalExpenses),
-            Math.round(u.netIncome),
-            u.feedConsumedBags,
-            Math.round(u.carriedNextCartons),
-            u.remainingFeedBags,
-            Math.round(u.avgCartonPrice),
-            Math.round(u.avgPerBirdCost),
-          ]),
-        },
-        ...(ceoMonthlyRows.length > 0
-          ? [
-              {
-                title: 'MONTHLY ROLLOVER SCHEDULE',
-                columns: [
-                  'Month',
-                  'C/F Prev (Ctns)',
-                  'Produced (Ctns)',
-                  'Sold (Ctns)',
-                  'Rem. Prod (Ctns)',
-                  'Total Sale (PKR)',
-                  'Total Expense (PKR)',
-                  'Net Income (PKR)',
-                  'Feed Consumed (Bags)',
-                  'Rem. Feed (Bags)',
-                  'Avg Carton Price (PKR)',
-                  'Cost / Bird (PKR)',
-                ],
-                rows: ceoMonthlyRows.map((r) => [
-                  r.monthLabel,
-                  Math.round(r.carriedPrevCartons),
-                  Math.round(r.totalCartonsProduced),
-                  Math.round(r.cartonsSold),
-                  Math.round(r.carriedNextCartons),
-                  Math.round(r.totalSales),
-                  Math.round(r.totalExpenses),
-                  Math.round(r.netIncome),
-                  r.feedConsumedBags,
-                  r.remainingFeedBags,
-                  Math.round(r.avgCartonPrice),
-                  Math.round(r.avgPerBirdCost),
-                ]),
-              },
-            ]
-          : []),
-        ...(bankSummary.banks.length > 0
-          ? [
-              {
-                title: 'BANK BALANCES LEDGER',
-                columns: [
-                  'Bank Name',
-                  'Account Title',
-                  'Account No',
-                  'Opening Date',
-                  'Opening Balance (PKR)',
-                  'Period Sales Added (PKR)',
-                  'Total Sales Added (PKR)',
-                  'Current Balance (PKR)',
-                ],
-                rows: bankSummary.banks.map((b) => [
-                  b.bank.bankName,
-                  b.bank.accountTitle,
-                  b.bank.accountNumber || '',
-                  b.bank.openingDate,
-                  Math.round(b.openingBalance),
-                  Math.round(b.salesInPeriod),
-                  Math.round(b.totalSalesAdded),
-                  Math.round(b.currentBalance),
-                ]),
-              },
-            ]
-          : []),
-      ],
     };
   };
 
@@ -1150,18 +1027,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           `${e.layingRatePercent || 0}%`,
         ];
       });
-      const csvRows = filteredEggs.map((e) => [
-        e.trackingId || e.id,
-        e.date,
-        e.flockName || 'Unit',
-        Number(e.morningEggs || 0),
-        Number(e.eveningEggs || 0),
-        Number(e.totalEggs || 0),
-        Number(((e.totalEggs || 0) / 360).toFixed(2)),
-        Number(e.damagedEggs || e.brokenEggs || 0),
-        Number(e.averageWeight || 60),
-        `${e.layingRatePercent || 0}%`,
-      ]);
       const avgRate = filteredEggs.length > 0 ? `${(sumRate / filteredEggs.length).toFixed(1)}%` : '0%';
       return {
         title: 'Egg Production Audit Records',
@@ -1180,7 +1045,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           { header: 'Laying %', align: 'right' as const, width: 22 },
         ],
         rows: pdfRows,
-        csvRows,
         totalsRow: [
           'TOTAL',
           '',
@@ -1224,25 +1088,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           s.notes || '-',
         ];
       });
-      const csvRows = filteredSales.map((s) => {
-        const qty = Number(s.quantity || 0);
-        const amt = Number(s.amount || 0);
-        const onl = Number(s.onlinePayment || (s.paymentMethod === 'Bank Transfer' ? amt : 0));
-        const csh = Number(s.cashPayment || (s.paymentMethod === 'Cash' ? amt : 0));
-        return [
-          s.trackingId || s.id,
-          s.date,
-          s.flockName || s.flock || 'Unit',
-          s.category,
-          Number((qty / 360).toFixed(2)),
-          Math.round((s.unitPrice || 0) * 360),
-          onl,
-          csh,
-          amt,
-          [s.vehicleNumber, s.challanNo].filter(Boolean).join('-'),
-          s.notes || '',
-        ];
-      });
       return {
         title: 'Sales & Revenue Audit Records',
         subtitle: `Unit: ${selectedUnit === 'all' ? 'All Units' : selectedUnit}  |  Range: ${rangeLabel}`,
@@ -1261,7 +1106,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           { header: 'Notes' },
         ],
         rows: pdfRows,
-        csvRows,
         totalsRow: [
           'TOTAL',
           '',
@@ -1300,19 +1144,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           r.notes || '-',
         ];
       });
-      const csvRows = filteredStocks.map((r) => [
-        r.trackingId || r.id,
-        r.rawDate || r.date,
-        r.flockName,
-        r.head,
-        r.feedType,
-        Number(r.quantity || 0),
-        Number(r.costPerBag || 0),
-        Number(r.amount || 0),
-        r.paymentType,
-        r.challanNo || '',
-        r.notes || '',
-      ]);
       const avgRate = sumBags > 0 ? Math.round(sumAmt / sumBags) : 0;
       return {
         title: 'Stock & Inventory Audit Records',
@@ -1332,7 +1163,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           { header: 'Notes' },
         ],
         rows: pdfRows,
-        csvRows,
         totalsRow: [
           'TOTAL',
           '',
@@ -1364,15 +1194,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         m.recordedBy || '-',
       ];
     });
-    const csvRows = filteredMortality.map((m) => [
-      m.id,
-      m.date,
-      m.flockName || 'Unit',
-      Number(m.count || 0),
-      m.cause || 'Natural / Routine',
-      m.symptoms || '',
-      m.recordedBy || '',
-    ]);
     return {
       title: 'Flock & Bird Health Audit Records',
       subtitle: `Unit: ${selectedUnit === 'all' ? 'All Units' : selectedUnit}  |  Range: ${rangeLabel}`,
@@ -1387,20 +1208,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         { header: 'Recorded By' },
       ],
       rows: pdfRows,
-      csvRows,
       totalsRow: ['TOTAL', '', '', sumCasualties.toLocaleString(), '', '', ''],
     };
-  };
-
-  const handleExportCSV = () => {
-    if (activeReport === 'income-vs-expense') {
-      const payload = buildIncomeVsExpenseExports();
-      downloadStructuredCSV(payload.filenameBase, payload.csvSections);
-      return;
-    }
-    const payload = getActiveRecordsExportPayload();
-    if (payload.rows.length === 0) return;
-    downloadRecordsCSV(payload);
   };
 
   const handleExportPDF = () => {
@@ -1427,28 +1236,16 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         iconColor="emerald"
         badge="Analytics Engine"
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <UIButton
-              variant="secondary"
-              icon={Download}
-              onClick={handleExportCSV}
-              disabled={disableRecordsExport}
-            >
-              {isRecordsTab
-                ? `Export CSV (${currentDatasetLength.toLocaleString()})`
-                : 'Export CSV'}
-            </UIButton>
-            <UIButton
-              variant="primary"
-              icon={FileText}
-              onClick={handleExportPDF}
-              disabled={disableRecordsExport}
-            >
-              {isRecordsTab
-                ? `Download PDF (${currentDatasetLength.toLocaleString()})`
-                : 'Download PDF'}
-            </UIButton>
-          </div>
+          <UIButton
+            variant="primary"
+            icon={FileText}
+            onClick={handleExportPDF}
+            disabled={disableRecordsExport}
+          >
+            {isRecordsTab
+              ? `Download PDF (${currentDatasetLength.toLocaleString()})`
+              : 'Download PDF'}
+          </UIButton>
         }
       />
 
