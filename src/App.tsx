@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, X, LayoutDashboard, Egg, Wheat, TrendingUp, FileBarChart2 } from 'lucide-react';
 import { Header, HealthNotification } from './components/Header';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
@@ -16,6 +16,7 @@ import { FarmsView } from './components/FarmsView';
 import { UserManagementView } from './components/UserManagementView';
 import { LoginView } from './components/LoginView';
 import { RecordModal } from './components/RecordModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { apiFetch } from './services/api';
 
 import {
@@ -2117,31 +2118,34 @@ export default function App() {
   // If not logged in, render the Login View directly
   if (!currentUser) {
     return (
-      <LoginView
-        onLoginSuccess={(user) => {
-          const isSuper = user.role === 'super_admin';
-          const profile = {
-            name: user.name || (isSuper ? 'Ahsan Nawaz' : 'Farm Supervisor'),
-            email: user.email,
-            token: user.token,
-            phone: isSuper ? '+92 300 8645210' : '+92 301 7654321',
-            role: user.role || (isSuper ? 'super_admin' : 'supervisor'),
-            isSuperAdmin: isSuper,
-            initials: isSuper ? 'AN' : 'FS',
-            emailVerified: true,
-          };
-          setCurrentUser(profile);
-          try {
-            localStorage.setItem('greenova_user', JSON.stringify(profile));
-          } catch (e) {}
-          const targetTab = currentTab && currentTab !== 'dashboard' ? currentTab : 'dashboard';
-          setCurrentTab(targetTab);
-          const targetPath = targetTab === 'dashboard' ? '/dashboard' : `/${targetTab}`;
-          try {
-            window.history.pushState({ tab: targetTab }, '', targetPath);
-          } catch (e) {}
-        }}
-      />
+      <>
+        <LoginView
+          onLoginSuccess={(user) => {
+            const isSuper = user.role === 'super_admin';
+            const profile = {
+              name: user.name || (isSuper ? 'Ahsan Nawaz' : 'Farm Supervisor'),
+              email: user.email,
+              token: user.token,
+              phone: isSuper ? '+92 300 8645210' : '+92 301 7654321',
+              role: user.role || (isSuper ? 'super_admin' : 'supervisor'),
+              isSuperAdmin: isSuper,
+              initials: isSuper ? 'AN' : 'FS',
+              emailVerified: true,
+            };
+            setCurrentUser(profile);
+            try {
+              localStorage.setItem('greenova_user', JSON.stringify(profile));
+            } catch (e) {}
+            const targetTab = currentTab && currentTab !== 'dashboard' ? currentTab : 'dashboard';
+            setCurrentTab(targetTab);
+            const targetPath = targetTab === 'dashboard' ? '/dashboard' : `/${targetTab}`;
+            try {
+              window.history.pushState({ tab: targetTab }, '', targetPath);
+            } catch (e) {}
+          }}
+        />
+        <OfflineIndicator />
+      </>
     );
   }
 
@@ -2180,7 +2184,7 @@ export default function App() {
         />
 
         {/* Dynamic Content View Area */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-6 md:pb-8 lg:p-8 max-w-7xl w-full mx-auto">
           {currentTab === 'dashboard' && (
             <DashboardView
               farms={farms}
@@ -2408,6 +2412,49 @@ export default function App() {
           </button>
         </div>
       )}
+
+      {/* Mobile Bottom Thumb Navigation Bar (Native App Feel) */}
+      <nav
+        aria-label="Mobile Bottom Navigation"
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] pb-[env(safe-area-inset-bottom)]"
+      >
+        <div className="grid grid-cols-5 h-16">
+          {(
+            [
+              { id: 'dashboard', label: 'Home', Icon: LayoutDashboard },
+              { id: 'egg-production', label: 'Eggs', Icon: Egg },
+              { id: 'daily-consumption', label: 'Feed', Icon: Wheat },
+              { id: 'sales', label: 'Sales', Icon: TrendingUp },
+              { id: 'reports', label: 'Reports', Icon: FileBarChart2 },
+            ] as const
+          ).map(({ id, label, Icon }) => {
+            const active = currentTab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleNavigateTab(id)}
+                className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-colors cursor-pointer ${
+                  active
+                    ? 'text-emerald-700'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span
+                  className={`p-1.5 rounded-xl transition-colors ${
+                    active ? 'bg-emerald-100 text-emerald-700' : ''
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                </span>
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      <OfflineIndicator />
     </div>
   );
 }

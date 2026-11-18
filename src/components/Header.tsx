@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Farm } from '../types/farm';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export interface HealthNotification {
   id: string;
@@ -107,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
   const scheduledCount = scheduledNotifications.length;
 
   return (
-    <header className="bg-emerald-950 text-white border-b border-emerald-800/60 sticky top-0 z-40 shadow-md">
+    <header className="bg-emerald-950 text-white border-b border-emerald-800/60 sticky top-0 z-40 shadow-md pt-[env(safe-area-inset-top)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Platform Title & Menu Toggle Buttons */}
@@ -165,8 +166,10 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right Section: Farm Selector, Bell Notification Prompt & User Profile */}
+          {/* Right Section: Install App, Farm Selector, Bell Notification Prompt & User Profile */}
           <div className="flex items-center space-x-2 sm:space-x-3">
+            <PWAInstallButton variant="header" />
+
             {/* Global Farm Dropdown */}
             {farms && farms.length > 0 && (
               <div className="relative flex items-center">

@@ -2,18 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="/assets/favicon-DwnAFEdf.png"
-    />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>GreenOva Poultry Management System</title>
     <meta name="description" content="Smarter Poultry. Stronger Profits. A modern, AI-ready brand for a platform that helps poultry businesses monitor performance, control costs, and make data-driven decisions." />
     <meta property="og:title" content="GreenOva Poultry Management System" />
     <meta property="og:description" content="Smarter Poultry. Stronger Profits. A modern, AI-ready brand for a platform that helps poultry businesses monitor performance, control costs, and make data-driven decisions." />
+    <meta name="theme-color" content="#022c22" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="GreenOva" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="icon" href="/favicon.ico" />
     <script>
       (function() {
+        // Capture Chrome/Android install prompt early before React mounts
+        window.addEventListener('beforeinstallprompt', function(e) {
+          e.preventDefault();
+          window.__deferredPWAInstallPrompt = e;
+        });
         // Safe toISOString polyfill to prevent RangeError: Invalid time value crashes
         var origToISO = Date.prototype.toISOString;
         Date.prototype.toISOString = function() {

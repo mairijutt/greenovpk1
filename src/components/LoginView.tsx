@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Mail, ArrowRight, ShieldCheck, CheckCircle2, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { UIInput, UIButton } from './ui';
+import { PWAInstallButton } from './PWAInstallButton';
 import loginBg from '../assets/images/poultry_login_bg_1793271065125.jpg';
 
 interface LoginViewProps {
@@ -61,7 +62,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-center items-center p-4 sm:p-6 overflow-hidden bg-slate-950">
+    <div className="relative min-h-screen w-full flex flex-col justify-center items-center px-4 py-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-6 overflow-hidden bg-slate-950">
       {/* Background Graphic & Atmosphere */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <img
@@ -194,6 +195,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onCancel }
               </UIButton>
             </div>
           </form>
+
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <PWAInstallButton variant="login" />
+          </div>
         </div>
 
         {/* Footer info */}
