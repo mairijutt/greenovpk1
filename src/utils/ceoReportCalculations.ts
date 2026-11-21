@@ -47,6 +47,13 @@ export function isEggSaleRecord(sale: any): boolean {
   return head.includes('EGG') || cat.includes('egg');
 }
 
+export function getEggSaleQuantity(sale: any): number {
+  const rawQty = Number(sale?.quantity ?? sale?.itemsSold) || 0;
+  if (rawQty > 0) return rawQty;
+  const amt = Number(sale?.amount ?? sale?.totalAmount) || 0;
+  return amt > 0 ? Math.round(amt / 18.3) : 0;
+}
+
 export function getMonthDateBounds(year: string, month: string): { from: string; to: string } {
   if (!year || year === 'all') {
     return { from: '', to: '' };
@@ -383,8 +390,7 @@ export function computeCeoSummary(params: {
     if (isEggSaleRecord(s)) {
       eggSalesRevenue += amt;
       eggSalesCount += 1;
-      const rawQty = Number(s.quantity ?? (s as any).itemsSold) || 0;
-      eggsSold += rawQty > 0 ? rawQty : amt > 0 ? Math.round(amt / 18.3) : 0;
+      eggsSold += getEggSaleQuantity(s);
     }
     const online = Number((s as any).onlinePayment) || (s.paymentMethod === 'Bank Transfer' ? amt : 0);
     const cash = Number((s as any).cashPayment) || (s.paymentMethod === 'Cash' ? amt : 0);
@@ -397,7 +403,7 @@ export function computeCeoSummary(params: {
   const prevSalesRevenue = prevSales.reduce((sum, s) => sum + (Number(s.amount ?? s.totalAmount) || 0), 0);
   const prevEggsSold = prevSales
     .filter((s) => isEggSaleRecord(s))
-    .reduce((sum, s) => sum + (Number(s.quantity ?? (s as any).itemsSold) || 0), 0);
+    .reduce((sum, s) => sum + getEggSaleQuantity(s), 0);
 
   // Feed Consumption & Stock (All FEED stock records)
   const allFeedStocks = stockRecords.filter((k) => isFeedStockRecord(k));
@@ -735,7 +741,7 @@ export function computeMonthlyBreakdown(params: {
           isEggSaleRecord(s) &&
           normalizeDateStr(s.date) < yearStart
       )
-      .reduce((s, x) => s + (Number(x.quantity ?? (x as any).itemsSold) || 0), 0);
+      .reduce((s, x) => s + getEggSaleQuantity(x), 0);
     runningEggsBalance = Math.max(0, priorEggsProduced - priorEggsSold);
 
     const priorFeedReceived = allFeedStocks
@@ -774,7 +780,7 @@ export function computeMonthlyBreakdown(params: {
 
     const totalEggsProduced = mEggs.reduce((s, e) => s + (Number(e.totalEggs) || 0), 0);
     const eggSales = mSales.filter((s) => isEggSaleRecord(s));
-    const eggsSold = eggSales.reduce((s, x) => s + (Number(x.quantity ?? (x as any).itemsSold) || 0), 0);
+    const eggsSold = eggSales.reduce((s, x) => s + getEggSaleQuantity(x), 0);
     const eggRevenue = eggSales.reduce((s, x) => s + (Number(x.amount ?? x.totalAmount) || 0), 0);
     const totalSales = mSales.reduce((s, x) => s + (Number(x.amount ?? x.totalAmount) || 0), 0);
 

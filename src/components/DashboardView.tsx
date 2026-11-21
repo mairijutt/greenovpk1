@@ -256,7 +256,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [selectedFlock, fromDate, toDate, financials]);
 
-  const BIRD_EXPENSE_HEADS = useMemo(() => new Set(['FEED', 'CHICKEN', 'MEDICINE', 'VACCINE']), []);
+  const BIRD_EXPENSE_HEADS = useMemo(
+    () =>
+      new Set([
+        'FEED',
+        'CHICKEN',
+        'MEDICINE',
+        'UTILITIES',
+        'SALARIES_PAYMENTS',
+        'POL',
+        'VACCINE',
+        'MESS',
+        'RENT',
+      ]),
+    []
+  );
   const normalizeExpenseHead = (exp: any) =>
     String(exp?.head || exp?.category || '').trim().toUpperCase().replace(/\s+/g, '_');
   const isBirdRelatedExpense = (exp: any) => BIRD_EXPENSE_HEADS.has(normalizeExpenseHead(exp));
@@ -689,7 +703,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [eggProductions, financials, mortalityLogs, flocks, consumptionLogs, allFeedStocks, preset, fromDate, toDate]);
 
-  // Unit Operating Cost = Total Farm Operating Expenses minus Bird Cost (FEED consumed, CHICKEN, MEDICINE, VACCINE)
+  // Unit Operating Cost = Total Farm Operating Expenses minus Bird Cost (FEED consumed, CHICKEN, MEDICINE, UTILITIES, SALARIES_PAYMENTS, POL, VACCINE, MESS, RENT)
   const unitOperatingEconomics = useMemo(() => {
     const isAllUnits = selectedFlock === 'all';
     const matchingUnits = isAllUnits
@@ -1145,7 +1159,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-teal-700 transition-colors">
-                  Cost per Bird
+                  Expense per Bird
                 </span>
                 <div className="p-2 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition-colors flex items-center gap-1">
                   <Scale className="w-5 h-5" />
@@ -1156,7 +1170,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="flex items-baseline justify-between">
                   <div className="text-2xl sm:text-3xl font-black text-rose-700 font-mono tracking-tight">
                     Rs. {perBirdEconomics.expensePerBird.toFixed(2)}
-                    <span className="text-xs font-normal text-slate-500 ml-1.5">cost / bird</span>
                   </div>
                   <span
                     className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
@@ -1172,6 +1185,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                  <div className="col-span-2 pb-1.5 border-b border-slate-200/80 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-600 font-semibold">Total Bird Expenses</span>
+                    <span className="font-black text-rose-700 font-mono">
+                      Rs. {Math.round(dynamicFinance.birdExpenses).toLocaleString()}
+                    </span>
+                  </div>
                   <div>
                     <span className="text-[11px] text-slate-500 block">Revenue / Bird</span>
                     <span className="font-bold text-emerald-700 font-mono">
@@ -1212,7 +1231,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500 group-hover:text-indigo-700 transition-colors">
-                  Unit Operating Cost
+                  Unit Operating Expense
                 </span>
                 <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white transition-colors flex items-center gap-1">
                   <Building2 className="w-5 h-5" />
@@ -1772,7 +1791,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </span>
                         </div>
                         <div className="px-2 border-r border-slate-200">
-                          <span className="text-[9px] text-slate-500 font-semibold block uppercase">Cost / Bird</span>
+                          <span className="text-[9px] text-slate-500 font-semibold block uppercase">Expense / Bird</span>
                           <span className="font-bold font-mono text-rose-600 text-xs sm:text-sm mt-0.5 block">
                             Rs. {unit.displayExpPerBird.toFixed(2)}
                           </span>
