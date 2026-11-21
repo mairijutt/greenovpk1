@@ -15,7 +15,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Farm } from '../types/farm';
-import { PWAInstallButton } from './PWAInstallButton';
 
 export interface HealthNotification {
   id: string;
@@ -166,10 +165,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right Section: Install App, Farm Selector, Bell Notification Prompt & User Profile */}
+          {/* Right Section: Farm Selector, Bell Notification Prompt & User Profile */}
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <PWAInstallButton variant="header" />
-
             {/* Global Farm Dropdown */}
             {farms && farms.length > 0 && (
               <div className="relative flex items-center">
