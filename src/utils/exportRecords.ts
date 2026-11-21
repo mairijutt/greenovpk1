@@ -509,6 +509,26 @@ export function downloadIncomeStatementPDF({
       alternateRowStyles: {
         fillColor: [248, 250, 252],
       },
+      didParseCell: (data) => {
+        const colIdx = data.column.index;
+        if (data.section === 'head') {
+          if (colIdx >= 1 && colIdx <= 3) {
+            data.cell.styles.fillColor = [120, 53, 15]; // Amber Eggs
+          } else if (colIdx >= 4 && colIdx <= 6) {
+            data.cell.styles.fillColor = [6, 78, 59]; // Emerald Financials
+          } else if (colIdx >= 7 && colIdx <= 9) {
+            data.cell.styles.fillColor = [12, 74, 110]; // Sky Feed
+          }
+        } else if (data.section === 'body') {
+          if (colIdx >= 1 && colIdx <= 3) {
+            data.cell.styles.fillColor = [255, 251, 235];
+          } else if (colIdx >= 4 && colIdx <= 6) {
+            data.cell.styles.fillColor = [236, 253, 245];
+          } else if (colIdx >= 7 && colIdx <= 9) {
+            data.cell.styles.fillColor = [240, 249, 255];
+          }
+        }
+      },
       columnStyles: mColStyles,
     });
   }

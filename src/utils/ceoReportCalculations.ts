@@ -161,6 +161,8 @@ export interface MonthlyCeoRow {
   carriedPrevCartons: number;
   remainingProductionCartons: number;
   carriedNextCartons: number;
+  carriedPrevFeedBags: number;
+  totalAvailableFeedBags: number;
   remainingFeedBags: number;
   carriedNextFeedBags: number;
   avgCartonPrice: number;
@@ -721,6 +723,30 @@ export function computeMonthlyBreakdown(params: {
   let runningEggsBalance = 0;
   let runningFeedBalance = 0;
 
+  if (selectedYear && selectedYear !== 'all') {
+    const yearStart = `${selectedYear}-01-01`;
+    const priorEggsProduced = eggProductions
+      .filter((e) => matchesSelectedUnit(e, selectedUnit) && normalizeDateStr(e.date) < yearStart)
+      .reduce((s, e) => s + (Number(e.totalEggs) || 0), 0);
+    const priorEggsSold = salesRecords
+      .filter(
+        (s) =>
+          matchesSelectedUnit(s, selectedUnit) &&
+          isEggSaleRecord(s) &&
+          normalizeDateStr(s.date) < yearStart
+      )
+      .reduce((s, x) => s + (Number(x.quantity ?? (x as any).itemsSold) || 0), 0);
+    runningEggsBalance = Math.max(0, priorEggsProduced - priorEggsSold);
+
+    const priorFeedReceived = allFeedStocks
+      .filter((k) => matchesSelectedUnit(k, selectedUnit) && normalizeDateStr(k.date) < yearStart)
+      .reduce((s, k) => s + (Number(k.quantity) || 0), 0);
+    const priorFeedConsumed = consumptionLogs
+      .filter((c) => matchesSelectedUnit(c, selectedUnit) && normalizeDateStr(c.date) < yearStart)
+      .reduce((s, c) => s + getConsumptionBags(c), 0);
+    runningFeedBalance = priorFeedReceived - priorFeedConsumed;
+  }
+
   return sortedMonths.map((monthKey) => {
     const [y, m] = monthKey.split('-');
     const monthLabel = new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('en-US', {
@@ -793,7 +819,9 @@ export function computeMonthlyBreakdown(params: {
     runningEggsBalance = Math.max(0, runningEggsBalance + totalEggsProduced - eggsSold);
     const carriedNextCartons = runningEggsBalance / 360;
 
-    runningFeedBalance = runningFeedBalance + feedReceivedBags - feedConsumedBags;
+    const carriedPrevFeedBags = runningFeedBalance;
+    const totalAvailableFeedBags = carriedPrevFeedBags + feedReceivedBags;
+    runningFeedBalance = totalAvailableFeedBags - feedConsumedBags;
 
     const cartonsSold = eggsSold / 360;
     const avgCartonPrice = cartonsSold > 0 ? eggRevenue / cartonsSold : 0;
@@ -815,6 +843,8 @@ export function computeMonthlyBreakdown(params: {
       carriedPrevCartons,
       remainingProductionCartons: (totalEggsProduced - eggsSold) / 360,
       carriedNextCartons,
+      carriedPrevFeedBags,
+      totalAvailableFeedBags,
       remainingFeedBags: runningFeedBalance,
       carriedNextFeedBags: runningFeedBalance,
       avgCartonPrice,

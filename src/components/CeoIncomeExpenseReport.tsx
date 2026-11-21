@@ -910,27 +910,85 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
           </span>
         }
       >
-        <table className="w-full text-left text-xs whitespace-nowrap">
-          <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase text-[10px]">
-            <tr>
-              <th className="py-3 px-3.5">Month</th>
-              <th className="py-3 px-3 text-right">C/F Prev (Ctns)</th>
-              <th className="py-3 px-3 text-right">Produced (Ctns)</th>
-              <th className="py-3 px-3 text-right">Sold (Ctns)</th>
-              <th className="py-3 px-3 text-right">Rem. Prod (Next)</th>
-              <th className="py-3 px-3 text-right">Total Sale</th>
-              <th className="py-3 px-3 text-right">Total Expense</th>
-              <th className="py-3 px-3 text-right">Net P&amp;L</th>
-              <th className="py-3 px-3 text-right">Feed Consumed</th>
-              <th className="py-3 px-3 text-right">Rem. Feed</th>
-              <th className="py-3 px-3 text-right">Avg Carton</th>
-              <th className="py-3 px-3.5 text-right">Cost / Bird</th>
+        <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
+          <thead className="font-bold uppercase text-[10px]">
+            {/* Section Group Header Row */}
+            <tr className="border-b border-slate-200">
+              <th className="py-2 px-3.5 bg-slate-100 text-slate-700 border-r border-slate-200">
+                Period
+              </th>
+              <th
+                colSpan={4}
+                className="py-2 px-3 text-center bg-amber-100/90 text-amber-950 border-r border-amber-200 tracking-wider"
+              >
+                Egg Production &amp; Stock (Cartons)
+              </th>
+              <th
+                colSpan={3}
+                className="py-2 px-3 text-center bg-emerald-100/90 text-emerald-950 border-r border-emerald-200 tracking-wider"
+              >
+                Financials (Income &amp; Expenses)
+              </th>
+              <th
+                colSpan={3}
+                className="py-2 px-3 text-center bg-sky-100/90 text-sky-950 border-r border-sky-200 tracking-wider"
+              >
+                Feed Inventory (Bags)
+              </th>
+              <th
+                colSpan={2}
+                className="py-2 px-3.5 text-center bg-indigo-100/90 text-indigo-950 tracking-wider"
+              >
+                Unit Economics
+              </th>
+            </tr>
+            {/* Individual Column Headers */}
+            <tr className="border-b-2 border-slate-200">
+              <th className="py-2.5 px-3.5 bg-slate-50 text-slate-700 border-r border-slate-200">
+                Month
+              </th>
+              <th className="py-2.5 px-3 text-right bg-amber-50/80 text-amber-900">
+                C/F Prev (Ctns)
+              </th>
+              <th className="py-2.5 px-3 text-right bg-amber-50/80 text-amber-900">
+                Produced (Ctns)
+              </th>
+              <th className="py-2.5 px-3 text-right bg-amber-50/80 text-amber-900">
+                Sold (Ctns)
+              </th>
+              <th className="py-2.5 px-3 text-right bg-amber-50/80 text-amber-900 border-r border-amber-200/80">
+                Rem. Prod (Next)
+              </th>
+              <th className="py-2.5 px-3 text-right bg-emerald-50/80 text-emerald-900">
+                Total Sale
+              </th>
+              <th className="py-2.5 px-3 text-right bg-emerald-50/80 text-emerald-900">
+                Total Expense
+              </th>
+              <th className="py-2.5 px-3 text-right bg-emerald-50/80 text-emerald-900 border-r border-emerald-200/80">
+                Net P&amp;L
+              </th>
+              <th className="py-2.5 px-3 text-right bg-sky-50/80 text-sky-900">
+                Total Feed
+              </th>
+              <th className="py-2.5 px-3 text-right bg-sky-50/80 text-sky-900">
+                Feed Consumed
+              </th>
+              <th className="py-2.5 px-3 text-right bg-sky-50/80 text-sky-900 border-r border-sky-200/80">
+                Rem. Feed
+              </th>
+              <th className="py-2.5 px-3 text-right bg-indigo-50/80 text-indigo-900">
+                Avg Carton
+              </th>
+              <th className="py-2.5 px-3.5 text-right bg-indigo-50/80 text-indigo-900">
+                Cost / Bird
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {monthlyRows.length === 0 ? (
               <tr>
-                <td colSpan={12} className="py-8 text-center text-slate-400">
+                <td colSpan={13} className="py-8 text-center text-slate-400">
                   No monthly activity recorded for {selectedYear === 'all' ? 'the selected filters' : selectedYear}.
                 </td>
               </tr>
@@ -939,18 +997,22 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                 const isSelectedMonth = activeMonthKey === row.monthKey;
                 const monthCode = row.monthKey.split('-')[1];
                 const isProfit = row.netIncome >= 0;
+                const eggTint = isSelectedMonth ? 'bg-emerald-50/60' : 'bg-amber-50/30';
+                const finTint = isSelectedMonth ? 'bg-emerald-50/80' : 'bg-emerald-50/30';
+                const feedTint = isSelectedMonth ? 'bg-emerald-50/60' : 'bg-sky-50/30';
+                const econTint = isSelectedMonth ? 'bg-emerald-50/60' : 'bg-indigo-50/30';
 
                 return (
                   <tr
                     key={row.monthKey}
                     onClick={() => onSelectMonth(monthCode)}
-                    className={`cursor-pointer transition-colors ${
+                    className={`cursor-pointer transition-colors group ${
                       isSelectedMonth
                         ? 'bg-emerald-50 font-semibold border-l-4 border-l-emerald-600'
-                        : 'hover:bg-slate-50'
+                        : 'hover:bg-slate-50/80'
                     }`}
                   >
-                    <td className="py-3 px-3.5">
+                    <td className="py-3 px-3.5 border-r border-slate-200/80">
                       <div className="flex items-center space-x-1.5">
                         <span className="font-bold text-slate-900">{row.monthLabel}</span>
                         {isSelectedMonth && (
@@ -960,46 +1022,62 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-right text-amber-800 font-medium">
+                    {/* Egg Production & Stock Section */}
+                    <td className={`py-3 px-3 text-right text-amber-800 font-medium ${eggTint}`}>
                       {Math.round(row.carriedPrevCartons).toLocaleString()}
                     </td>
-                    <td className="py-3 px-3 text-right font-bold text-slate-900">
+                    <td className={`py-3 px-3 text-right font-bold text-slate-900 ${eggTint}`}>
                       {Math.round(row.totalCartonsProduced).toLocaleString()}
                     </td>
-                    <td className="py-3 px-3 text-right font-semibold text-slate-700">
+                    <td className={`py-3 px-3 text-right font-semibold text-slate-700 ${eggTint}`}>
                       {Math.round(row.cartonsSold).toLocaleString()}
                     </td>
-                    <td className="py-3 px-3 text-right font-bold text-sky-700">
+                    <td
+                      className={`py-3 px-3 text-right font-bold text-amber-900 border-r border-amber-200/70 ${eggTint}`}
+                    >
                       {Math.round(row.carriedNextCartons).toLocaleString()} ctns
                     </td>
-                    <td className="py-3 px-3 text-right font-bold text-emerald-700">
+                    {/* Financials Section */}
+                    <td className={`py-3 px-3 text-right font-bold text-emerald-700 ${finTint}`}>
                       {formatPkr(row.totalSales)}
                     </td>
-                    <td className="py-3 px-3 text-right font-bold text-rose-600">
+                    <td className={`py-3 px-3 text-right font-bold text-rose-600 ${finTint}`}>
                       {formatPkr(row.totalExpenses)}
                     </td>
                     <td
-                      className={`py-3 px-3 text-right font-black ${
+                      className={`py-3 px-3 text-right font-black border-r border-emerald-200/70 ${finTint} ${
                         isProfit ? 'text-emerald-700' : 'text-rose-600'
                       }`}
                     >
                       {formatPkr(row.netIncome)}
                     </td>
-                    <td className="py-3 px-3 text-right">
+                    {/* Feed Inventory Section */}
+                    <td className={`py-3 px-3 text-right ${feedTint}`}>
+                      <div className="font-bold text-sky-900">
+                        {row.totalAvailableFeedBags.toLocaleString()} bags
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        {row.feedReceivedBags.toLocaleString()} purch + {row.carriedPrevFeedBags.toLocaleString()} C/F
+                      </div>
+                    </td>
+                    <td className={`py-3 px-3 text-right ${feedTint}`}>
                       <div className="font-semibold text-slate-700">
                         {row.feedConsumedBags.toLocaleString()} bags
                       </div>
-                      <div className="text-[10px] text-slate-400">
+                      <div className="text-[10px] text-slate-500">
                         {formatPkr(row.feedConsumedExpense)}
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-right font-bold text-indigo-700">
+                    <td
+                      className={`py-3 px-3 text-right font-bold text-sky-700 border-r border-sky-200/70 ${feedTint}`}
+                    >
                       {row.remainingFeedBags.toLocaleString()} bags
                     </td>
-                    <td className="py-3 px-3 text-right font-bold text-amber-700">
+                    {/* Unit Economics Section */}
+                    <td className={`py-3 px-3 text-right font-bold text-indigo-800 ${econTint}`}>
                       Rs. {Math.round(row.avgCartonPrice).toLocaleString()}
                     </td>
-                    <td className="py-3 px-3.5 text-right font-bold text-slate-800">
+                    <td className={`py-3 px-3.5 text-right font-bold text-indigo-950 ${econTint}`}>
                       Rs. {Math.round(row.avgPerBirdCost).toLocaleString()}
                     </td>
                   </tr>
