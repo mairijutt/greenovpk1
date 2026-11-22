@@ -19,6 +19,8 @@ export interface StockRecord {
   paymentType: string;
   challanNo: string;
   notes: string;
+  expenseId?: number;
+  attachment?: string | null;
 }
 
 export const STOCK_SUMMARY = {

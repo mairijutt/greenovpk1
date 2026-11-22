@@ -28,6 +28,7 @@ import {
   Check,
   PanelLeftClose,
   PanelLeftOpen,
+  Zap,
 } from 'lucide-react';
 
 export type NavTab =
@@ -41,6 +42,7 @@ export type NavTab =
   | 'stocks'
   | 'salaries'
   | 'reports'
+  | 'power-consumption'
   | 'farms'
   | 'users';
 
@@ -156,6 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'stocks', label: 'Stocks', icon: Boxes },
         { id: 'salaries', label: 'Salaries', icon: Users },
         { id: 'reports', label: 'Reports', icon: FileBarChart2 },
+        { id: 'power-consumption', label: 'Power Consumption', icon: Zap },
       ],
     },
     {
@@ -290,7 +293,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         className={`bg-white border-r border-slate-200 ${
           isCollapsed ? 'w-72 md:w-[72px]' : 'w-72 md:w-64'
-        } flex-shrink-0 flex flex-col justify-between transition-all duration-300 ease-in-out shadow-2xl md:shadow-sm fixed md:static inset-y-0 left-0 z-50 md:z-auto ${
+        } flex-shrink-0 flex flex-col justify-between transition-all duration-300 ease-in-out shadow-2xl md:shadow-md fixed md:sticky top-0 bottom-0 md:top-16 md:bottom-auto left-0 md:left-auto z-50 md:z-30 md:h-[calc(100vh-4rem)] md:self-start ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >

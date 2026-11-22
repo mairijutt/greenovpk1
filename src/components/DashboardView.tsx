@@ -28,6 +28,7 @@ import {
   Sun,
   Moon,
   ExternalLink,
+  Zap,
 } from 'lucide-react';
 import {
   Farm,
@@ -38,10 +39,15 @@ import {
   FinancialRecord,
   BankAccount,
   InventoryItem,
+  PowerConsumptionRecord,
 } from '../types/farm.ts';
 import { DateRangePickerBar, DatePreset } from './ui';
 import { getInitialUrlFilters } from '../utils/urlFilters.ts';
-import { DashboardTransactionModal, DashboardStockModal } from './DashboardQuickActionModals.tsx';
+import {
+  DashboardTransactionModal,
+  DashboardStockModal,
+  DashboardPowerModal,
+} from './DashboardQuickActionModals.tsx';
 import {
   SALES_SUMMARY,
   unitWiseSalesSummary,
@@ -82,6 +88,7 @@ interface DashboardViewProps {
   onAddTransaction?: (record: FinancialRecord) => Promise<void> | void;
   onAddBank?: (bank: BankAccount) => void;
   onRestock?: (id: string, amount: number) => void;
+  onAddPowerLog?: (record: Omit<PowerConsumptionRecord, 'id'>) => Promise<PowerConsumptionRecord | void> | void;
   onOpenRecordModal: (type: 'egg' | 'mortality' | 'feed') => void;
   onNavigateTab: (tab: any) => void;
 }
@@ -98,6 +105,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onAddTransaction,
   onAddBank,
   onRestock,
+  onAddPowerLog,
   onOpenRecordModal,
   onNavigateTab,
 }) => {
@@ -124,7 +132,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [hoveredConsumptionIndex, setHoveredConsumptionIndex] = useState<number | null>(null);
   const [hoveredStockMonth, setHoveredStockMonth] = useState<number | null>(null);
   const [financeViewMode, setFinanceViewMode] = useState<'today' | 'monthly'>('monthly');
-  const [quickActionModal, setQuickActionModal] = useState<'sale' | 'expense' | 'stock' | null>(null);
+  const [quickActionModal, setQuickActionModal] = useState<'sale' | 'expense' | 'stock' | 'power' | null>(null);
   const [stockRefreshKey, setStockRefreshKey] = useState(0);
   const [actionToast, setActionToast] = useState<string | null>(null);
 
@@ -883,7 +891,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Smarter Poultry. Stronger Profits.
           </p>
           <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
-            A modern, AI-ready brand for a platform that helps poultry businesses monitor performance, control costs, and make data-driven decisions.
+            A modern, AI-ready brand for a platform that helps poultry businesses monitor performance, control expenses, and make data-driven decisions.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2.5">
@@ -925,6 +933,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             >
               <Plus className="w-4 h-4" />
               <span>Add Stock Record</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickActionModal('power')}
+              className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center space-x-1.5"
+            >
+              <Zap className="w-4 h-4" />
+              <span>Add Power Record</span>
             </button>
             <button
               type="button"
@@ -1125,7 +1141,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <p className="text-xs font-semibold mt-1.5 flex items-center gap-1.5">
                   <span className={`inline-block w-2 h-2 rounded-full ${dynamicFinance.isProfit ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
                   <span className={dynamicFinance.isProfit ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>
-                    {dynamicFinance.isProfit ? 'Operational Profit' : 'Operating Cost Burden (Deficit)'}
+                    {dynamicFinance.isProfit ? 'Operational Profit' : 'Operating Expense Burden (Deficit)'}
                   </span>
                 </p>
               </div>
@@ -1240,7 +1256,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     Rs. {Math.round(unitOperatingEconomics.totalOperatingCost).toLocaleString()}
                   </div>
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 shrink-0">
-                    {unitOperatingEconomics.operatingSharePct}% of costs
+                    {unitOperatingEconomics.operatingSharePct}% of expenses
                   </span>
                 </div>
 
@@ -1264,7 +1280,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </span>
                     </div>
                     <div>
-                      <span className="text-[11px] text-slate-500 block">Minus Bird Cost</span>
+                      <span className="text-[11px] text-slate-500 block">Minus Bird Expenses</span>
                       <span className="font-bold text-rose-600 font-mono">
                         −{formatCompactRs(unitOperatingEconomics.birdCost)}
                       </span>
@@ -1278,7 +1294,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {formatCompactRs(unitOperatingEconomics.totalAllExpenses)} − {formatCompactRs(unitOperatingEconomics.birdCost)} bird
               </span>
               <span className="font-bold text-indigo-700 group-hover:text-indigo-900 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                <span>Cost Ledger</span>
+                <span>Expense Ledger</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </span>
             </div>
@@ -2349,6 +2365,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         onRestock={onRestock}
         onAddTransaction={onAddTransaction}
         onStockSaved={() => setStockRefreshKey((k) => k + 1)}
+        onSuccessToast={showQuickToast}
+      />
+
+      <DashboardPowerModal
+        isOpen={quickActionModal === 'power'}
+        flocks={flocks}
+        onClose={() => setQuickActionModal(null)}
+        onAddPowerLog={onAddPowerLog}
         onSuccessToast={showQuickToast}
       />
     </div>

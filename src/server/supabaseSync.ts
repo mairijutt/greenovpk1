@@ -132,6 +132,30 @@ async function runInitialization(): Promise<void> {
     );
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS public."PowerConsumption" (
+      id serial PRIMARY KEY,
+      "clientId" text,
+      date text NOT NULL,
+      "flockId" integer NOT NULL DEFAULT 8,
+      "flockName" text,
+      "solarProducedUnits" double precision NOT NULL DEFAULT 0,
+      "solarConsumedUnits" double precision NOT NULL DEFAULT 0,
+      "gridConsumedUnits" double precision NOT NULL DEFAULT 0,
+      "unitRatePkr" double precision NOT NULL DEFAULT 35,
+      "gridUnitRatePkr" double precision NOT NULL DEFAULT 60,
+      "dieselPurchasedLiters" double precision NOT NULL DEFAULT 0,
+      "dieselConsumedLiters" double precision NOT NULL DEFAULT 0,
+      "dieselRatePerLiter" double precision NOT NULL DEFAULT 0,
+      "dieselPurchaseCost" double precision NOT NULL DEFAULT 0,
+      "referenceNo" text DEFAULT '',
+      notes text DEFAULT '',
+      "createdAt" timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    ALTER TABLE public."PowerConsumption" ADD COLUMN IF NOT EXISTS "gridUnitRatePkr" double precision NOT NULL DEFAULT 60;
+  `);
+
   // 2. Non-destructive schema extensions & sequence alignment (guarded once per schema version)
   if (!(await hasMeta('schema_migrated_v2'))) {
     await pool.query(`
@@ -202,6 +226,7 @@ async function runInitialization(): Promise<void> {
       alignSequence('BirdHealth'),
       alignSequence('DailyConsumption'),
       alignSequence('VaccineSchedule'),
+      alignSequence('PowerConsumption'),
       alignSequence('user'),
     ]);
 
@@ -778,29 +803,148 @@ function normalizeExpenseHead(raw?: string): string {
   return 'OTHER';
 }
 
+export class StockLinkedExpenseError extends Error {
+  statusCode = 403;
+  code = 'STOCK_LINKED_EXPENSE';
+  constructor(message: string) {
+    super(message);
+    this.name = 'StockLinkedExpenseError';
+  }
+}
+
+function stockExpenseSignature(
+  head?: string,
+  flockId?: number | string,
+  dateVal?: any,
+  amountVal?: number | string,
+  challanNo?: string
+): string {
+  const cleanHead = String(head || 'OTHER').toUpperCase().trim();
+  const fid = Number(flockId) || 8;
+  let dateKey = '';
+  if (dateVal) {
+    const d = dateVal instanceof Date ? dateVal : new Date(dateVal);
+    if (!isNaN(d.getTime())) {
+      dateKey = d.toISOString().slice(0, 10);
+    } else {
+      dateKey = String(dateVal).slice(0, 10);
+    }
+  }
+  const amtKey = Math.round((Number(amountVal) || 0) * 100);
+  const challanKey = String(challanNo || '').trim() || '0';
+  return `${cleanHead}|${fid}|${dateKey}|${amtKey}|${challanKey}`;
+}
+
+function formatExpenseRow(r: any, linkedStock?: any) {
+  const fid = Number(r.flockId) || 8;
+  const dIso = r.expense_date ? new Date(r.expense_date).toISOString() : new Date().toISOString();
+  const isStockLinked = Boolean(linkedStock || String(r.clientId || '').startsWith('exp-stk-'));
+  return {
+    id: r.id,
+    clientId: r.clientId || undefined,
+    expenseDate: dIso,
+    date: dIso,
+    expenseCost: Number(r.expense_cost || 0),
+    amount: Number(r.expense_cost || 0),
+    head: r.head,
+    category: r.head,
+    notes: r.notes || '',
+    description: r.notes || r.head,
+    attachment: r.attachment || null,
+    challanNo: r.challanNo || '0',
+    flockId: fid,
+    flock: { id: fid, flockName: flockNameForId(fid) },
+    isStockLinked,
+    linkedStockId: linkedStock?.id ?? undefined,
+    linkedStockHead: linkedStock?.head ?? undefined,
+    linkedStockType: linkedStock?.Type ?? linkedStock?.type ?? undefined,
+    linkedStockQuantity: linkedStock?.quantity !== undefined ? Number(linkedStock.quantity) : undefined,
+    createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : dIso,
+    updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : dIso,
+  };
+}
+
+async function findLinkedStockForExpense(idOrClient: number | string) {
+  const num = safePgInt(idOrClient);
+  const expRes =
+    num > 0
+      ? await pool.query('SELECT * FROM public."Expense" WHERE id = $1 OR "clientId" = $2 LIMIT 1', [
+          num,
+          String(idOrClient),
+        ])
+      : await pool.query('SELECT * FROM public."Expense" WHERE "clientId" = $1 LIMIT 1', [
+          String(idOrClient),
+        ]);
+  const exp = expRes.rows[0];
+  if (!exp) return { expense: null, stock: null };
+
+  const direct = await pool.query(
+    'SELECT id, head::text AS head, "Type", quantity FROM public."Stock" WHERE "expenseId" = $1 LIMIT 1',
+    [exp.id]
+  );
+  if (direct.rows[0]) {
+    return { expense: exp, stock: direct.rows[0] };
+  }
+
+  const sigMatch = await pool.query(
+    `SELECT id, head::text AS head, "Type", quantity
+     FROM public."Stock"
+     WHERE ("expenseId" IS NULL OR "expenseId" = 0)
+       AND head::text = $1
+       AND "flockId" = $2
+       AND date::date = $3::date
+       AND ROUND("amountPaid"::numeric, 2) = ROUND($4::numeric, 2)
+       AND COALESCE(NULLIF(TRIM("challanNo"), ''), '0') = $5
+     ORDER BY id DESC
+     LIMIT 1`,
+    [
+      String(exp.head || 'OTHER'),
+      Number(exp.flockId) || 8,
+      exp.expense_date,
+      Number(exp.expense_cost || 0),
+      String(exp.challanNo || '').trim() || '0',
+    ]
+  );
+  if (sigMatch.rows[0]) {
+    return { expense: exp, stock: sigMatch.rows[0] };
+  }
+
+  if (String(exp.clientId || '').startsWith('exp-stk-')) {
+    return { expense: exp, stock: { id: exp.clientId, head: exp.head } };
+  }
+
+  return { expense: exp, stock: null };
+}
+
 export async function fetchAllExpenses() {
-  const res = await pool.query('SELECT * FROM public."Expense" ORDER BY expense_date DESC, id DESC');
-  return res.rows.map((r: any) => {
-    const fid = Number(r.flockId) || 8;
-    const dIso = r.expense_date ? new Date(r.expense_date).toISOString() : new Date().toISOString();
-    return {
-      id: r.id,
-      clientId: r.clientId || undefined,
-      expenseDate: dIso,
-      date: dIso,
-      expenseCost: Number(r.expense_cost || 0),
-      amount: Number(r.expense_cost || 0),
-      head: r.head,
-      category: r.head,
-      notes: r.notes || '',
-      description: r.notes || r.head,
-      attachment: r.attachment || null,
-      challanNo: r.challanNo || '0',
-      flockId: fid,
-      flock: { id: fid, flockName: flockNameForId(fid) },
-      createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : dIso,
-      updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : dIso,
-    };
+  const [expRes, stkRes] = await Promise.all([
+    pool.query('SELECT * FROM public."Expense" ORDER BY expense_date DESC, id DESC'),
+    pool.query(
+      'SELECT id, "expenseId", head::text AS head, "Type", quantity, "flockId", date, "amountPaid", "challanNo" FROM public."Stock" ORDER BY id DESC'
+    ),
+  ]);
+
+  const stockByExpenseId = new Map<number, any>();
+  const stockBySig = new Map<string, any>();
+
+  for (const s of stkRes.rows) {
+    const eid = Number(s.expenseId || 0);
+    if (eid > 0 && !stockByExpenseId.has(eid)) {
+      stockByExpenseId.set(eid, s);
+    }
+    const sig = stockExpenseSignature(s.head, s.flockId, s.date, s.amountPaid, s.challanNo);
+    if (!stockBySig.has(sig)) {
+      stockBySig.set(sig, s);
+    }
+  }
+
+  return expRes.rows.map((r: any) => {
+    let linkedStock = stockByExpenseId.get(Number(r.id));
+    if (!linkedStock) {
+      const sig = stockExpenseSignature(r.head, r.flockId, r.expense_date, r.expense_cost, r.challanNo);
+      linkedStock = stockBySig.get(sig);
+    }
+    return formatExpenseRow(r, linkedStock);
   });
 }
 
@@ -811,6 +955,18 @@ export async function upsertExpense(exp: any, explicitId?: number | string) {
     (exp.id !== undefined && safePgInt(exp.id) === 0 ? String(exp.id) : null);
 
   let targetId = explicitId !== undefined ? safePgInt(explicitId) : safePgInt(exp.trackingId ?? exp.id);
+
+  if (explicitId !== undefined || targetId > 0 || clientId) {
+    const checkKey = explicitId ?? (targetId > 0 ? targetId : clientId);
+    if (checkKey) {
+      const { stock } = await findLinkedStockForExpense(checkKey);
+      if (stock) {
+        throw new StockLinkedExpenseError(
+          "It's a stock record — you can't edit it in Expenses. You need to go to Stocks to edit it."
+        );
+      }
+    }
+  }
 
   let prev: any = {};
   if (!targetId && (clientId || explicitId)) {
@@ -864,6 +1020,12 @@ export async function upsertExpense(exp: any, explicitId?: number | string) {
 }
 
 export async function deleteExpense(idOrClient: number | string) {
+  const { stock } = await findLinkedStockForExpense(idOrClient);
+  if (stock) {
+    throw new StockLinkedExpenseError(
+      "It's a stock record — you can't delete it in Expenses. You need to go to Stocks to manage or delete it."
+    );
+  }
   const num = safePgInt(idOrClient);
   if (num > 0) {
     await pool.query('DELETE FROM public."Expense" WHERE id = $1 OR "clientId" = $2', [num, String(idOrClient)]);
@@ -1081,68 +1243,260 @@ export async function upsertStock(stock: any, explicitId?: number | string) {
 
   let targetId = explicitId !== undefined ? safePgInt(explicitId) : safePgInt(stock.trackingId ?? stock.id);
 
-  let prev: any = {};
-  if (!targetId && (clientId || explicitId)) {
-    const key = String(clientId || explicitId);
-    const found = await pool.query('SELECT * FROM public."Stock" WHERE "clientId" = $1 LIMIT 1', [key]);
-    if (found.rows[0]) {
-      prev = found.rows[0];
-      targetId = prev.id;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    let prev: any = {};
+    if (!targetId && (clientId || explicitId)) {
+      const key = String(clientId || explicitId);
+      const found = await client.query('SELECT * FROM public."Stock" WHERE "clientId" = $1 LIMIT 1', [key]);
+      if (found.rows[0]) {
+        prev = found.rows[0];
+        targetId = prev.id;
+      }
+    } else if (targetId > 0) {
+      const found = await client.query('SELECT * FROM public."Stock" WHERE id = $1 LIMIT 1', [targetId]);
+      if (found.rows[0]) prev = found.rows[0];
     }
-  } else if (targetId > 0) {
-    const found = await pool.query('SELECT * FROM public."Stock" WHERE id = $1 LIMIT 1', [targetId]);
-    if (found.rows[0]) prev = found.rows[0];
-  }
 
-  const rawHead = String(stock.head || prev.head || 'FEED').toUpperCase().trim();
-  const head = VALID_STOCK_HEADS.has(rawHead) ? rawHead : 'OTHER';
-  const fid = flockIdFromInput(stock.flockId ?? prev.flockId, stock.flockName);
-  const rawDate = stock.date ?? prev.date;
-  const dateIso = rawDate ? new Date(rawDate).toISOString() : new Date().toISOString();
-  const qty = Math.round(Number(stock.quantity ?? stock.bags ?? prev.quantity ?? 0));
-  const amt = stock.amountPaid !== undefined ? Number(stock.amountPaid) : stock.amount !== undefined ? Number(stock.amount) : Number(prev.amountPaid ?? 0);
-  const stockType = String(stock.Type ?? stock.type ?? prev.Type ?? '13');
-  const challanNo = String(stock.challanNo ?? prev.challanNo ?? '0');
+    const rawHead = String(stock.head || prev.head || 'FEED').toUpperCase().trim();
+    const head = VALID_STOCK_HEADS.has(rawHead) ? rawHead : 'OTHER';
+    const fid =
+      stock.flockId !== undefined || stock.flockName
+        ? flockIdFromInput(stock.flockId, stock.flockName)
+        : Number(prev.flockId) || 8;
+    const rawDate = stock.date ?? prev.date;
+    const dateIso = rawDate ? new Date(rawDate).toISOString() : new Date().toISOString();
+    const qty = Math.round(Number(stock.quantity ?? stock.bags ?? prev.quantity ?? 0));
+    const amt =
+      stock.amountPaid !== undefined
+        ? Number(stock.amountPaid)
+        : stock.amount !== undefined
+        ? Number(stock.amount)
+        : Number(prev.amountPaid ?? 0);
+    const stockType = String(stock.Type ?? stock.type ?? prev.Type ?? '13');
+    const challanNo = String(stock.challanNo ?? prev.challanNo ?? '0');
+    const paymentType = String(stock.paymentType ?? prev.paymentType ?? 'CASH');
+    const stockNotes = stock.notes !== undefined ? String(stock.notes) : String(prev.notes ?? '');
+    const expenseHead = normalizeExpenseHead(head);
+    const unitNoun = head === 'FEED' ? 'bags' : 'units';
+    const syncNotes =
+      stockNotes.trim() ||
+      `Stock Intake: ${qty} ${unitNoun} of ${stockType} (${head}) via ${paymentType}`;
 
-  if (targetId > 0) {
-    const res = await pool.query(
-      `INSERT INTO public."Stock" (id, date, "Type", head, quantity, notes, attachment, "amountPaid", "paymentType", "expenseId", "challanNo", "flockId", "clientId", "createdAt", "updatedAt")
-       VALUES ($1,$2,$3,$4::"StockHead",$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
-       ON CONFLICT (id) DO UPDATE SET
-         date = EXCLUDED.date,
-         "Type" = EXCLUDED."Type",
-         head = EXCLUDED.head,
-         quantity = EXCLUDED.quantity,
-         notes = EXCLUDED.notes,
-         attachment = COALESCE(EXCLUDED.attachment, public."Stock".attachment),
-         "amountPaid" = EXCLUDED."amountPaid",
-         "paymentType" = EXCLUDED."paymentType",
-         "challanNo" = EXCLUDED."challanNo",
-         "flockId" = EXCLUDED."flockId",
-         "clientId" = COALESCE(EXCLUDED."clientId", public."Stock"."clientId"),
-         "updatedAt" = NOW()
-       RETURNING *`,
-      [targetId, dateIso, stockType, head, qty, stock.notes ?? prev.notes ?? '', stock.attachment || null, amt, stock.paymentType ?? prev.paymentType ?? 'CASH', Number(stock.expenseId ?? prev.expenseId ?? 0), challanNo, fid, clientId || prev.clientId || null]
-    );
-    await alignSequence('Stock');
-    return res.rows[0];
-  } else {
-    const res = await pool.query(
-      `INSERT INTO public."Stock" (date, "Type", head, quantity, notes, attachment, "amountPaid", "paymentType", "expenseId", "challanNo", "flockId", "clientId", "createdAt", "updatedAt")
-       VALUES ($1,$2,$3::"StockHead",$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW())
-       RETURNING *`,
-      [dateIso, stockType, head, qty, stock.notes || '', stock.attachment || null, amt, stock.paymentType || 'CASH', Number(stock.expenseId || 0), challanNo, fid, clientId]
-    );
-    return res.rows[0];
+    // Resolve or create linked Expense record
+    let linkedExpenseId = Number(stock.expenseId ?? prev.expenseId ?? 0);
+    if (!linkedExpenseId && prev.id) {
+      const matchedExp = await client.query(
+        `SELECT id FROM public."Expense"
+         WHERE head::text = $1
+           AND "flockId" = $2
+           AND expense_date::date = $3::date
+           AND ROUND(expense_cost::numeric, 2) = ROUND($4::numeric, 2)
+           AND COALESCE(NULLIF(TRIM("challanNo"), ''), '0') = $5
+         ORDER BY id DESC
+         LIMIT 1`,
+        [
+          String(prev.head || 'FEED'),
+          Number(prev.flockId) || 8,
+          prev.date,
+          Number(prev.amountPaid || 0),
+          String(prev.challanNo || '').trim() || '0',
+        ]
+      );
+      if (matchedExp.rows[0]) {
+        linkedExpenseId = Number(matchedExp.rows[0].id);
+      }
+    }
+
+    let expenseRow: any = null;
+    if (linkedExpenseId > 0) {
+      const updExp = await client.query(
+        `UPDATE public."Expense"
+         SET expense_date = $1,
+             expense_cost = $2,
+             head = $3::"ExpenseHead",
+             notes = $4,
+             attachment = COALESCE($5, attachment),
+             "challanNo" = $6,
+             "flockId" = $7,
+             "updatedAt" = NOW()
+         WHERE id = $8
+         RETURNING *`,
+        [dateIso, amt, expenseHead, syncNotes, stock.attachment || null, challanNo, fid, linkedExpenseId]
+      );
+      expenseRow = updExp.rows[0] || null;
+    }
+
+    if (!expenseRow) {
+      const expClientId = stock.expenseClientId || `exp-stk-${Date.now()}`;
+      const insExp = await client.query(
+        `INSERT INTO public."Expense" (expense_date, expense_cost, head, notes, attachment, "challanNo", "flockId", "clientId", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3::"ExpenseHead",$4,$5,$6,$7,$8,NOW(),NOW())
+         RETURNING *`,
+        [dateIso, amt, expenseHead, syncNotes, stock.attachment || null, challanNo, fid, expClientId]
+      );
+      expenseRow = insExp.rows[0];
+      linkedExpenseId = Number(expenseRow.id);
+    }
+
+    let savedStockRow: any;
+    if (targetId > 0) {
+      const res = await client.query(
+        `INSERT INTO public."Stock" (id, date, "Type", head, quantity, notes, attachment, "amountPaid", "paymentType", "expenseId", "challanNo", "flockId", "clientId", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4::"StockHead",$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
+         ON CONFLICT (id) DO UPDATE SET
+           date = EXCLUDED.date,
+           "Type" = EXCLUDED."Type",
+           head = EXCLUDED.head,
+           quantity = EXCLUDED.quantity,
+           notes = EXCLUDED.notes,
+           attachment = COALESCE(EXCLUDED.attachment, public."Stock".attachment),
+           "amountPaid" = EXCLUDED."amountPaid",
+           "paymentType" = EXCLUDED."paymentType",
+           "expenseId" = EXCLUDED."expenseId",
+           "challanNo" = EXCLUDED."challanNo",
+           "flockId" = EXCLUDED."flockId",
+           "clientId" = COALESCE(EXCLUDED."clientId", public."Stock"."clientId"),
+           "updatedAt" = NOW()
+         RETURNING *`,
+        [
+          targetId,
+          dateIso,
+          stockType,
+          head,
+          qty,
+          stockNotes,
+          stock.attachment || null,
+          amt,
+          paymentType,
+          linkedExpenseId,
+          challanNo,
+          fid,
+          clientId || prev.clientId || null,
+        ]
+      );
+      savedStockRow = res.rows[0];
+    } else {
+      const res = await client.query(
+        `INSERT INTO public."Stock" (date, "Type", head, quantity, notes, attachment, "amountPaid", "paymentType", "expenseId", "challanNo", "flockId", "clientId", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3::"StockHead",$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW())
+         RETURNING *`,
+        [
+          dateIso,
+          stockType,
+          head,
+          qty,
+          stockNotes,
+          stock.attachment || null,
+          amt,
+          paymentType,
+          linkedExpenseId,
+          challanNo,
+          fid,
+          clientId,
+        ]
+      );
+      savedStockRow = res.rows[0];
+    }
+
+    await client.query('COMMIT');
+    if (targetId > 0) {
+      await alignSequence('Stock');
+    }
+
+    const formattedExpense = formatExpenseRow(expenseRow, savedStockRow);
+    return {
+      ...savedStockRow,
+      expenseId: linkedExpenseId,
+      syncedExpense: formattedExpense,
+    };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
 export async function deleteStock(idOrClient: number | string) {
-  const num = safePgInt(idOrClient);
-  if (num > 0) {
-    await pool.query('DELETE FROM public."Stock" WHERE id = $1 OR "clientId" = $2', [num, String(idOrClient)]);
-  } else {
-    await pool.query('DELETE FROM public."Stock" WHERE "clientId" = $1', [String(idOrClient)]);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const num = safePgInt(idOrClient);
+    const foundRes =
+      num > 0
+        ? await client.query('SELECT * FROM public."Stock" WHERE id = $1 OR "clientId" = $2', [
+            num,
+            String(idOrClient),
+          ])
+        : await client.query('SELECT * FROM public."Stock" WHERE "clientId" = $1', [String(idOrClient)]);
+
+    let deletedExpenseId: number | null = null;
+    let deletedExpenseClientId: string | null = null;
+
+    for (const s of foundRes.rows) {
+      const expId = Number(s.expenseId || 0);
+      if (expId > 0) {
+        const delExp = await client.query(
+          'DELETE FROM public."Expense" WHERE id = $1 RETURNING id, "clientId"',
+          [expId]
+        );
+        if (delExp.rows[0]) {
+          deletedExpenseId = Number(delExp.rows[0].id);
+          deletedExpenseClientId = delExp.rows[0].clientId || null;
+        }
+      } else {
+        const matchedExp = await client.query(
+          `SELECT id, "clientId" FROM public."Expense"
+           WHERE head::text = $1
+             AND "flockId" = $2
+             AND expense_date::date = $3::date
+             AND ROUND(expense_cost::numeric, 2) = ROUND($4::numeric, 2)
+             AND COALESCE(NULLIF(TRIM("challanNo"), ''), '0') = $5
+           ORDER BY id DESC
+           LIMIT 1`,
+          [
+            String(s.head || 'FEED'),
+            Number(s.flockId) || 8,
+            s.date,
+            Number(s.amountPaid || 0),
+            String(s.challanNo || '').trim() || '0',
+          ]
+        );
+        if (matchedExp.rows[0]) {
+          const delExp = await client.query(
+            'DELETE FROM public."Expense" WHERE id = $1 RETURNING id, "clientId"',
+            [matchedExp.rows[0].id]
+          );
+          if (delExp.rows[0]) {
+            deletedExpenseId = Number(delExp.rows[0].id);
+            deletedExpenseClientId = delExp.rows[0].clientId || null;
+          }
+        }
+      }
+    }
+
+    if (num > 0) {
+      await client.query('DELETE FROM public."Stock" WHERE id = $1 OR "clientId" = $2', [
+        num,
+        String(idOrClient),
+      ]);
+    } else {
+      await client.query('DELETE FROM public."Stock" WHERE "clientId" = $1', [String(idOrClient)]);
+    }
+
+    await client.query('COMMIT');
+    return {
+      deletedExpenseId,
+      deletedExpenseClientId,
+    };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
@@ -1802,3 +2156,185 @@ export async function fetchAllUsers() {
     createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : undefined,
   }));
 }
+
+// ==========================================
+// POWER CONSUMPTION (SOLAR, GRID & DIESEL)
+// ==========================================
+function normalizePowerRow(r: any) {
+  const fid = Number(r.flockId ?? 8);
+  const rawName = r.flockName === 'Main Complex' ? 'All Units' : r.flockName;
+  const fName = rawName || (fid === 0 ? 'All Units' : flockNameForId(fid));
+  const solarRate = Number(r.unitRatePkr ?? 35) || 35;
+  const gridRate = Number(r.gridUnitRatePkr ?? 60) || 60;
+  return {
+    id: r.clientId || String(r.id),
+    trackingId: Number(r.id) || undefined,
+    flockId: String(fid),
+    flockName: fName,
+    date: String(r.date || new Date().toISOString()).split('T')[0],
+    solarProducedUnits: Number(r.solarProducedUnits ?? 0),
+    solarConsumedUnits: Number(r.solarConsumedUnits ?? 0),
+    gridConsumedUnits: Number(r.gridConsumedUnits ?? 0),
+    unitRatePkr: solarRate,
+    solarUnitRatePkr: solarRate,
+    gridUnitRatePkr: gridRate,
+    dieselPurchasedLiters: Number(r.dieselPurchasedLiters ?? 0),
+    dieselConsumedLiters: Number(r.dieselConsumedLiters ?? 0),
+    dieselRatePerLiter: Number(r.dieselRatePerLiter ?? 0),
+    dieselPurchaseCost: Number(r.dieselPurchaseCost ?? 0),
+    referenceNo: r.referenceNo || '',
+    notes: r.notes || '',
+    createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : undefined,
+    updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : undefined,
+  };
+}
+
+export async function fetchAllPowerConsumptions() {
+  const res = await pool.query(
+    'SELECT * FROM public."PowerConsumption" ORDER BY date DESC, id DESC'
+  );
+  return res.rows.map(normalizePowerRow);
+}
+
+export async function upsertPowerConsumption(item: any, idParam?: number | string) {
+  const rawLookup = idParam ?? item.id;
+  const numericId = safePgInt(rawLookup);
+  const clientId = item.clientId ? String(item.clientId) : (numericId === 0 && rawLookup ? String(rawLookup) : null);
+
+  let prev: any = null;
+  if (numericId > 0) {
+    const r = await pool.query('SELECT * FROM public."PowerConsumption" WHERE id = $1 LIMIT 1', [numericId]);
+    prev = r.rows[0] || null;
+  }
+  if (!prev && clientId) {
+    const r = await pool.query('SELECT * FROM public."PowerConsumption" WHERE "clientId" = $1 LIMIT 1', [clientId]);
+    prev = r.rows[0] || null;
+  }
+
+  const rawFlock = item.flockId ?? prev?.flockId;
+  const rawFlockName = item.flockName ?? prev?.flockName;
+  const isComplex =
+    String(rawFlock) === '0' ||
+    String(rawFlock).toLowerCase() === 'common' ||
+    String(rawFlockName || '').toLowerCase().includes('complex') ||
+    String(rawFlockName || '').toLowerCase() === 'all units';
+  const fid = isComplex ? 0 : flockIdFromInput(rawFlock, rawFlockName);
+  const fName = isComplex ? 'All Units' : (rawFlockName || flockNameForId(fid));
+
+  const dateStr = String(item.date ?? prev?.date ?? new Date().toISOString().slice(0, 10)).split('T')[0];
+  const solarProducedUnits = Math.max(0, Number(item.solarProducedUnits ?? prev?.solarProducedUnits ?? 0) || 0);
+  const solarConsumedUnits = Math.max(0, Number(item.solarConsumedUnits ?? prev?.solarConsumedUnits ?? 0) || 0);
+  const gridConsumedUnits = Math.max(0, Number(item.gridConsumedUnits ?? prev?.gridConsumedUnits ?? 0) || 0);
+  const parsedSolarRate = Number(item.solarUnitRatePkr ?? item.unitRatePkr ?? prev?.unitRatePkr ?? 35);
+  const unitRatePkr = Number.isFinite(parsedSolarRate) && parsedSolarRate > 0 ? parsedSolarRate : 35;
+  const parsedGridRate = Number(item.gridUnitRatePkr ?? prev?.gridUnitRatePkr ?? 60);
+  const gridUnitRatePkr = Number.isFinite(parsedGridRate) && parsedGridRate > 0 ? parsedGridRate : 60;
+
+  const dieselPurchasedLiters = Math.max(0, Number(item.dieselPurchasedLiters ?? prev?.dieselPurchasedLiters ?? 0) || 0);
+  const dieselConsumedLiters = Math.max(0, Number(item.dieselConsumedLiters ?? prev?.dieselConsumedLiters ?? 0) || 0);
+  let dieselRatePerLiter = Math.max(0, Number(item.dieselRatePerLiter ?? prev?.dieselRatePerLiter ?? 0) || 0);
+  let dieselPurchaseCost = Math.max(0, Number(item.dieselPurchaseCost ?? prev?.dieselPurchaseCost ?? 0) || 0);
+
+  if (dieselPurchaseCost === 0 && dieselPurchasedLiters > 0 && dieselRatePerLiter > 0) {
+    dieselPurchaseCost = Number((dieselPurchasedLiters * dieselRatePerLiter).toFixed(2));
+  } else if (dieselRatePerLiter === 0 && dieselPurchasedLiters > 0 && dieselPurchaseCost > 0) {
+    dieselRatePerLiter = Number((dieselPurchaseCost / dieselPurchasedLiters).toFixed(2));
+  }
+
+  const referenceNo = String(item.referenceNo ?? prev?.referenceNo ?? '').trim();
+  const notes = String(item.notes ?? prev?.notes ?? '').trim();
+
+  if (prev?.id || numericId > 0) {
+    const targetId = prev?.id || numericId;
+    const res = await pool.query(
+      `INSERT INTO public."PowerConsumption" (
+         id, "clientId", date, "flockId", "flockName",
+         "solarProducedUnits", "solarConsumedUnits", "gridConsumedUnits", "unitRatePkr", "gridUnitRatePkr",
+         "dieselPurchasedLiters", "dieselConsumedLiters", "dieselRatePerLiter", "dieselPurchaseCost",
+         "referenceNo", notes, "createdAt", "updatedAt"
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),NOW())
+       ON CONFLICT (id) DO UPDATE SET
+         "clientId" = COALESCE(EXCLUDED."clientId", public."PowerConsumption"."clientId"),
+         date = EXCLUDED.date,
+         "flockId" = EXCLUDED."flockId",
+         "flockName" = EXCLUDED."flockName",
+         "solarProducedUnits" = EXCLUDED."solarProducedUnits",
+         "solarConsumedUnits" = EXCLUDED."solarConsumedUnits",
+         "gridConsumedUnits" = EXCLUDED."gridConsumedUnits",
+         "unitRatePkr" = EXCLUDED."unitRatePkr",
+         "gridUnitRatePkr" = EXCLUDED."gridUnitRatePkr",
+         "dieselPurchasedLiters" = EXCLUDED."dieselPurchasedLiters",
+         "dieselConsumedLiters" = EXCLUDED."dieselConsumedLiters",
+         "dieselRatePerLiter" = EXCLUDED."dieselRatePerLiter",
+         "dieselPurchaseCost" = EXCLUDED."dieselPurchaseCost",
+         "referenceNo" = EXCLUDED."referenceNo",
+         notes = EXCLUDED.notes,
+         "updatedAt" = NOW()
+       RETURNING *`,
+      [
+        targetId,
+        clientId || prev?.clientId || null,
+        dateStr,
+        fid,
+        fName,
+        solarProducedUnits,
+        solarConsumedUnits,
+        gridConsumedUnits,
+        unitRatePkr,
+        gridUnitRatePkr,
+        dieselPurchasedLiters,
+        dieselConsumedLiters,
+        dieselRatePerLiter,
+        dieselPurchaseCost,
+        referenceNo,
+        notes,
+      ]
+    );
+    await alignSequence('PowerConsumption');
+    return normalizePowerRow(res.rows[0]);
+  }
+
+  const res = await pool.query(
+    `INSERT INTO public."PowerConsumption" (
+       "clientId", date, "flockId", "flockName",
+       "solarProducedUnits", "solarConsumedUnits", "gridConsumedUnits", "unitRatePkr", "gridUnitRatePkr",
+       "dieselPurchasedLiters", "dieselConsumedLiters", "dieselRatePerLiter", "dieselPurchaseCost",
+       "referenceNo", notes, "createdAt", "updatedAt"
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),NOW())
+     RETURNING *`,
+    [
+      clientId,
+      dateStr,
+      fid,
+      fName,
+      solarProducedUnits,
+      solarConsumedUnits,
+      gridConsumedUnits,
+      unitRatePkr,
+      gridUnitRatePkr,
+      dieselPurchasedLiters,
+      dieselConsumedLiters,
+      dieselRatePerLiter,
+      dieselPurchaseCost,
+      referenceNo,
+      notes,
+    ]
+  );
+  return normalizePowerRow(res.rows[0]);
+}
+
+export async function deletePowerConsumption(idOrClient: number | string) {
+  const num = safePgInt(idOrClient);
+  if (num > 0) {
+    await pool.query(
+      'DELETE FROM public."PowerConsumption" WHERE id = $1 OR "clientId" = $2',
+      [num, String(idOrClient)]
+    );
+  } else {
+    await pool.query(
+      'DELETE FROM public."PowerConsumption" WHERE "clientId" = $1',
+      [String(idOrClient)]
+    );
+  }
+}
+

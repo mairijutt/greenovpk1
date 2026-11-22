@@ -9,8 +9,15 @@ import {
   CheckCircle,
   Package,
   AlertCircle,
+  Zap,
 } from 'lucide-react';
-import { BankAccount, FinancialRecord, InventoryItem } from '../types/farm.ts';
+import {
+  BankAccount,
+  FinancialRecord,
+  Flock,
+  InventoryItem,
+  PowerConsumptionRecord,
+} from '../types/farm.ts';
 import { EXPENSE_HEADS_21 } from '../data/liveExpenses.ts';
 import { liveStockRecords, StockRecord } from '../data/liveStocks.ts';
 import { BankFormModal } from './BankFormModal.tsx';
@@ -1433,6 +1440,426 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
             </UIButton>
             <UIButton type="submit" variant="primary" disabled={isSaving}>
               {isSaving ? 'Saving...' : 'Save Stock Record'}
+            </UIButton>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+interface DashboardPowerModalProps {
+  isOpen: boolean;
+  flocks: Flock[];
+  onClose: () => void;
+  onAddPowerLog?: (record: Omit<PowerConsumptionRecord, 'id'>) => Promise<PowerConsumptionRecord | void> | void;
+  onSuccessToast?: (message: string) => void;
+}
+
+const DEFAULT_SOLAR_RATE_PKR = 35;
+const DEFAULT_GRID_RATE_PKR = 60;
+
+export const DashboardPowerModal: React.FC<DashboardPowerModalProps> = ({
+  isOpen,
+  flocks,
+  onClose,
+  onAddPowerLog,
+  onSuccessToast,
+}) => {
+  const [formDate, setFormDate] = useState(getTodayDateStr);
+  const [formFlockId, setFormFlockId] = useState('8');
+  const [formSolarRate, setFormSolarRate] = useState<string>(String(DEFAULT_SOLAR_RATE_PKR));
+  const [formGridRate, setFormGridRate] = useState<string>(String(DEFAULT_GRID_RATE_PKR));
+  const [formSolarProduced, setFormSolarProduced] = useState<string>('');
+  const [formSolarConsumed, setFormSolarConsumed] = useState<string>('');
+  const [formGridConsumed, setFormGridConsumed] = useState<string>('');
+  const [formDieselPurchased, setFormDieselPurchased] = useState<string>('');
+  const [formDieselRate, setFormDieselRate] = useState<string>('');
+  const [formDieselCost, setFormDieselCost] = useState<string>('');
+  const [formDieselConsumed, setFormDieselConsumed] = useState<string>('');
+  const [formReferenceNo, setFormReferenceNo] = useState<string>('');
+  const [formNotes, setFormNotes] = useState<string>('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const unitOptions = React.useMemo(() => {
+    const base =
+      flocks.length > 0
+        ? flocks.map((f) => ({ id: String(f.id), name: f.name }))
+        : [
+            { id: '8', name: 'Unit 1' },
+            { id: '9', name: 'Unit 2' },
+            { id: '10', name: 'Unit 3' },
+          ];
+    return [...base, { id: '0', name: 'All Units' }];
+  }, [flocks]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormDate(getTodayDateStr());
+      setFormFlockId(unitOptions[0]?.id || '8');
+      setFormSolarRate(String(DEFAULT_SOLAR_RATE_PKR));
+      setFormGridRate(String(DEFAULT_GRID_RATE_PKR));
+      setFormSolarProduced('');
+      setFormSolarConsumed('');
+      setFormGridConsumed('');
+      setFormDieselPurchased('');
+      setFormDieselRate('');
+      setFormDieselCost('');
+      setFormDieselConsumed('');
+      setFormReferenceNo('');
+      setFormNotes('');
+      setFormError(null);
+      setIsSaving(false);
+    }
+  }, [isOpen, unitOptions]);
+
+  const preview = React.useMemo(() => {
+    const solarRate = Math.max(1, Number(formSolarRate) || DEFAULT_SOLAR_RATE_PKR);
+    const gridRate = Math.max(1, Number(formGridRate) || DEFAULT_GRID_RATE_PKR);
+    const solarCons = Math.max(0, Number(formSolarConsumed) || 0);
+    const gridCons = Math.max(0, Number(formGridConsumed) || 0);
+    const dieselPurch = Math.max(0, Number(formDieselPurchased) || 0);
+    const dieselRate = Math.max(0, Number(formDieselRate) || 0);
+    const dieselCost =
+      Math.max(0, Number(formDieselCost) || 0) ||
+      (dieselPurch > 0 && dieselRate > 0 ? dieselPurch * dieselRate : 0);
+    const dieselCons = Math.max(0, Number(formDieselConsumed) || 0);
+
+    const solarConsCost = solarCons * solarRate;
+    const gridCost = gridCons * gridRate;
+
+    return {
+      solarRate,
+      gridRate,
+      solarConsCost,
+      gridCost,
+      dieselCost,
+      dieselNetLiters: dieselPurch - dieselCons,
+      totalPowerCost: solarConsCost + gridCost + dieselCost,
+    };
+  }, [
+    formSolarRate,
+    formGridRate,
+    formSolarConsumed,
+    formGridConsumed,
+    formDieselPurchased,
+    formDieselRate,
+    formDieselCost,
+    formDieselConsumed,
+  ]);
+
+  if (!isOpen) return null;
+
+  const handleDieselLitersOrRateChange = (litersVal: string, rateVal: string) => {
+    setFormDieselPurchased(litersVal);
+    setFormDieselRate(rateVal);
+    const l = Number(litersVal);
+    const r = Number(rateVal);
+    if (l > 0 && r > 0) {
+      setFormDieselCost(String(Math.round(l * r)));
+    } else if (!litersVal || Number(litersVal) <= 0) {
+      setFormDieselCost('');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!formDate) {
+      setFormError('Please select a recording date.');
+      return;
+    }
+
+    const solarProducedUnits = Math.max(0, Number(formSolarProduced) || 0);
+    const solarConsumedUnits = Math.max(0, Number(formSolarConsumed) || 0);
+    const gridConsumedUnits = Math.max(0, Number(formGridConsumed) || 0);
+    const dieselPurchasedLiters = Math.max(0, Number(formDieselPurchased) || 0);
+    const dieselConsumedLiters = Math.max(0, Number(formDieselConsumed) || 0);
+    const solarUnitRatePkr =
+      Number(formSolarRate) > 0 ? Number(formSolarRate) : DEFAULT_SOLAR_RATE_PKR;
+    const gridUnitRatePkr =
+      Number(formGridRate) > 0 ? Number(formGridRate) : DEFAULT_GRID_RATE_PKR;
+
+    let dieselRatePerLiter = Math.max(0, Number(formDieselRate) || 0);
+    let dieselPurchaseCost = Math.max(0, Number(formDieselCost) || 0);
+
+    if (dieselPurchaseCost === 0 && dieselPurchasedLiters > 0 && dieselRatePerLiter > 0) {
+      dieselPurchaseCost = Number((dieselPurchasedLiters * dieselRatePerLiter).toFixed(2));
+    } else if (dieselRatePerLiter === 0 && dieselPurchasedLiters > 0 && dieselPurchaseCost > 0) {
+      dieselRatePerLiter = Number((dieselPurchaseCost / dieselPurchasedLiters).toFixed(2));
+    }
+
+    if (
+      solarProducedUnits === 0 &&
+      solarConsumedUnits === 0 &&
+      gridConsumedUnits === 0 &&
+      dieselPurchasedLiters === 0 &&
+      dieselConsumedLiters === 0 &&
+      dieselPurchaseCost === 0
+    ) {
+      setFormError('Please enter at least one solar, main grid, or diesel meter reading.');
+      return;
+    }
+
+    const matchedUnit = unitOptions.find((u) => String(u.id) === String(formFlockId));
+    const flockName =
+      matchedUnit?.name ||
+      (String(formFlockId) === '0'
+        ? 'All Units'
+        : String(formFlockId) === '9'
+        ? 'Unit 2'
+        : String(formFlockId) === '10'
+        ? 'Unit 3'
+        : 'Unit 1');
+
+    const payload: Omit<PowerConsumptionRecord, 'id'> = {
+      date: formDate,
+      flockId: formFlockId,
+      flockName,
+      solarProducedUnits,
+      solarConsumedUnits,
+      gridConsumedUnits,
+      unitRatePkr: solarUnitRatePkr,
+      solarUnitRatePkr,
+      gridUnitRatePkr,
+      dieselPurchasedLiters,
+      dieselConsumedLiters,
+      dieselRatePerLiter,
+      dieselPurchaseCost,
+      referenceNo: formReferenceNo.trim() || undefined,
+      notes: formNotes.trim() || undefined,
+    };
+
+    setIsSaving(true);
+    try {
+      if (onAddPowerLog) {
+        await onAddPowerLog(payload);
+      } else {
+        await apiFetch('/api/power-consumptions', {
+          method: 'POST',
+          body: JSON.stringify({ ...payload, clientId: `pwr-${Date.now()}` }),
+        });
+      }
+      onSuccessToast?.(`Power log saved for ${flockName} (${formDate}).`);
+      onClose();
+    } catch (err: any) {
+      setFormError(err?.message || 'Failed to save power consumption record.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 my-auto animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">Record Power &amp; Energy Log</h3>
+              <p className="text-xs text-slate-500">
+                Solar default Rs. {DEFAULT_SOLAR_RATE_PKR}/unit • Main Grid default Rs. {DEFAULT_GRID_RATE_PKR}/unit • Diesel fuel tracking
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {formError && (
+          <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{formError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <UIInput
+              label="Date *"
+              type="date"
+              value={formDate}
+              onChange={(e) => setFormDate(e.target.value)}
+              required
+            />
+            <UISelect
+              label="Unit / Shed *"
+              value={formFlockId}
+              onChange={(e) => setFormFlockId(e.target.value)}
+            >
+              {unitOptions.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </UISelect>
+            <UIInput
+              label="Solar Rate (Rs. / unit)"
+              type="number"
+              min="1"
+              step="0.5"
+              value={formSolarRate}
+              onChange={(e) => setFormSolarRate(e.target.value)}
+              helperText={`Default Rs. ${DEFAULT_SOLAR_RATE_PKR}`}
+            />
+            <UIInput
+              label="Main Grid Rate (Rs. / unit)"
+              type="number"
+              min="1"
+              step="0.5"
+              value={formGridRate}
+              onChange={(e) => setFormGridRate(e.target.value)}
+              helperText={`Default Rs. ${DEFAULT_GRID_RATE_PKR}`}
+            />
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+            <div className="text-xs font-bold text-slate-800">
+              Solar &amp; Main Grid Electricity (kWh / Units)
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <UIInput
+                label="Solar Produced (Units)"
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="e.g. 420"
+                value={formSolarProduced}
+                onChange={(e) => setFormSolarProduced(e.target.value)}
+              />
+              <UIInput
+                label="Solar Consumed (Units)"
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="e.g. 380"
+                value={formSolarConsumed}
+                onChange={(e) => setFormSolarConsumed(e.target.value)}
+              />
+              <UIInput
+                label="Main Grid Consumed (Units)"
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="e.g. 150"
+                value={formGridConsumed}
+                onChange={(e) => setFormGridConsumed(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+            <div className="text-xs font-bold text-slate-800">
+              Diesel Generator Fuel (Purchased &amp; Consumed)
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <UIInput
+                label="Diesel Purchased (L)"
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="e.g. 200"
+                value={formDieselPurchased}
+                onChange={(e) => handleDieselLitersOrRateChange(e.target.value, formDieselRate)}
+              />
+              <UIInput
+                label="Diesel Rate (Rs./L)"
+                type="number"
+                min="0"
+                step="0.5"
+                placeholder="e.g. 265"
+                value={formDieselRate}
+                onChange={(e) => handleDieselLitersOrRateChange(formDieselPurchased, e.target.value)}
+              />
+              <UIInput
+                label="Diesel Purchase Cost (Rs.)"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Auto or manual Rs."
+                value={formDieselCost}
+                onChange={(e) => setFormDieselCost(e.target.value)}
+              />
+              <UIInput
+                label="Diesel Consumed (L)"
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="e.g. 45"
+                value={formDieselConsumed}
+                onChange={(e) => setFormDieselConsumed(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div>
+              <div className="text-[11px] text-slate-500">Solar Cost (@ Rs.{preview.solarRate})</div>
+              <div className="font-black text-amber-800 font-mono tabular-nums">
+                Rs. {Math.round(preview.solarConsCost).toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] text-slate-500">Grid Cost (@ Rs.{preview.gridRate})</div>
+              <div className="font-black text-blue-800 font-mono tabular-nums">
+                Rs. {Math.round(preview.gridCost).toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] text-slate-500">Diesel Net (Bought - Used)</div>
+              <div className="font-black text-slate-900 font-mono tabular-nums">
+                {preview.dieselNetLiters >= 0 ? '+' : ''}
+                {preview.dieselNetLiters.toLocaleString(undefined, { maximumFractionDigits: 1 })} L
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] text-slate-500">Total Power Cost</div>
+              <div className="font-black text-slate-900 font-mono tabular-nums">
+                Rs. {Math.round(preview.totalPowerCost).toLocaleString()}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <UIInput
+              label="Meter / Slip Ref #"
+              placeholder="Optional challan or meter ref"
+              value={formReferenceNo}
+              onChange={(e) => setFormReferenceNo(e.target.value)}
+            />
+            <div className="sm:col-span-2">
+              <UITextarea
+                label="Notes / Remarks"
+                rows={2}
+                placeholder="Generator hours, shift timings, WAPDA outage duration, etc."
+                value={formNotes}
+                onChange={(e) => setFormNotes(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
+            <UIButton type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </UIButton>
+            <UIButton type="submit" variant="primary" disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save Power Record'}
             </UIButton>
           </div>
         </form>

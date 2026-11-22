@@ -12,6 +12,7 @@ import { FinanceView } from './components/FinanceView';
 import { StaffView } from './components/StaffView';
 import { SalariesView } from './components/SalariesView';
 import { ReportsView } from './components/ReportsView';
+import { PowerConsumptionView } from './components/PowerConsumptionView';
 import { FarmsView } from './components/FarmsView';
 import { UserManagementView } from './components/UserManagementView';
 import { LoginView } from './components/LoginView';
@@ -59,6 +60,7 @@ import {
   SalaryDisbursal,
   AdvanceSalaryRecord,
   BankAccount,
+  PowerConsumptionRecord,
 } from './types/farm';
 
 const VALID_TABS: NavTab[] = [
@@ -72,6 +74,7 @@ const VALID_TABS: NavTab[] = [
   'stocks',
   'salaries',
   'reports',
+  'power-consumption',
   'farms',
   'users',
 ];
@@ -180,6 +183,7 @@ export default function App() {
 
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [recordModalType, setRecordModalType] = useState<'egg' | 'mortality' | 'feed' | null>(null);
+  const [stockNavFocus, setStockNavFocus] = useState<{ head?: string; unit?: string } | null>(null);
   const [savedBanner, setSavedBanner] = useState<{ title: string; detail?: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -393,7 +397,23 @@ export default function App() {
     return [];
   });
 
+  const [powerLogs, setPowerLogs] = useState<PowerConsumptionRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('greenova_power_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+
   // Local storage synchronization
+  useEffect(() => {
+    try {
+      localStorage.setItem('greenova_power_v1', JSON.stringify(powerLogs));
+    } catch {}
+  }, [powerLogs]);
   useEffect(() => {
     try {
       localStorage.setItem('greenova_banks_v1', JSON.stringify(bankAccounts));
@@ -445,6 +465,7 @@ export default function App() {
         else if (e.key === 'greenova_financials_v3') setFinancials(JSON.parse(e.newValue));
         else if (e.key === 'greenova_feed_v4') setConsumptionLogs(JSON.parse(e.newValue));
         else if (e.key === 'greenova_vaccines_v2') setVaccines(JSON.parse(e.newValue));
+        else if (e.key === 'greenova_power_v1') setPowerLogs(JSON.parse(e.newValue));
       } catch (err) {}
     };
     window.addEventListener('storage', handleStorageSync);
@@ -506,6 +527,7 @@ export default function App() {
         expensesRes,
         salariesRes,
         workersRes,
+        powerRes,
       ] = await Promise.allSettled([
         apiFetch('/api/flocks'),
         apiFetch('/api/farms'),
@@ -518,6 +540,7 @@ export default function App() {
         apiFetch('/api/expenses?limit=5000'),
         apiFetch('/api/salaries?limit=5000'),
         apiFetch('/api/workers'),
+        apiFetch('/api/power-consumptions?limit=5000'),
       ]);
 
       if (!active) return;
@@ -764,6 +787,11 @@ export default function App() {
             notes: e.notes || '',
             status: 'Paid',
             attachment: e.attachment || null,
+            isStockLinked: Boolean(e.isStockLinked),
+            linkedStockId: e.linkedStockId ?? undefined,
+            linkedStockHead: e.linkedStockHead ?? undefined,
+            linkedStockType: e.linkedStockType ?? undefined,
+            linkedStockQuantity: e.linkedStockQuantity !== undefined ? Number(e.linkedStockQuantity) : undefined,
           };
         });
 
@@ -836,6 +864,15 @@ export default function App() {
         setWorkers(mappedWorkers);
         try {
           localStorage.setItem('greenova_staff_v2', JSON.stringify(mappedWorkers));
+        } catch {}
+      }
+
+      // 11. Power Consumptions (Solar, Main Grid & Diesel)
+      if (powerRes.status === 'fulfilled' && Array.isArray(powerRes.value?.data?.items)) {
+        const mappedPower: PowerConsumptionRecord[] = powerRes.value.data.items;
+        setPowerLogs(mappedPower);
+        try {
+          localStorage.setItem('greenova_power_v1', JSON.stringify(mappedPower));
         } catch {}
       }
     };
@@ -1639,6 +1676,41 @@ export default function App() {
     }
   };
 
+  const handleStockExpenseSynced = (
+    action: 'create' | 'update' | 'delete',
+    syncedExpense?: FinancialRecord,
+    deletedExpenseId?: number | string | null,
+    deletedExpenseClientId?: string | null
+  ) => {
+    setFinancials((prev) => {
+      let next = prev;
+      if ((action === 'create' || action === 'update') && syncedExpense) {
+        const isMatch = (f: FinancialRecord) =>
+          (syncedExpense.trackingId && String(f.trackingId) === String(syncedExpense.trackingId)) ||
+          String(f.id) === String(syncedExpense.id);
+        next = prev.some(isMatch)
+          ? prev.map((f) => (isMatch(f) ? syncedExpense : f))
+          : [syncedExpense, ...prev];
+      } else if (action === 'delete') {
+        next = prev.filter((f) => {
+          if (deletedExpenseId && String(f.trackingId) === String(deletedExpenseId)) return false;
+          if (deletedExpenseClientId && String(f.id) === String(deletedExpenseClientId)) return false;
+          if (deletedExpenseId && String(f.id) === `exp-${deletedExpenseId}`) return false;
+          return true;
+        });
+      }
+      next = [...next].sort((a, b) => {
+        const cmp = String(b.date).localeCompare(String(a.date));
+        if (cmp !== 0) return cmp;
+        return (Number(b.trackingId) || 0) - (Number(a.trackingId) || 0);
+      });
+      try {
+        localStorage.setItem('greenova_financials_v3', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
   const handleAddSalaryDisbursal = async (newSalary: SalaryDisbursal) => {
     try {
       const res = await apiFetch('/api/salaries', {
@@ -2044,6 +2116,68 @@ export default function App() {
     }
   };
 
+  // Power Consumption CRUD handlers (persisted directly to PostgreSQL /api/power-consumptions)
+  const handleAddPowerLog = async (newLog: Omit<PowerConsumptionRecord, 'id'>) => {
+    try {
+      const clientId = `pwr-${Date.now()}`;
+      const res = await apiFetch('/api/power-consumptions', {
+        method: 'POST',
+        body: JSON.stringify({ ...newLog, clientId }),
+      });
+      const canonical: PowerConsumptionRecord = {
+        ...newLog,
+        ...(res?.data || {}),
+        id: res?.data?.id || clientId,
+      };
+      const nextLogs = [canonical, ...powerLogs];
+      setPowerLogs(nextLogs);
+      try {
+        localStorage.setItem('greenova_power_v1', JSON.stringify(nextLogs));
+      } catch {}
+      return canonical;
+    } catch (err) {
+      reportError(err, 'Failed to save power consumption record.');
+      throw err;
+    }
+  };
+
+  const handleEditPowerLog = async (updatedLog: PowerConsumptionRecord) => {
+    try {
+      const res = await apiFetch(`/api/power-consumptions/${updatedLog.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedLog),
+      });
+      const canonical: PowerConsumptionRecord = {
+        ...updatedLog,
+        ...(res?.data || {}),
+      };
+      const nextLogs = powerLogs.map((p) =>
+        String(p.id) === String(updatedLog.id) ? canonical : p
+      );
+      setPowerLogs(nextLogs);
+      try {
+        localStorage.setItem('greenova_power_v1', JSON.stringify(nextLogs));
+      } catch {}
+    } catch (err) {
+      reportError(err, 'Failed to update power consumption record.');
+      throw err;
+    }
+  };
+
+  const handleDeletePowerLog = async (target: PowerConsumptionRecord) => {
+    try {
+      await apiFetch(`/api/power-consumptions/${target.id}`, { method: 'DELETE' });
+      const nextLogs = powerLogs.filter((p) => String(p.id) !== String(target.id));
+      setPowerLogs(nextLogs);
+      try {
+        localStorage.setItem('greenova_power_v1', JSON.stringify(nextLogs));
+      } catch {}
+    } catch (err) {
+      reportError(err, 'Failed to delete power consumption record.');
+      throw err;
+    }
+  };
+
   // Sign out handler - explicitly removes session and redirects to /login
   const handleSignOut = () => {
     try {
@@ -2169,7 +2303,7 @@ export default function App() {
       />
 
       {/* Main Body */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-x-clip relative">
         {/* Navigation Sidebar matching live menu */}
         <Sidebar
           currentTab={currentTab}
@@ -2184,7 +2318,7 @@ export default function App() {
         />
 
         {/* Dynamic Content View Area */}
-        <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-6 md:pb-8 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 min-w-0 p-4 pb-24 sm:p-6 md:pb-8 lg:p-8 max-w-7xl w-full mx-auto">
           {currentTab === 'dashboard' && (
             <DashboardView
               farms={farms}
@@ -2198,6 +2332,7 @@ export default function App() {
               onAddTransaction={handleAddTransaction}
               onAddBank={handleAddBank}
               onRestock={handleRestock}
+              onAddPowerLog={handleAddPowerLog}
               onOpenRecordModal={(type) => setRecordModalType(type)}
               onNavigateTab={handleNavigateTab}
             />
@@ -2253,24 +2388,34 @@ export default function App() {
           {currentTab === 'sales' && (
             <FinanceView
               financials={financials}
+              flocks={flocks}
               onAddTransaction={handleAddTransaction}
               onEditTransaction={handleEditTransaction}
               onDeleteTransaction={handleDeleteTransaction}
               defaultType="Income"
               bankAccounts={bankAccounts}
               onAddBank={handleAddBank}
+              onNavigateToStocks={(head, unit) => {
+                setStockNavFocus({ head, unit });
+                handleNavigateTab('stocks');
+              }}
             />
           )}
 
           {currentTab === 'expenses' && (
             <FinanceView
               financials={financials}
+              flocks={flocks}
               onAddTransaction={handleAddTransaction}
               onEditTransaction={handleEditTransaction}
               onDeleteTransaction={handleDeleteTransaction}
               defaultType="Expense"
               bankAccounts={bankAccounts}
               onAddBank={handleAddBank}
+              onNavigateToStocks={(head, unit) => {
+                setStockNavFocus({ head, unit });
+                handleNavigateTab('stocks');
+              }}
             />
           )}
 
@@ -2279,6 +2424,9 @@ export default function App() {
               inventory={inventory}
               onRestock={handleRestock}
               onAddTransaction={handleAddTransaction}
+              onStockExpenseSynced={handleStockExpenseSynced}
+              initialFocus={stockNavFocus}
+              onClearInitialFocus={() => setStockNavFocus(null)}
             />
           )}
 
@@ -2313,6 +2461,16 @@ export default function App() {
               onEditBank={handleEditBank}
               onDeleteBank={handleDeleteBank}
               onNavigateTab={(tab) => handleNavigateTab(tab as NavTab)}
+            />
+          )}
+
+          {currentTab === 'power-consumption' && (
+            <PowerConsumptionView
+              powerLogs={powerLogs}
+              flocks={flocks}
+              onAddPowerLog={handleAddPowerLog}
+              onEditPowerLog={handleEditPowerLog}
+              onDeletePowerLog={handleDeletePowerLog}
             />
           )}
 

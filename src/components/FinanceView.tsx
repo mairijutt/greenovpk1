@@ -31,8 +31,10 @@ import {
   CheckCircle2,
   Landmark,
   Package,
+  AlertTriangle,
+  Boxes,
 } from 'lucide-react';
-import { FinancialRecord, BankAccount } from '../types/farm.ts';
+import { FinancialRecord, BankAccount, Flock } from '../types/farm.ts';
 import { BankFormModal } from './BankFormModal.tsx';
 import {
   EXPENSE_HEADS_21,
@@ -63,22 +65,28 @@ import {
 
 interface FinanceViewProps {
   financials: FinancialRecord[];
+  flocks?: Flock[];
   onAddTransaction: (record: FinancialRecord) => Promise<void> | void;
   onEditTransaction?: (updated: FinancialRecord) => Promise<void> | void;
   onDeleteTransaction?: (record: FinancialRecord) => Promise<void> | void;
   defaultType?: 'all' | 'Income' | 'Expense';
   bankAccounts?: BankAccount[];
   onAddBank?: (bank: BankAccount) => Promise<void> | void;
+  onNavigateToStocks?: (head?: string, unit?: string) => void;
 }
+
+const ALL_EXPENSE_HEADS = Array.from(new Set([...EXPENSE_HEADS_21, 'EQUIPMENT']));
 
 export const FinanceView: React.FC<FinanceViewProps> = ({
   financials,
+  flocks = [],
   onAddTransaction,
   onEditTransaction,
   onDeleteTransaction,
   defaultType = 'all',
   bankAccounts = [],
   onAddBank,
+  onNavigateToStocks,
 }) => {
   const getTodayDateStr = () => {
     const now = new Date();
@@ -96,6 +104,10 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   const [showModal, setShowModal] = useState(false);
   const [editingTx, setEditingTx] = useState<FinancialRecord | null>(null);
   const [viewingTx, setViewingTx] = useState<FinancialRecord | null>(null);
+  const [stockGuardModal, setStockGuardModal] = useState<{
+    action: 'edit' | 'delete';
+    record: FinancialRecord;
+  } | null>(null);
   const [confirmDeleteTxId, setConfirmDeleteTxId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -280,6 +292,31 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     setAttachmentData(null);
   };
 
+  const isStockSyncedExpense = (fin: FinancialRecord): boolean => {
+    if (fin.type !== 'Expense') return false;
+    return Boolean(
+      fin.isStockLinked ||
+        fin.linkedStockId ||
+        String(fin.id || '').startsWith('exp-stk-')
+    );
+  };
+
+  const handleAttemptEditTx = (fin: FinancialRecord) => {
+    if (isStockSyncedExpense(fin)) {
+      setStockGuardModal({ action: 'edit', record: fin });
+      return;
+    }
+    setEditingTx(fin);
+  };
+
+  const handleAttemptDeleteTx = (fin: FinancialRecord) => {
+    if (isStockSyncedExpense(fin)) {
+      setStockGuardModal({ action: 'delete', record: fin });
+      return;
+    }
+    setConfirmDeleteTxId(fin.id);
+  };
+
   // Filtered dataset
   const filtered = useMemo(() => {
     return financials.filter((fin) => {
@@ -395,19 +432,94 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     };
   }, [filtered]);
 
+  // Dynamic Active Birds Managed metrics based on selected unit & live flocks
+  const activeBirdsStats = useMemo(() => {
+    const f1 = flocks.find((f) => String(f.id) === '8' || (f.name || '').toLowerCase().includes('unit 1'));
+    const f2 = flocks.find((f) => String(f.id) === '9' || (f.name || '').toLowerCase().includes('unit 2'));
+    const f3 = flocks.find((f) => String(f.id) === '10' || (f.name || '').toLowerCase().includes('unit 3'));
+
+    const unit1Count = f1?.currentCount ?? f1?.initialCount ?? 24786;
+    const unit2Count = f2?.currentCount ?? f2?.initialCount ?? 31739;
+    const unit3Count = f3?.currentCount ?? f3?.initialCount ?? 25189;
+    const allCount =
+      flocks.length > 0
+        ? flocks.reduce((sum, f) => sum + (f.currentCount ?? f.initialCount ?? 0), 0)
+        : unit1Count + unit2Count + unit3Count;
+
+    if (selectedUnit === 'Unit 1') {
+      return {
+        count: unit1Count,
+        badgeText: 'Unit 1',
+        subtext: 'Shed 1 • Flock ID 8',
+        unit1Count,
+        unit2Count,
+        unit3Count,
+        allCount,
+      };
+    }
+    if (selectedUnit === 'Unit 2') {
+      return {
+        count: unit2Count,
+        badgeText: 'Unit 2',
+        subtext: 'Shed 2 • Flock ID 9',
+        unit1Count,
+        unit2Count,
+        unit3Count,
+        allCount,
+      };
+    }
+    if (selectedUnit === 'Unit 3') {
+      return {
+        count: unit3Count,
+        badgeText: 'Unit 3',
+        subtext: 'Shed 3 • Flock ID 10',
+        unit1Count,
+        unit2Count,
+        unit3Count,
+        allCount,
+      };
+    }
+
+    return {
+      count: allCount,
+      badgeText: `${flocks.length > 0 ? flocks.length : 3} Units`,
+      subtext: 'Unit 1, Unit 2, Unit 3',
+      unit1Count,
+      unit2Count,
+      unit3Count,
+      allCount,
+    };
+  }, [flocks, selectedUnit]);
+
   // Dynamic Per Bird Feed Consumption metrics based on selected unit
   const perBirdFeedConsumption = useMemo(() => {
     if (selectedUnit === 'Unit 1') {
-      return { intake: '117 g / day', fcr: '1.48 FCR', subtext: '58 bags/day • 27.8 kg/bird (24,786 birds)' };
+      return {
+        intake: '117 g / day',
+        fcr: '1.48 FCR',
+        subtext: `58 bags/day • 27.8 kg/bird (${activeBirdsStats.unit1Count.toLocaleString()} birds)`,
+      };
     }
     if (selectedUnit === 'Unit 2') {
-      return { intake: '118 g / day', fcr: '1.49 FCR', subtext: '75 bags/day • 28.5 kg/bird (31,739 birds)' };
+      return {
+        intake: '118 g / day',
+        fcr: '1.49 FCR',
+        subtext: `75 bags/day • 28.5 kg/bird (${activeBirdsStats.unit2Count.toLocaleString()} birds)`,
+      };
     }
     if (selectedUnit === 'Unit 3') {
-      return { intake: '123 g / day', fcr: '1.47 FCR', subtext: '62 bags/day • 29.1 kg/bird (25,189 birds)' };
+      return {
+        intake: '123 g / day',
+        fcr: '1.47 FCR',
+        subtext: `62 bags/day • 29.1 kg/bird (${activeBirdsStats.unit3Count.toLocaleString()} birds)`,
+      };
     }
-    return { intake: '118 g / day', fcr: '1.48 FCR', subtext: '195 bags/day • 28.3 kg/bird (85,500 birds)' };
-  }, [selectedUnit]);
+    return {
+      intake: '118 g / day',
+      fcr: '1.48 FCR',
+      subtext: `195 bags/day • 28.3 kg/bird (${activeBirdsStats.allCount.toLocaleString()} birds)`,
+    };
+  }, [selectedUnit, activeBirdsStats]);
 
   // Projected Revenue for next 4 weeks on the basis of last 12 weeks
   const projectionRevenue = useMemo(() => {
@@ -974,7 +1086,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
     const totalExp = expenseRecords.reduce((s, r) => s + r.amount, 0) || 1;
 
-    return EXPENSE_HEADS_21.map((head) => {
+    return ALL_EXPENSE_HEADS.map((head) => {
       const records = expenseRecords.filter((r) => (r.head || r.category) === head);
       const amount = records.reduce((s, r) => s + r.amount, 0);
       const count = records.length;
@@ -982,6 +1094,24 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       return { head, amount, count, percent };
     }).sort((a, b) => b.amount - a.amount);
   }, [financials, selectedUnit, fromDate, toDate]);
+
+  const topExpenseCategory = useMemo(() => {
+    const top = currentExpenseBreakdown[0];
+    if (!top || top.amount <= 0) {
+      return {
+        head: 'N/A',
+        percent: '0.00',
+        amount: 0,
+        count: 0,
+      };
+    }
+    return {
+      head: top.head,
+      percent: top.percent.toFixed(2),
+      amount: top.amount,
+      count: top.count,
+    };
+  }, [currentExpenseBreakdown]);
 
   // Unit-wise live stats from currently loaded financials
   const unitStats = useMemo(() => {
@@ -1502,7 +1632,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       <PageHeader
         title={
           selectedType === 'Expense'
-            ? 'Operational Expenses & Farm Costs (21 Heads)'
+            ? 'Operational & Farm Expenses (21 Heads)'
             : selectedType === 'Income'
             ? 'Commercial Egg & Farm Sales'
             : 'Farm Financials, 21 Expense Heads & Ledger'
@@ -1512,7 +1642,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             ? 'Audited unit-wise expenses across 21 expense heads for Unit 1, Unit 2, and Unit 3.'
             : selectedType === 'Income'
             ? 'Track wholesale egg crate sales, cull bird revenues, manure dispatches, and customer receipts.'
-            : 'Track commercial egg sales, cull bird revenue, feed costs, electricity, and unit-wise operating expenses.'
+            : 'Track commercial egg sales, cull bird revenue, feed expenses, electricity, and unit-wise operating expenses.'
         }
         icon={selectedType === 'Expense' ? ArrowDownRight : DollarSign}
         iconColor={selectedType === 'Expense' ? 'rose' : 'emerald'}
@@ -1831,11 +1961,11 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             />
             <StatCard
               title="Top Expense Category"
-              value="FEED"
+              value={topExpenseCategory.head}
               icon={Tag}
               color="teal"
-              badge={{ text: '76.11% of Cost', color: 'teal' }}
-              subtext="Rs. 294,653,964 (161 vouchers)"
+              badge={{ text: `${topExpenseCategory.percent}% of Expenses`, color: 'teal' }}
+              subtext={`Rs. ${topExpenseCategory.amount.toLocaleString(undefined, { maximumFractionDigits: 1 })} (${topExpenseCategory.count.toLocaleString()} ${topExpenseCategory.count === 1 ? 'voucher' : 'vouchers'})`}
             />
             <StatCard
               title="Per Bird Feed consumption"
@@ -1856,11 +1986,11 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             />
             <StatCard
               title="Active Birds Managed"
-              value="85,500 Birds"
+              value={`${activeBirdsStats.count.toLocaleString()} Birds`}
               icon={Building2}
               color="amber"
-              badge={{ text: '3 Units', color: 'amber' }}
-              subtext="Unit 1, Unit 2, Unit 3"
+              badge={{ text: activeBirdsStats.badgeText, color: 'amber' }}
+              subtext={activeBirdsStats.subtext}
             />
           </>
         ) : (
@@ -2551,7 +2681,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 <Info className="w-3.5 h-3.5 text-slate-400" />
                 <span>
                   {expenseGraphMode === 'monthly'
-                    ? 'Showing monthly audited ledger outflow • Hover columns for cost driver breakdown'
+                    ? 'Showing monthly audited ledger outflow • Hover columns for expense driver breakdown'
                     : 'Showing 12 consecutive 7-day buckets • Hover columns for weekly performance'}
                 </span>
               </div>
@@ -2749,7 +2879,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               aria-label="Filter by Type"
             >
               <option value="all">All Types (Income & Exp)</option>
-              <option value="Expense">Expense (Costs)</option>
+              <option value="Expense">Expense (Outflows)</option>
               <option value="Income">Income (Sales)</option>
             </UISelect>
           </div>
@@ -2783,8 +2913,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 </>
               ) : selectedType === 'Expense' ? (
                 <>
-                  <option value="all">All 21 Expense Heads</option>
-                  {EXPENSE_HEADS_21.map((h) => (
+                  <option value="all">All Expense Heads</option>
+                  {ALL_EXPENSE_HEADS.map((h) => (
                     <option key={h} value={h}>
                       {h.replace('_', ' ')}
                     </option>
@@ -2799,8 +2929,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     <option value="Feed BAGS">Feed BAGS</option>
                     <option value="OTHER">OTHER</option>
                   </optgroup>
-                  <optgroup label="21 Expense Heads">
-                    {EXPENSE_HEADS_21.map((h) => (
+                  <optgroup label="Expense Heads">
+                    {ALL_EXPENSE_HEADS.map((h) => (
                       <option key={h} value={h}>
                         {h.replace('_', ' ')}
                       </option>
@@ -2854,11 +2984,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="py-3 px-3">Category</th>
                   <th className="py-3 px-3 text-right">Cartons Sold (Eggs)</th>
                   <th className="py-3 px-3 text-right">Rate / Carton</th>
-                  <th className="py-3 px-3 text-right">Online Payment</th>
-                  <th className="py-3 px-3 text-right">Cash Payment</th>
                   <th className="py-3 px-3 text-right">Total Amount</th>
-                  <th className="py-3 px-3">Vehicle / Challan</th>
-                  <th className="py-3 px-3 text-center">Attachment</th>
+                  <th className="py-3 px-3">Notes / Remarks</th>
                   <th className="py-3 px-3 text-center">Action</th>
                 </tr>
               ) : selectedType === 'Expense' ? (
@@ -2893,7 +3020,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             <tbody className="divide-y divide-slate-100">
               {paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-slate-400">
+                  <td colSpan={selectedType === 'Income' ? 9 : selectedType === 'Expense' ? 10 : 11} className="py-12 text-center text-slate-400">
                     No financial records match the selected unit, head, date range, and filters.
                   </td>
                 </tr>
@@ -2948,39 +3075,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                             'Rs. 0'
                           )}
                         </td>
-                        <td className="py-3 px-3 text-right font-mono text-teal-700 font-semibold">
-                          {s.onlinePayment !== undefined && s.onlinePayment > 0 ? `Rs. ${s.onlinePayment.toLocaleString()}` : 'Rs. 0'}
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono text-emerald-700 font-semibold">
-                          {s.cashPayment !== undefined && s.cashPayment > 0 ? `Rs. ${s.cashPayment.toLocaleString()}` : 'Rs. 0'}
-                        </td>
                         <td className="py-3 px-3 font-black text-right font-mono text-emerald-700">
                           Rs. {fin.amount.toLocaleString(undefined, { maximumFractionDigits: 1 })}
                         </td>
-                        <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">
-                          <div>
-                            {s.vehicleNumber || 'ABC'} {s.challanNo ? `(#${s.challanNo})` : ''}
-                          </div>
-                          {s.partyName && (
-                            <div className="text-[10px] text-slate-500 font-sans truncate max-w-[140px]">
-                              {s.partyName}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          {fin.attachment || fin.attachmentName ? (
-                            <button
-                              type="button"
-                              onClick={() => setPreviewRecord(fin)}
-                              className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 cursor-pointer transition-colors shadow-xs"
-                              title={fin.attachmentName || 'View Attachment'}
-                            >
-                              <Paperclip className="w-3 h-3 mr-1" />
-                              Slip
-                            </button>
-                          ) : (
-                            <span className="text-slate-300 font-mono text-xs">—</span>
-                          )}
+                        <td
+                          className="py-3 px-3 text-slate-600 text-[11px] max-w-[220px] truncate"
+                          title={fin.notes || fin.description || '—'}
+                        >
+                          {fin.notes || fin.description || '—'}
                         </td>
                         <td className="py-3 px-3 text-center whitespace-nowrap">
                           <div className="inline-flex items-center justify-center gap-1.5">
@@ -3076,9 +3178,20 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-3">
-                        <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
-                          {headName}
-                        </span>
+                        <div className="inline-flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                            {headName}
+                          </span>
+                          {isStockSyncedExpense(fin) && (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold"
+                              title="Synchronized from Stocks (edit in Stocks)"
+                            >
+                              <Boxes className="w-2.5 h-2.5" />
+                              Stock
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-3 font-mono text-slate-600">
                         {fin.challanNo ? `#${fin.challanNo}` : fin.referenceNo || '—'}
@@ -3127,9 +3240,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={() => setEditingTx(fin)}
+                            onClick={() => handleAttemptEditTx(fin)}
                             className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                            title={`Edit Voucher #${trackingId}`}
+                            title={
+                              isStockSyncedExpense(fin)
+                                ? 'Stock-linked record (manage in Stocks)'
+                                : `Edit Voucher #${trackingId}`
+                            }
                           >
                             <Edit className="w-3 h-3" />
                             <span>Edit</span>
@@ -3137,9 +3254,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                           {onDeleteTransaction && confirmDeleteTxId !== fin.id && (
                             <button
                               type="button"
-                              onClick={() => setConfirmDeleteTxId(fin.id)}
+                              onClick={() => handleAttemptDeleteTx(fin)}
                               className="inline-flex items-center p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer shadow-2xs"
-                              title={`Delete Voucher #${trackingId}`}
+                              title={
+                                isStockSyncedExpense(fin)
+                                  ? 'Stock-linked record (manage in Stocks)'
+                                  : `Delete Voucher #${trackingId}`
+                              }
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -3397,7 +3518,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                       setFormError(null);
                     }}
                   >
-                    <option value="Expense">Expense (Cost)</option>
+                    <option value="Expense">Expense</option>
                     <option value="Income">Income (Sales)</option>
                   </UISelect>
                 )}
@@ -4178,7 +4299,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
 
       {/* Attachment Document Preview Modal */}
       {previewRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center space-x-2.5">
@@ -4332,10 +4453,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     mono: true,
                   },
                   {
-                    label: 'Cash / Online Payment',
-                    value: `Cash: Rs. ${((viewingTx as any).cashPayment || 0).toLocaleString()} • Online: Rs. ${(
-                      (viewingTx as any).onlinePayment || 0
-                    ).toLocaleString()}`,
+                    label: 'Online Payment',
+                    value: `Rs. ${((viewingTx as any).onlinePayment || 0).toLocaleString()}`,
+                    mono: true,
+                  },
+                  {
+                    label: 'Cash Payment',
+                    value: `Rs. ${((viewingTx as any).cashPayment || 0).toLocaleString()}`,
                     mono: true,
                   },
                   {
@@ -4370,6 +4494,14 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     mono: true,
                   },
                   { label: 'Payment Status', value: viewingTx.status || 'Paid' },
+                  ...(isStockSyncedExpense(viewingTx)
+                    ? [
+                        {
+                          label: 'Inventory Sync Source',
+                          value: `Linked Stock Record${viewingTx.linkedStockId ? ` #${viewingTx.linkedStockId}` : ''} (Edit in Stocks)`,
+                        },
+                      ]
+                    : []),
                   {
                     label: 'Total Expense Amount',
                     value: `Rs. ${viewingTx.amount.toLocaleString()}`,
@@ -4385,10 +4517,16 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               ? { data: viewingTx.attachment, name: viewingTx.attachmentName }
               : undefined
           }
-          onEdit={() => setEditingTx(viewingTx)}
+          showEmptyAttachment
+          onPreviewAttachment={() => setPreviewRecord(viewingTx)}
+          onEdit={() => handleAttemptEditTx(viewingTx)}
           onDelete={
             onDeleteTransaction
               ? async () => {
+                  if (isStockSyncedExpense(viewingTx)) {
+                    setStockGuardModal({ action: 'delete', record: viewingTx });
+                    return;
+                  }
                   await onDeleteTransaction(viewingTx);
                   const label = viewingTx.type === 'Income' ? 'Sale record' : 'Expense voucher';
                   setToastMessage(`${label} #${viewingTx.trackingId || viewingTx.id} deleted from database.`);
@@ -4397,6 +4535,114 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               : undefined
           }
         />
+      )}
+
+      {/* Stock-Linked Expense Guard Popup Modal */}
+      {stockGuardModal && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          onClick={() => setStockGuardModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-amber-200 animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-100 text-amber-700 border border-amber-200 shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    {stockGuardModal.action === 'edit'
+                      ? 'Stock Record — Cannot Edit in Expenses'
+                      : 'Stock Record — Cannot Delete in Expenses'}
+                  </h3>
+                  <p className="text-[11px] font-semibold text-amber-700 mt-0.5">
+                    Inventory &amp; Expense Synchronization Protection
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStockGuardModal(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                aria-label="Close notice"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <p className="text-xs font-semibold text-slate-700 leading-relaxed bg-amber-50/70 border border-amber-200/80 rounded-xl p-3.5">
+                {stockGuardModal.action === 'edit'
+                  ? "It's a stock record — you can't edit it in Expenses. You need to go to Stocks to edit it."
+                  : "It's a stock record — you can't delete it in Expenses. You need to go to Stocks to manage or delete it."}
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px]">
+                <div>
+                  <span className="text-slate-500 font-semibold block">Category / Head</span>
+                  <span className="font-bold text-slate-900">
+                    {stockGuardModal.record.head || stockGuardModal.record.category}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-semibold block">Unit / Flock</span>
+                  <span className="font-bold text-slate-900">
+                    {stockGuardModal.record.flockName ||
+                      (stockGuardModal.record.flockId === 9
+                        ? 'Unit 2'
+                        : stockGuardModal.record.flockId === 10
+                        ? 'Unit 3'
+                        : 'Unit 1')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-semibold block">Date &amp; Challan</span>
+                  <span className="font-mono font-bold text-slate-800">
+                    {stockGuardModal.record.date}{' '}
+                    {stockGuardModal.record.challanNo ? `(#${stockGuardModal.record.challanNo})` : ''}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-semibold block">Amount</span>
+                  <span className="font-mono font-black text-emerald-700">
+                    Rs. {Number(stockGuardModal.record.amount || 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setStockGuardModal(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer"
+              >
+                Close
+              </button>
+              {onNavigateToStocks && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const rec = stockGuardModal.record;
+                    const unit =
+                      rec.flockName ||
+                      (rec.flockId === 9 ? 'Unit 2' : rec.flockId === 10 ? 'Unit 3' : 'Unit 1');
+                    const head = rec.linkedStockHead || rec.head || rec.category;
+                    setStockGuardModal(null);
+                    onNavigateToStocks(head, unit);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  <Boxes className="w-4 h-4" />
+                  <span>Go to Stocks</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Edit Sale / Expense Transaction Modal */}

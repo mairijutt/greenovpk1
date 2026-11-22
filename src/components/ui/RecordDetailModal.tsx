@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Edit, Trash2, Paperclip, Eye } from 'lucide-react';
+import { X, Edit, Trash2, Paperclip, Eye, Download, FileText } from 'lucide-react';
 
 export interface RecordDetailField {
   label: string;
@@ -24,6 +24,8 @@ interface RecordDetailModalProps {
     data?: string | null;
     name?: string | null;
   };
+  showEmptyAttachment?: boolean;
+  onPreviewAttachment?: () => void;
   onEdit?: () => void;
   onDelete?: () => Promise<void> | void;
 }
@@ -47,6 +49,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
   fields,
   notes,
   attachment,
+  showEmptyAttachment = false,
+  onPreviewAttachment,
   onEdit,
   onDelete,
 }) => {
@@ -59,6 +63,12 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
     attachment?.data &&
     (attachment.data.startsWith('data:image/') ||
       /\.(png|jpe?g|gif|webp)$/i.test(attachment.data));
+
+  const isPdfAttachment =
+    attachment?.data &&
+    (attachment.data.startsWith('data:application/pdf') ||
+      /\.pdf$/i.test(attachment.name || '') ||
+      /\.pdf$/i.test(attachment.data));
 
   const handleConfirmDelete = async () => {
     if (!onDelete || isDeleting) return;
@@ -147,22 +157,62 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
           </div>
         )}
 
-        {(attachment?.data || attachment?.name) && (
+        {(attachment?.data || attachment?.name || showEmptyAttachment) && (
           <div className="mt-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-              <Paperclip className="w-3.5 h-3.5" />
-              <span>Attachment {attachment.name ? `— ${attachment.name}` : ''}</span>
-            </div>
-            {isImageAttachment && attachment.data ? (
-              <img
-                src={attachment.data}
-                alt={attachment.name || 'Record attachment'}
-                className="max-h-60 rounded-lg border border-slate-200 object-contain bg-white"
-              />
-            ) : (
-              <div className="text-slate-700 font-medium">
-                {attachment.name || 'Attached receipt / challan document'}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                <Paperclip className="w-3.5 h-3.5" />
+                <span>
+                  Attachment
+                  {attachment?.name ? ` — ${attachment.name}` : attachment?.data ? ' — Attached Slip' : ''}
+                </span>
               </div>
+              {(attachment?.data || attachment?.name) && (
+                <div className="flex items-center gap-1.5">
+                  {onPreviewAttachment && (
+                    <button
+                      type="button"
+                      onClick={onPreviewAttachment}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>Preview</span>
+                    </button>
+                  )}
+                  {attachment?.data && (
+                    <a
+                      href={attachment.data}
+                      download={attachment.name || 'attachment'}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Download</span>
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+            {attachment?.data || attachment?.name ? (
+              isImageAttachment && attachment?.data ? (
+                <img
+                  src={attachment.data}
+                  alt={attachment.name || 'Record attachment'}
+                  className="max-h-60 rounded-lg border border-slate-200 object-contain bg-white"
+                />
+              ) : isPdfAttachment && attachment?.data ? (
+                <iframe
+                  src={attachment.data}
+                  title={attachment.name || 'PDF Attachment'}
+                  className="w-full h-64 rounded-lg border border-slate-200 bg-white"
+                />
+              ) : (
+                <div className="flex items-center gap-2 text-slate-700 font-medium bg-white p-2.5 rounded-lg border border-slate-200/80">
+                  <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{attachment?.name || 'Attached receipt / challan document'}</span>
+                </div>
+              )
+            ) : (
+              <div className="text-slate-400 font-medium">No attachment uploaded</div>
             )}
           </div>
         )}

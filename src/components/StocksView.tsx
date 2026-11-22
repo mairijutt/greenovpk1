@@ -25,29 +25,76 @@ import {
   Trash2,
   X,
   AlertCircle,
+  Wheat,
+  Pill,
+  Syringe,
+  Wrench,
 } from 'lucide-react';
 import { InventoryItem, FinancialRecord } from '../types/farm.ts';
 import { StatCard, PageHeader, UIButton, TableCard, DateRangePickerBar, DatePreset, RecordDetailModal } from './ui';
-import {
-  STOCK_SUMMARY,
-  unitWiseStockSummary,
-  liveStockRecords,
-  StockRecord,
-} from '../data/liveStocks.ts';
+import { liveStockRecords, StockRecord } from '../data/liveStocks.ts';
 import { getInitialUrlFilters } from '../utils/urlFilters.ts';
 import { apiFetch } from '../services/api.ts';
 import { downloadRecordsCSV, downloadRecordsPDF } from '../utils/exportRecords.ts';
+
+const STOCK_HEADS = ['FEED', 'MEDICINE', 'VACCINE', 'EQUIPMENT', 'OTHER'] as const;
+type StockHead = (typeof STOCK_HEADS)[number];
+
+const STOCK_HEAD_META: Record<
+  StockHead,
+  { label: string; shortLabel: string; unitLabel: string; icon: typeof Wheat; badgeColor: 'indigo' | 'emerald' | 'amber' | 'blue' | 'rose' }
+> = {
+  FEED: { label: 'Feed', shortLabel: 'FEED', unitLabel: 'bags', icon: Wheat, badgeColor: 'indigo' },
+  MEDICINE: { label: 'Medicine', shortLabel: 'Medicine', unitLabel: 'units', icon: Pill, badgeColor: 'emerald' },
+  VACCINE: { label: 'Vaccine', shortLabel: 'Vaccine', unitLabel: 'units', icon: Syringe, badgeColor: 'blue' },
+  EQUIPMENT: { label: 'Equipment', shortLabel: 'Equipment', unitLabel: 'units', icon: Wrench, badgeColor: 'amber' },
+  OTHER: { label: 'Others', shortLabel: 'Others', unitLabel: 'units', icon: Package, badgeColor: 'rose' },
+};
+
+const normalizeStockHead = (rawHead?: string): StockHead => {
+  const h = String(rawHead || 'FEED').trim().toUpperCase();
+  if (h.includes('FEED')) return 'FEED';
+  if (h.includes('MED')) return 'MEDICINE';
+  if (h.includes('VAC')) return 'VACCINE';
+  if (h.includes('EQUIP')) return 'EQUIPMENT';
+  return 'OTHER';
+};
+
+const getStockUnit = (r: Pick<StockRecord, 'flockName' | 'flockId'>): 'Unit 1' | 'Unit 2' | 'Unit 3' => {
+  const fname = String(r.flockName || '').toLowerCase();
+  const fid = String(r.flockId || '');
+  if (fname.includes('unit 2') || fid === '9') return 'Unit 2';
+  if (fname.includes('unit 3') || fid === '10') return 'Unit 3';
+  return 'Unit 1';
+};
 
 interface StocksViewProps {
   inventory?: InventoryItem[];
   onRestock?: (id: string, amount: number) => void;
   onAddTransaction?: (record: FinancialRecord) => Promise<void> | void;
+  onStockExpenseSynced?: (
+    action: 'create' | 'update' | 'delete',
+    syncedExpense?: FinancialRecord,
+    deletedExpenseId?: number | string | null,
+    deletedExpenseClientId?: string | null
+  ) => void;
+  initialFocus?: { head?: string; unit?: string } | null;
+  onClearInitialFocus?: () => void;
 }
 
-export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
+export const StocksView: React.FC<StocksViewProps> = ({
+  onAddTransaction,
+  onStockExpenseSynced,
+  initialFocus,
+  onClearInitialFocus,
+}) => {
   const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
   const [activeTab, setActiveTab] = useState<'shipments' | 'add-stock'>('shipments');
   const [selectedUnit, setSelectedUnit] = useState<string>(() => initialUrlFilters.unit);
+  const [selectedHead, setSelectedHead] = useState<'all' | StockHead>(() => {
+    const raw = (initialUrlFilters.head || '').trim().toUpperCase();
+    return STOCK_HEADS.includes(raw as StockHead) ? (raw as StockHead) : 'all';
+  });
   const [selectedFeedType, setSelectedFeedType] = useState<string>('all');
   const [selectedPayment, setSelectedPayment] = useState<string>('all');
   const [fromDate, setFromDate] = useState<string>(() => initialUrlFilters.from);
@@ -94,6 +141,56 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
   const [viewingStock, setViewingStock] = useState<StockRecord | null>(null);
   const [isSavingStock, setIsSavingStock] = useState(false);
 
+  // Apply incoming navigation focus (e.g., "Go to Stocks" from Expenses guard popup)
+  useEffect(() => {
+    if (!initialFocus) return;
+    if (initialFocus.head) {
+      const normalized = normalizeStockHead(initialFocus.head);
+      setSelectedHead(normalized);
+      setSelectedFeedType('all');
+    }
+    if (initialFocus.unit) {
+      setSelectedUnit(initialFocus.unit);
+    }
+    setActiveTab('shipments');
+    setCurrentPage(1);
+    onClearInitialFocus?.();
+  }, [initialFocus, onClearInitialFocus]);
+
+  const mapSyncedExpenseToFinancial = (rawExp: any, fallbackStock: StockRecord): FinancialRecord => {
+    const fid = Number(rawExp?.flockId ?? fallbackStock.flockId) || 8;
+    const rawDate = rawExp?.expenseDate || rawExp?.date || fallbackStock.date;
+    const dateStr = String(rawDate || '').slice(0, 10);
+    const challan = String(rawExp?.challanNo ?? fallbackStock.challanNo ?? '');
+    return {
+      id: rawExp?.clientId || `exp-${rawExp?.id}`,
+      trackingId: Number(rawExp?.id) || undefined,
+      type: 'Expense',
+      category: rawExp?.head || fallbackStock.head,
+      head: rawExp?.head || fallbackStock.head,
+      amount: Number(rawExp?.expenseCost ?? rawExp?.amount ?? fallbackStock.amount ?? 0),
+      expenseCost: Number(rawExp?.expenseCost ?? rawExp?.amount ?? fallbackStock.amount ?? 0),
+      date: dateStr,
+      rawDate: dateStr,
+      referenceNo: challan ? `CH-${challan}` : `EXP-${rawExp?.id || fallbackStock.trackingId}`,
+      challanNo: challan,
+      flockId: fid,
+      flockName:
+        rawExp?.flock?.flockName ||
+        fallbackStock.flockName ||
+        (fid === 9 ? 'Unit 2' : fid === 10 ? 'Unit 3' : 'Unit 1'),
+      description: rawExp?.notes || rawExp?.description || fallbackStock.notes || fallbackStock.head,
+      notes: rawExp?.notes || fallbackStock.notes || '',
+      status: 'Paid',
+      attachment: rawExp?.attachment ?? fallbackStock.attachment ?? null,
+      isStockLinked: true,
+      linkedStockId: fallbackStock.trackingId || fallbackStock.id,
+      linkedStockHead: fallbackStock.head,
+      linkedStockType: fallbackStock.type,
+      linkedStockQuantity: fallbackStock.quantity,
+    };
+  };
+
   // Hydrate live Stock records from PostgreSQL on mount
   useEffect(() => {
     let active = true;
@@ -128,6 +225,8 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
             paymentType: String(r.paymentType || 'CASH'),
             challanNo: String(r.challanNo || ''),
             notes: String(r.notes || ''),
+            expenseId: Number(r.expenseId || 0) || undefined,
+            attachment: r.attachment || null,
           };
         });
         setAllStockRecords(mapped);
@@ -222,7 +321,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
 
     const resolvedId = updatedRecord.trackingId || updatedRecord.id;
     try {
-      await apiFetch(`/api/stocks/${resolvedId}`, {
+      const res = await apiFetch(`/api/stocks/${resolvedId}`, {
         method: 'PUT',
         body: JSON.stringify({
           clientId: updatedRecord.id,
@@ -236,11 +335,19 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
           amount: amt,
           amountPaid: amt,
           paymentType: editPaymentType,
+          expenseId: updatedRecord.expenseId,
           notes: updatedRecord.notes,
         }),
       });
 
-      const nextList = allStockRecords.map((r) => (r.id === updatedRecord.id ? updatedRecord : r));
+      const finalUpdatedRecord: StockRecord = {
+        ...updatedRecord,
+        expenseId: Number(res?.data?.expenseId || updatedRecord.expenseId || 0) || undefined,
+      };
+
+      const nextList = allStockRecords.map((r) =>
+        r.id === finalUpdatedRecord.id ? finalUpdatedRecord : r
+      );
       setAllStockRecords(nextList);
       try {
         localStorage.setItem('greenova_stocks_v2', JSON.stringify(nextList));
@@ -248,8 +355,17 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
         console.warn('LocalStorage error:', err);
       }
 
+      if (res?.data?.syncedExpense && onStockExpenseSynced) {
+        onStockExpenseSynced(
+          'update',
+          mapSyncedExpenseToFinancial(res.data.syncedExpense, finalUpdatedRecord)
+        );
+      }
+
       setEditingStock(null);
-      setToastMessage(`Stock record #${updatedRecord.trackingId} updated successfully.`);
+      setToastMessage(
+        `Stock record #${finalUpdatedRecord.trackingId} & linked expense updated.`
+      );
       setTimeout(() => setToastMessage(null), 3500);
     } catch (err: any) {
       setEditError(err?.message || 'Failed to update stock record.');
@@ -261,14 +377,24 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
   const handleDeleteStock = async (record: StockRecord) => {
     const resolvedId = record.trackingId || record.id;
     try {
-      await apiFetch(`/api/stocks/${resolvedId}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/stocks/${resolvedId}`, { method: 'DELETE' });
       const nextList = allStockRecords.filter((r) => String(r.id) !== String(record.id));
       setAllStockRecords(nextList);
       try {
         localStorage.setItem('greenova_stocks_v2', JSON.stringify(nextList));
       } catch {}
+      if (onStockExpenseSynced) {
+        onStockExpenseSynced(
+          'delete',
+          undefined,
+          res?.data?.deletedExpenseId ?? record.expenseId ?? null,
+          res?.data?.deletedExpenseClientId ?? null
+        );
+      }
       setConfirmDeleteStockId(null);
-      setToastMessage(`Stock record #${record.trackingId} deleted from database.`);
+      setToastMessage(
+        `Stock record #${record.trackingId} & linked expense deleted from database.`
+      );
       setTimeout(() => setToastMessage(null), 3500);
     } catch (err: any) {
       setToastMessage(err?.message || 'Failed to delete stock record.');
@@ -388,6 +514,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
       });
 
       const canonicalId = Number(res?.data?.id) || maxTracking + 1;
+      const canonicalExpenseId = Number(res?.data?.expenseId || 0) || undefined;
 
       const newRecord: StockRecord = {
         id: String(canonicalId),
@@ -406,7 +533,9 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
         costPerBag: costBag,
         paymentType: formPaymentType.toUpperCase(),
         challanNo: formChallan.trim(),
-        notes: formNotes || `${qty} bags of ${formStockType} received...`,
+        notes: formNotes || `${qty} ${formHead === 'FEED' ? 'bags' : 'units'} of ${formStockType} received...`,
+        expenseId: canonicalExpenseId,
+        attachment: attachmentData || null,
       };
 
       const updated = [newRecord, ...allStockRecords];
@@ -417,13 +546,18 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
         console.warn('LocalStorage error:', err);
       }
 
-      // Automatically create corresponding Farm Expense transaction so cost reflects dynamically everywhere
-      if (onAddTransaction) {
+      // Sync corresponding Farm Expense state (already persisted atomically in DB via POST /api/stocks)
+      if (res?.data?.syncedExpense && onStockExpenseSynced) {
+        onStockExpenseSynced(
+          'create',
+          mapSyncedExpenseToFinancial(res.data.syncedExpense, newRecord)
+        );
+      } else if (onAddTransaction && !onStockExpenseSynced) {
         const expenseRecord: FinancialRecord = {
           id: `exp-stk-${Date.now()}`,
           type: 'Expense',
-          category: formHead === 'FEED' ? 'FEED' : formHead === 'MEDICINE' ? 'MEDICINE' : formHead === 'VACCINE' ? 'VACCINE' : formHead,
-          head: formHead === 'FEED' ? 'FEED' : formHead === 'MEDICINE' ? 'MEDICINE' : formHead === 'VACCINE' ? 'VACCINE' : formHead,
+          category: formHead,
+          head: formHead,
           amount: amt,
           date: formDate,
           referenceNo: `STK-${newRecord.trackingId}`,
@@ -435,13 +569,25 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
           status: 'Paid',
           attachment: attachmentData || null,
           attachmentName: attachmentName || null,
+          isStockLinked: true,
+          linkedStockId: newRecord.trackingId,
+          linkedStockHead: formHead,
+          linkedStockType: formStockType,
+          linkedStockQuantity: qty,
         };
         await onAddTransaction(expenseRecord);
       }
 
+      const savedHead = normalizeStockHead(formHead);
       handleResetForm();
+      setSelectedHead(savedHead);
+      setSelectedFeedType('all');
       setActiveTab('shipments');
       setCurrentPage(1);
+      setToastMessage(
+        `Stock #${newRecord.trackingId} (${STOCK_HEAD_META[savedHead].label}) saved & synchronized with Farm Expenses!`
+      );
+      setTimeout(() => setToastMessage(null), 4000);
     } catch (err: any) {
       setFormError(err?.message || 'Failed to save stock record to database.');
     } finally {
@@ -449,15 +595,186 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
     }
   };
 
+  // Date-filtered records across all units & heads (base for Head Matrix & Unit-Wise Matrix)
+  const dateFilteredRecords = useMemo(() => {
+    return allStockRecords.filter((record) => {
+      const recDate = (record.date || '').slice(0, 10);
+      return (!fromDate || recDate >= fromDate) && (!toDate || recDate <= toDate);
+    });
+  }, [allStockRecords, fromDate, toDate]);
+
+  // Summary per Stock Head (respecting selectedUnit and date filters)
+  const headSummaryStats = useMemo(() => {
+    const unitScoped = dateFilteredRecords.filter((record) => {
+      const unit = getStockUnit(record);
+      return selectedUnit === 'all' || unit.toLowerCase() === selectedUnit.toLowerCase();
+    });
+
+    const totalAllAmount = unitScoped.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const totalAllQty = unitScoped.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+
+    const byHead = STOCK_HEADS.map((head) => {
+      const recs = unitScoped.filter((r) => normalizeStockHead(r.head) === head);
+      const count = recs.length;
+      const qty = recs.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+      const amount = recs.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      const unit1 = recs.filter((r) => getStockUnit(r) === 'Unit 1');
+      const unit2 = recs.filter((r) => getStockUnit(r) === 'Unit 2');
+      const unit3 = recs.filter((r) => getStockUnit(r) === 'Unit 3');
+      return {
+        head,
+        count,
+        qty,
+        amount,
+        sharePct: totalAllAmount > 0 ? Number(((amount / totalAllAmount) * 100).toFixed(1)) : 0,
+        units: {
+          'Unit 1': {
+            count: unit1.length,
+            qty: unit1.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+            amount: unit1.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+          },
+          'Unit 2': {
+            count: unit2.length,
+            qty: unit2.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+            amount: unit2.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+          },
+          'Unit 3': {
+            count: unit3.length,
+            qty: unit3.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+            amount: unit3.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+          },
+        },
+      };
+    });
+
+    return {
+      all: {
+        count: unitScoped.length,
+        qty: totalAllQty,
+        amount: totalAllAmount,
+      },
+      byHead,
+    };
+  }, [dateFilteredRecords, selectedUnit]);
+
+  // Full 5-head x 3-unit Matrix (always shows all 3 units across current date range for comparison)
+  const unitWiseHeadMatrix = useMemo(() => {
+    const rows = STOCK_HEADS.map((head) => {
+      const recs = dateFilteredRecords.filter((r) => normalizeStockHead(r.head) === head);
+      const calcUnit = (unitName: 'Unit 1' | 'Unit 2' | 'Unit 3') => {
+        const uRecs = recs.filter((r) => getStockUnit(r) === unitName);
+        return {
+          count: uRecs.length,
+          qty: uRecs.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+          amount: uRecs.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+        };
+      };
+      return {
+        head,
+        unit1: calcUnit('Unit 1'),
+        unit2: calcUnit('Unit 2'),
+        unit3: calcUnit('Unit 3'),
+        total: {
+          count: recs.length,
+          qty: recs.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+          amount: recs.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+        },
+      };
+    });
+
+    const grandUnit = (unitName: 'Unit 1' | 'Unit 2' | 'Unit 3') => {
+      const uRecs = dateFilteredRecords.filter((r) => getStockUnit(r) === unitName);
+      return {
+        count: uRecs.length,
+        qty: uRecs.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+        amount: uRecs.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+      };
+    };
+
+    return {
+      rows,
+      totals: {
+        unit1: grandUnit('Unit 1'),
+        unit2: grandUnit('Unit 2'),
+        unit3: grandUnit('Unit 3'),
+        all: {
+          count: dateFilteredRecords.length,
+          qty: dateFilteredRecords.reduce((s, r) => s + (Number(r.quantity) || 0), 0),
+          amount: dateFilteredRecords.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+        },
+      },
+    };
+  }, [dateFilteredRecords]);
+
+  // Dynamic Unit-Wise cards reactive to selectedHead and date range
+  const unitCardsStats = useMemo(() => {
+    const headFiltered =
+      selectedHead === 'all'
+        ? dateFilteredRecords
+        : dateFilteredRecords.filter((r) => normalizeStockHead(r.head) === selectedHead);
+
+    const calc = (recs: StockRecord[], totalQtyAll: number) => {
+      const qty = recs.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+      const amount = recs.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      const pct = totalQtyAll > 0 ? ((qty / totalQtyAll) * 100).toFixed(1) : '0.0';
+      return { count: recs.length, qty, amount, pct };
+    };
+
+    const totalQtyAll = headFiltered.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+    const u1 = calc(headFiltered.filter((r) => getStockUnit(r) === 'Unit 1'), totalQtyAll);
+    const u2 = calc(headFiltered.filter((r) => getStockUnit(r) === 'Unit 2'), totalQtyAll);
+    const u3 = calc(headFiltered.filter((r) => getStockUnit(r) === 'Unit 3'), totalQtyAll);
+    const all = calc(headFiltered, totalQtyAll);
+
+    const unitShares = [
+      { name: 'Unit 1', qty: u1.qty, pct: u1.pct },
+      { name: 'Unit 2', qty: u2.qty, pct: u2.pct },
+      { name: 'Unit 3', qty: u3.qty, pct: u3.pct },
+    ].sort((a, b) => b.qty - a.qty);
+
+    const activeUnitsCount = [u1, u2, u3].filter((u) => u.count > 0).length;
+
+    return {
+      all,
+      unit1: u1,
+      unit2: u2,
+      unit3: u3,
+      topUnit: unitShares[0],
+      activeUnitsCount,
+    };
+  }, [dateFilteredRecords, selectedHead]);
+
+  // Sub-type options for active Stock Head
+  const availableSubTypes = useMemo(() => {
+    if (selectedHead === 'FEED') {
+      return [
+        { value: '13', label: 'Feed 13 (Layer)' },
+        { value: '11', label: 'Feed 11 (Grower)' },
+        { value: '12', label: 'Feed 12 (Pre-Lay)' },
+        { value: '14', label: 'Feed 14' },
+      ];
+    }
+    if (selectedHead === 'all') {
+      return [
+        { value: '13', label: 'Feed 13 (Layer)' },
+        { value: '11', label: 'Feed 11 (Grower)' },
+        { value: '12', label: 'Feed 12 (Pre-Lay)' },
+      ];
+    }
+    const matching = allStockRecords.filter((r) => normalizeStockHead(r.head) === selectedHead);
+    const distinct = Array.from(new Set(matching.map((r) => String(r.type || '').trim()).filter(Boolean)));
+    return distinct.map((t) => ({ value: t, label: t }));
+  }, [allStockRecords, selectedHead]);
+
   // Filtered stock shipments from authentic records
   const filteredShipments = useMemo(() => {
     return allStockRecords.filter((record) => {
       const unitMatch =
         selectedUnit === 'all' ||
-        record.flockName.toLowerCase() === selectedUnit.toLowerCase() ||
-        (selectedUnit === 'Unit 1' && record.flockId === '8') ||
-        (selectedUnit === 'Unit 2' && record.flockId === '9') ||
-        (selectedUnit === 'Unit 3' && record.flockId === '10');
+        getStockUnit(record).toLowerCase() === selectedUnit.toLowerCase();
+
+      const headMatch =
+        selectedHead === 'all' || normalizeStockHead(record.head) === selectedHead;
 
       const feedTypeMatch =
         selectedFeedType === 'all' || record.type === selectedFeedType;
@@ -474,18 +791,20 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
         record.trackingId.toString().includes(q) ||
         record.date.toLowerCase().includes(q) ||
         record.flockName.toLowerCase().includes(q) ||
+        record.head.toLowerCase().includes(q) ||
+        record.type.toLowerCase().includes(q) ||
         record.challanNo.toLowerCase().includes(q) ||
         record.notes.toLowerCase().includes(q) ||
         record.feedType.toLowerCase().includes(q);
 
-      return unitMatch && feedTypeMatch && paymentMatch && dateMatch && searchMatch;
+      return unitMatch && headMatch && feedTypeMatch && paymentMatch && dateMatch && searchMatch;
     });
-  }, [allStockRecords, selectedUnit, selectedFeedType, selectedPayment, fromDate, toDate, searchQuery]);
+  }, [allStockRecords, selectedUnit, selectedHead, selectedFeedType, selectedPayment, fromDate, toDate, searchQuery]);
 
   // Aggregated stats of filtered shipments
   const filteredStats = useMemo(() => {
-    const totalBags = filteredShipments.reduce((sum, r) => sum + r.quantity, 0);
-    const totalAmount = filteredShipments.reduce((sum, r) => sum + r.amount, 0);
+    const totalBags = filteredShipments.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
+    const totalAmount = filteredShipments.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
     const avgCost = totalBags > 0 ? Math.round(totalAmount / totalBags) : 0;
     return { totalBags, totalAmount, avgCost, count: filteredShipments.length };
   }, [filteredShipments]);
@@ -536,6 +855,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
 
   const handleResetFilters = () => {
     setSelectedUnit('all');
+    setSelectedHead('all');
     setSelectedFeedType('all');
     setSelectedPayment('all');
     setFromDate('');
@@ -545,8 +865,29 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
     setCurrentPage(1);
   };
 
+  const openAddStockTab = (headOverride?: 'all' | StockHead) => {
+    const targetHead =
+      headOverride && headOverride !== 'all'
+        ? headOverride
+        : selectedHead !== 'all'
+        ? selectedHead
+        : undefined;
+    if (targetHead) {
+      handleHeadChange(targetHead);
+    }
+    if (selectedUnit !== 'all') {
+      setFormFlock(selectedUnit);
+    } else {
+      setFormFlock('');
+    }
+    setActiveTab('add-stock');
+  };
+
   const getStockExportPayload = () => {
     const unitLabel = selectedUnit === 'all' ? 'All Units' : selectedUnit;
+    const headLabel = selectedHead === 'all' ? 'All Heads' : STOCK_HEAD_META[selectedHead].label;
+    const qtyColLabel = selectedHead === 'FEED' ? 'Qty (Bags)' : selectedHead === 'all' ? 'Qty (Bags/Units)' : 'Qty (Units)';
+    const rateColLabel = selectedHead === 'FEED' ? 'Rate / Bag' : 'Rate / Unit';
     const rangeLabel =
       fromDate || toDate ? `${fromDate || 'Start'} to ${toDate || 'Latest'}` : 'All Dates';
     const todayStamp = new Date().toISOString().split('T')[0];
@@ -556,9 +897,9 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
       { header: 'Date', align: 'left' as const },
       { header: 'Unit / Flock', align: 'left' as const },
       { header: 'Category', align: 'left' as const },
-      { header: 'Item / Feed Type', align: 'left' as const },
-      { header: 'Qty (Bags)', align: 'right' as const },
-      { header: 'Rate / Bag', align: 'right' as const },
+      { header: 'Item / Stock Type', align: 'left' as const },
+      { header: qtyColLabel, align: 'right' as const },
+      { header: rateColLabel, align: 'right' as const },
       { header: 'Amount (PKR)', align: 'right' as const },
       { header: 'Payment', align: 'center' as const },
       { header: 'Challan #', align: 'left' as const },
@@ -617,9 +958,9 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
     ];
 
     return {
-      title: 'Stock Inventory Records',
-      subtitle: `Unit: ${unitLabel}  |  Range: ${rangeLabel}`,
-      filenameBase: `GreenOva_Stock_Records_${unitLabel}_${todayStamp}`,
+      title: `Stock Inventory Records (${headLabel})`,
+      subtitle: `Head: ${headLabel}  |  Unit: ${unitLabel}  |  Range: ${rangeLabel}`,
+      filenameBase: `GreenOva_Stock_${headLabel.replace(/\s+/g, '_')}_${unitLabel}_${todayStamp}`,
       columns,
       rows: pdfRows,
       csvRows,
@@ -676,7 +1017,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
             <UIButton
               variant="primary"
               icon={Plus}
-              onClick={() => setActiveTab('add-stock')}
+              onClick={() => openAddStockTab()}
             >
               + Add Stock Record
             </UIButton>
@@ -1011,20 +1352,134 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
         </div>
       )}
 
-      {/* --- TAB 1: FEED STOCK REPLENISHMENTS --- */}
+      {/* --- TAB 1: UNIT STOCK REPLENISHMENTS ACROSS 5 HEADS --- */}
       {activeTab === 'shipments' && (
         <div className="space-y-6">
-          {/* Key Stat Cards */}
+          {/* 5 Stock Heads Selector Cards (All, FEED, MEDICINE, VACCINE, EQUIPMENT, OTHER) */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <div className="flex items-center space-x-2">
+                <Layers className="w-4 h-4 text-indigo-600" />
+                <span className="text-xs font-bold text-slate-800">
+                  Stock Categories (5 Heads){selectedUnit !== 'all' ? ` — ${selectedUnit}` : ' — All Units'}:
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Select a category to view its unit-wise matrix &amp; stock records
+              </span>
+            </div>
 
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedHead('all');
+                  setSelectedFeedType('all');
+                  setCurrentPage(1);
+                }}
+                className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
+                  selectedHead === 'all'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-slate-400'
+                }`}
+              >
+                <div className="flex items-center justify-between text-[11px] font-bold">
+                  <span className="flex items-center gap-1.5">
+                    <Boxes className="w-3.5 h-3.5" />
+                    <span>All Heads</span>
+                  </span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                      selectedHead === 'all' ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {headSummaryStats.all.count}
+                  </span>
+                </div>
+                <div className="text-xs font-black mt-1.5 font-mono">
+                  {headSummaryStats.all.qty.toLocaleString()}{' '}
+                  <span className="text-[10px] font-normal">items</span>
+                </div>
+                <div
+                  className={`text-[11px] font-semibold mt-0.5 font-mono ${
+                    selectedHead === 'all' ? 'text-slate-300' : 'text-slate-500'
+                  }`}
+                >
+                  Rs. {Math.round(headSummaryStats.all.amount).toLocaleString()}
+                </div>
+              </button>
+
+              {headSummaryStats.byHead.map((item) => {
+                const meta = STOCK_HEAD_META[item.head];
+                const IconComp = meta.icon;
+                const isSelected = selectedHead === item.head;
+                return (
+                  <button
+                    key={item.head}
+                    type="button"
+                    onClick={() => {
+                      setSelectedHead(item.head);
+                      setSelectedFeedType('all');
+                      setCurrentPage(1);
+                    }}
+                    className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                        : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <IconComp className="w-3.5 h-3.5" />
+                        <span>{meta.shortLabel}</span>
+                      </span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                          isSelected ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    </div>
+                    <div className="text-xs font-black mt-1.5 font-mono">
+                      {item.qty.toLocaleString()}{' '}
+                      <span className="text-[10px] font-normal">{meta.unitLabel}</span>
+                    </div>
+                    <div
+                      className={`text-[11px] font-semibold mt-0.5 font-mono ${
+                        isSelected ? 'text-indigo-100' : 'text-slate-500'
+                      }`}
+                    >
+                      Rs. {Math.round(item.amount).toLocaleString()}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Key Stat Cards (Adaptive to Selected Head & Unit) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              title="Total Bags Received"
+              title={
+                selectedHead === 'FEED'
+                  ? 'Total Bags Received'
+                  : selectedHead === 'all'
+                  ? 'Total Stock Received'
+                  : `${STOCK_HEAD_META[selectedHead].label} Stock Received`
+              }
               value={filteredStats.totalBags}
-              unit="Bags"
-              icon={Package}
+              unit={selectedHead === 'FEED' ? 'Bags' : selectedHead === 'all' ? 'Items' : 'Units'}
+              icon={selectedHead === 'all' ? Package : STOCK_HEAD_META[selectedHead].icon}
               color="indigo"
               badge={{ text: `${filteredStats.count} Shipments`, color: 'indigo' }}
-              subtext="Layer Feed Formulations (50kg bags)"
+              subtext={
+                selectedHead === 'FEED'
+                  ? 'Layer Feed Formulations (50kg bags)'
+                  : selectedHead === 'all'
+                  ? 'All 5 stock categories combined'
+                  : `${STOCK_HEAD_META[selectedHead].label} stock entries in filter`
+              }
             />
 
             <StatCard
@@ -1034,178 +1489,249 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
               color="emerald"
               valueColor="text-emerald-700"
               badge={{ text: 'Disbursed', color: 'emerald' }}
-              subtext="Total feed invoice disbursements"
+              subtext={
+                selectedHead === 'all'
+                  ? 'All stock invoice disbursements'
+                  : `${STOCK_HEAD_META[selectedHead].label} invoice disbursements`
+              }
             />
 
             <StatCard
-              title="Average Cost per Bag"
+              title={selectedHead === 'FEED' ? 'Average Expense per Bag' : 'Average Expense per Unit'}
               value={`Rs. ${filteredStats.avgCost.toLocaleString()}`}
               icon={Layers}
               color="blue"
-              badge={{ text: '~Rs. 117 / kg', color: 'blue' }}
-              subtext="Weighted average procurement cost"
+              badge={{
+                text:
+                  selectedHead === 'FEED' && filteredStats.avgCost > 0
+                    ? `~Rs. ${Math.round(filteredStats.avgCost / 50)} / kg`
+                    : selectedHead === 'all'
+                    ? 'All Categories'
+                    : STOCK_HEAD_META[selectedHead].shortLabel,
+                color: 'blue',
+              }}
+              subtext="Weighted average procurement expense"
             />
 
             <StatCard
-              title="Active Feed Units"
-              value="3 Sheds"
+              title="Active Stock Units"
+              value={`${unitCardsStats.activeUnitsCount} ${unitCardsStats.activeUnitsCount === 1 ? 'Shed' : 'Sheds'}`}
               icon={Building2}
               color="amber"
-              badge={{ text: 'Units 1, 2, 3', color: 'amber' }}
-              subtext="Unit 2 consumed 70.8% of bags"
+              badge={{ text: selectedUnit === 'all' ? 'Units 1, 2, 3' : selectedUnit, color: 'amber' }}
+              subtext={
+                unitCardsStats.topUnit && unitCardsStats.all.qty > 0
+                  ? `${unitCardsStats.topUnit.name} holds ${unitCardsStats.topUnit.pct}% of stock qty`
+                  : 'No stock recorded for selected category'
+              }
             />
           </div>
 
-          {/* Unit-Wise Quick Filter Cards with authentic figures */}
+          {/* Dynamic Unit-Wise Quick Filter Cards (Reactive to Selected Stock Head & Date Range) */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <div className="flex items-center space-x-2">
                 <Building2 className="w-4 h-4 text-slate-500" />
-                <span className="text-xs font-bold text-slate-800">Unit-Wise Stock Receipts:</span>
+                <span className="text-xs font-bold text-slate-800">
+                  Unit-Wise Stock Receipts ({selectedHead === 'all' ? 'All 5 Heads' : STOCK_HEAD_META[selectedHead].label}):
+                </span>
               </div>
               <span className="text-[11px] text-slate-500 font-medium">
-                Click any unit to focus feed intake and delivery challans
+                Click any unit to focus{' '}
+                {selectedHead === 'all' ? 'stock intake' : STOCK_HEAD_META[selectedHead].label.toLowerCase()} and delivery challans
               </span>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('all');
-                  setCurrentPage(1);
-                }}
-                className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'all'
-                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>All Units Combined</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                      selectedUnit === 'all' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
+              {(
+                [
+                  { key: 'all', title: 'All Units Combined', data: unitCardsStats.all, showPct: false },
+                  { key: 'Unit 1', title: 'Unit 1', data: unitCardsStats.unit1, showPct: true },
+                  { key: 'Unit 2', title: 'Unit 2', data: unitCardsStats.unit2, showPct: true },
+                  { key: 'Unit 3', title: 'Unit 3', data: unitCardsStats.unit3, showPct: true },
+                ] as const
+              ).map((card) => {
+                const isSel = selectedUnit === card.key;
+                const qtyUnitText =
+                  selectedHead === 'FEED'
+                    ? 'Bags'
+                    : selectedHead === 'all'
+                    ? 'Items'
+                    : 'Units';
+                return (
+                  <button
+                    key={card.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedUnit(card.key);
+                      setCurrentPage(1);
+                    }}
+                    className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
+                      isSel
+                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                        : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
                     }`}
                   >
-                    145 Shipments
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  48,395 <span className="text-[10px] font-normal">Bags</span>
-                </div>
-                <div
-                  className={`text-[11px] font-semibold mt-0.5 ${
-                    selectedUnit === 'all' ? 'text-indigo-100' : 'text-slate-500'
-                  }`}
-                >
-                  Rs. 282,566,219
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 1');
-                  setCurrentPage(1);
-                }}
-                className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 1'
-                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 1</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                      selectedUnit === 'Unit 1' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    49 Shipments
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  7,840 <span className="text-[10px] font-normal">Bags (16.2%)</span>
-                </div>
-                <div
-                  className={`text-[11px] font-semibold mt-0.5 ${
-                    selectedUnit === 'Unit 1' ? 'text-indigo-100' : 'text-slate-500'
-                  }`}
-                >
-                  Rs. 46,373,074
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 2');
-                  setCurrentPage(1);
-                }}
-                className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 2'
-                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 2 (Primary)</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                      selectedUnit === 'Unit 2' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    67 Shipments
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  34,245 <span className="text-[10px] font-normal">Bags (70.8%)</span>
-                </div>
-                <div
-                  className={`text-[11px] font-semibold mt-0.5 ${
-                    selectedUnit === 'Unit 2' ? 'text-indigo-100' : 'text-slate-500'
-                  }`}
-                >
-                  Rs. 199,645,042
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedUnit('Unit 3');
-                  setCurrentPage(1);
-                }}
-                className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
-                  selectedUnit === 'Unit 3'
-                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                    : 'bg-slate-50 text-slate-800 border-slate-200 hover:border-indigo-400'
-                }`}
-              >
-                <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span>Unit 3</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                      selectedUnit === 'Unit 3' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    29 Shipments
-                  </span>
-                </div>
-                <div className="text-xs font-black mt-1">
-                  6,310 <span className="text-[10px] font-normal">Bags (13.0%)</span>
-                </div>
-                <div
-                  className={`text-[11px] font-semibold mt-0.5 ${
-                    selectedUnit === 'Unit 3' ? 'text-indigo-100' : 'text-slate-500'
-                  }`}
-                >
-                  Rs. 36,548,103
-                </div>
-              </button>
+                    <div className="flex justify-between items-center text-[11px] font-bold">
+                      <span>{card.title}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                          isSel ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {card.data.count} {card.data.count === 1 ? 'Entry' : 'Entries'}
+                      </span>
+                    </div>
+                    <div className="text-xs font-black mt-1 font-mono">
+                      {card.data.qty.toLocaleString()}{' '}
+                      <span className="text-[10px] font-normal">
+                        {qtyUnitText}
+                        {card.showPct ? ` (${card.data.pct}%)` : ''}
+                      </span>
+                    </div>
+                    <div
+                      className={`text-[11px] font-semibold mt-0.5 font-mono ${
+                        isSel ? 'text-indigo-100' : 'text-slate-500'
+                      }`}
+                    >
+                      Rs. {Math.round(card.data.amount).toLocaleString()}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
+
+          {/* Unit-Wise 5-Head Stock Matrix (FEED, MEDICINE, VACCINE, EQUIPMENT, OTHER across Unit 1, 2, 3) */}
+          <TableCard
+            title="Unit-Wise Stock Matrix (All 5 Heads)"
+            subtitle="Click any category row or unit cell to filter the stock ledger below"
+            badge={
+              <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 text-[11px] font-bold">
+                5 Categories × 3 Units
+              </span>
+            }
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="py-2.5 px-3.5">Stock Head</th>
+                    <th className="py-2.5 px-3 text-right">Unit 1</th>
+                    <th className="py-2.5 px-3 text-right">Unit 2</th>
+                    <th className="py-2.5 px-3 text-right">Unit 3</th>
+                    <th className="py-2.5 px-3.5 text-right bg-slate-100/80">All Units Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {unitWiseHeadMatrix.rows.map((row) => {
+                    const meta = STOCK_HEAD_META[row.head];
+                    const IconComp = meta.icon;
+                    const isRowSelected = selectedHead === row.head;
+                    return (
+                      <tr
+                        key={row.head}
+                        className={`transition-colors ${
+                          isRowSelected ? 'bg-indigo-50/60' : 'hover:bg-slate-50/80'
+                        }`}
+                      >
+                        <td className="py-2.5 px-3.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedHead(row.head);
+                              setSelectedUnit('all');
+                              setSelectedFeedType('all');
+                              setCurrentPage(1);
+                            }}
+                            className="flex items-center gap-2 font-bold text-slate-900 hover:text-indigo-700 cursor-pointer"
+                          >
+                            <IconComp className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span>{meta.label}</span>
+                            <span className="text-[10px] font-mono text-slate-400">({row.total.count})</span>
+                          </button>
+                        </td>
+                        {(
+                          [
+                            { name: 'Unit 1', cell: row.unit1 },
+                            { name: 'Unit 2', cell: row.unit2 },
+                            { name: 'Unit 3', cell: row.unit3 },
+                          ] as const
+                        ).map((u) => {
+                          const isCellSel = selectedHead === row.head && selectedUnit === u.name;
+                          return (
+                            <td key={u.name} className="py-2.5 px-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedHead(row.head);
+                                  setSelectedUnit(u.name);
+                                  setSelectedFeedType('all');
+                                  setCurrentPage(1);
+                                }}
+                                className={`inline-block text-right rounded-lg px-2 py-1 transition-colors cursor-pointer ${
+                                  isCellSel
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'hover:bg-indigo-50 text-slate-700'
+                                }`}
+                              >
+                                <div className="font-mono font-bold">
+                                  {u.cell.qty.toLocaleString()} {meta.unitLabel}
+                                </div>
+                                <div
+                                  className={`text-[10px] font-mono ${
+                                    isCellSel ? 'text-indigo-100' : 'text-slate-500'
+                                  }`}
+                                >
+                                  Rs. {Math.round(u.cell.amount).toLocaleString()}
+                                </div>
+                              </button>
+                            </td>
+                          );
+                        })}
+                        <td className="py-2.5 px-3.5 text-right bg-slate-50/70">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedHead(row.head);
+                              setSelectedUnit('all');
+                              setSelectedFeedType('all');
+                              setCurrentPage(1);
+                            }}
+                            className="text-right cursor-pointer hover:text-indigo-700"
+                          >
+                            <div className="font-mono font-black text-slate-900">
+                              {row.total.qty.toLocaleString()} {meta.unitLabel}
+                            </div>
+                            <div className="text-[10px] font-mono font-semibold text-emerald-700">
+                              Rs. {Math.round(row.total.amount).toLocaleString()}
+                            </div>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-slate-900 text-white text-[11px] font-bold">
+                  <tr>
+                    <td className="py-2.5 px-3.5">All 5 Heads Total</td>
+                    <td className="py-2.5 px-3 text-right font-mono">
+                      Rs. {Math.round(unitWiseHeadMatrix.totals.unit1.amount).toLocaleString()}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono">
+                      Rs. {Math.round(unitWiseHeadMatrix.totals.unit2.amount).toLocaleString()}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono">
+                      Rs. {Math.round(unitWiseHeadMatrix.totals.unit3.amount).toLocaleString()}
+                    </td>
+                    <td className="py-2.5 px-3.5 text-right font-mono text-emerald-300">
+                      Rs. {Math.round(unitWiseHeadMatrix.totals.all.amount).toLocaleString()}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </TableCard>
 
           {/* Unified Date & Month/Year Range Picker Bar */}
           <DateRangePickerBar
@@ -1223,7 +1749,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
             onReset={handleResetFilters}
           />
 
-          {/* Search, Feed Type & Payment Filters Bar */}
+          {/* Search, Sub-Type & Payment Filters Bar */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               {/* Search */}
@@ -1241,65 +1767,46 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
                 />
               </div>
 
-              {/* Feed Type Filter */}
-              <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedFeedType('all');
-                    setCurrentPage(1);
-                  }}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
-                    selectedFeedType === 'all'
-                      ? 'bg-white text-indigo-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  All Feeds
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedFeedType('13');
-                    setCurrentPage(1);
-                  }}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
-                    selectedFeedType === '13'
-                      ? 'bg-white text-indigo-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Feed 13 (Layer)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedFeedType('11');
-                    setCurrentPage(1);
-                  }}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
-                    selectedFeedType === '11'
-                      ? 'bg-white text-indigo-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Feed 11 (Grower)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedFeedType('12');
-                    setCurrentPage(1);
-                  }}
-                  className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
-                    selectedFeedType === '12'
-                      ? 'bg-white text-indigo-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Feed 12 (Pre-Lay)
-                </button>
-              </div>
+              {/* Adaptive Item / Feed Type Sub-Filter */}
+              {availableSubTypes.length > 0 && (
+                <div className="flex items-center flex-wrap gap-1 bg-slate-100 p-1 rounded-lg text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFeedType('all');
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                      selectedFeedType === 'all'
+                        ? 'bg-white text-indigo-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {selectedHead === 'FEED'
+                      ? 'All Feeds'
+                      : selectedHead === 'all'
+                      ? 'All Types'
+                      : `All ${STOCK_HEAD_META[selectedHead].label}`}
+                  </button>
+                  {availableSubTypes.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setSelectedFeedType(opt.value);
+                        setCurrentPage(1);
+                      }}
+                      className={`px-2.5 py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                        selectedFeedType === opt.value
+                          ? 'bg-white text-indigo-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Payment Type Filter */}
               <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg text-xs">
@@ -1349,22 +1856,30 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
             </div>
           </div>
 
-          {/* Table Card for Feed Stock with 10 records per page */}
+          {/* Table Card for Stock Registry with 10 records per page */}
           <TableCard
-            title="Feed Stock & Replenishment Registry"
-            subtitle={`Showing shipments ${startIndex + 1} to ${Math.min(startIndex + recordsPerPage, filteredShipments.length)} of ${filteredShipments.length} records (10 per page)`}
+            title={`${
+              selectedHead === 'all' ? 'All Stock' : STOCK_HEAD_META[selectedHead].label + ' Stock'
+            } & Replenishment Registry`}
+            subtitle={
+              filteredShipments.length === 0
+                ? `No ${selectedHead === 'all' ? 'stock' : STOCK_HEAD_META[selectedHead].label.toLowerCase()} records found for ${selectedUnit === 'all' ? 'all units' : selectedUnit}`
+                : `Showing shipments ${startIndex + 1} to ${Math.min(startIndex + recordsPerPage, filteredShipments.length)} of ${filteredShipments.length} records (10 per page)`
+            }
             badge={
               <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('add-stock')}
+                  onClick={() => openAddStockTab()}
                   className="px-2.5 py-1 rounded-lg bg-[#3b8754] hover:bg-[#327347] text-white text-xs font-bold transition-colors flex items-center space-x-1 cursor-pointer shadow-2xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Add New Stock</span>
+                  <span>
+                    + Add {selectedHead === 'all' ? 'New' : STOCK_HEAD_META[selectedHead].label} Stock
+                  </span>
                 </button>
                 <span className="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-900 text-xs font-bold">
-                  {filteredShipments.length} Filtered Shipments
+                  {filteredShipments.length} Filtered Entries
                 </span>
               </div>
             }
@@ -1378,24 +1893,50 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
                     <th className="py-3 px-3">Type</th>
                     <th className="py-3 px-3">Flock / Unit</th>
                     <th className="py-3 px-3">Category</th>
-                    <th className="py-3 px-3 text-right">Quantity (Bags)</th>
+                    <th className="py-3 px-3 text-right">
+                      {selectedHead === 'FEED'
+                        ? 'Quantity (Bags)'
+                        : selectedHead === 'all'
+                        ? 'Quantity'
+                        : 'Quantity (Units)'}
+                    </th>
                     <th className="py-3 px-3 text-right">Amount (PKR)</th>
-                    <th className="py-3 px-3 text-right">Avg Rate/Bag</th>
+                    <th className="py-3 px-3 text-right">
+                      {selectedHead === 'FEED' ? 'Avg Rate/Bag' : 'Avg Rate/Unit'}
+                    </th>
                     <th className="py-3 px-3">Payment</th>
                     <th className="py-3 px-3">Challan #</th>
-                    <th className="py-3 px-3">D.O. / Dispatch Notes</th>
+                    <th className="py-3 px-3">Dispatch / Store Notes</th>
                     <th className="py-3 px-3 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedShipments.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="py-8 text-center text-slate-400">
-                        No feed stock records match the selected filter criteria.
+                      <td colSpan={12} className="py-10 text-center text-slate-500">
+                        <div className="space-y-2">
+                          <p className="font-semibold text-slate-700">
+                            No {selectedHead === 'all' ? '' : STOCK_HEAD_META[selectedHead].label.toLowerCase() + ' '}stock records match the selected filters
+                            {selectedUnit !== 'all' ? ` for ${selectedUnit}` : ''}.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => openAddStockTab()}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#3b8754] hover:bg-[#327347] text-white text-xs font-bold cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>
+                              Add {selectedHead === 'all' ? 'Stock' : STOCK_HEAD_META[selectedHead].label} Record
+                              {selectedUnit !== 'all' ? ` for ${selectedUnit}` : ''}
+                            </span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    paginatedShipments.map((record) => (
+                    paginatedShipments.map((record) => {
+                      const normHead = normalizeStockHead(record.head);
+                      return (
                       <tr key={record.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-3 px-3 font-mono font-bold text-slate-600">
                           #{record.trackingId}
@@ -1413,7 +1954,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
                                 : 'bg-teal-100 text-teal-900'
                             }`}
                           >
-                            {record.head === 'FEED' ? `Feed ${record.type}` : record.type}
+                            {normHead === 'FEED' ? `Feed ${record.type}` : record.type}
                           </span>
                         </td>
                         <td className="py-3 px-3 font-bold text-slate-900">
@@ -1429,12 +1970,14 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
                             {record.flockName}
                           </span>
                         </td>
-                        <td className="py-3 px-3 font-medium text-slate-600">
+                        <td className="py-3 px-3 font-semibold text-slate-700">
                           {record.head}
                         </td>
                         <td className="py-3 px-3 text-right font-bold font-mono text-indigo-900">
                           {record.quantity.toLocaleString()}{' '}
-                          <span className="text-[10px] text-slate-400 font-normal">bags</span>
+                          <span className="text-[10px] text-slate-400 font-normal">
+                            {normHead === 'FEED' ? 'bags' : 'units'}
+                          </span>
                         </td>
                         <td className="py-3 px-3 text-right font-bold font-mono text-emerald-800">
                           Rs. {record.amount.toLocaleString()}
@@ -1511,7 +2054,8 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
                           )}
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1669,7 +2213,7 @@ export const StocksView: React.FC<StocksViewProps> = ({ onAddTransaction }) => {
                     required
                     value={editType}
                     onChange={(e) => setEditType(e.target.value)}
-                    placeholder="e.g. 13, 11, 12"
+                    placeholder="e.g. 13, Antibiotic, ND + IB Lasota..."
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-semibold"
                   />
                 </div>

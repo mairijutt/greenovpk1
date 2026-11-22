@@ -48,7 +48,11 @@ import {
   upsertBank,
   deleteBank,
   fetchAllUsers,
+  fetchAllPowerConsumptions,
+  upsertPowerConsumption,
+  deletePowerConsumption,
   reconcileFlockBirdHealth,
+  StockLinkedExpenseError,
 } from './supabaseSync.ts';
 
 export const apiRouter = Router();
@@ -59,6 +63,13 @@ const asyncHandler =
     Promise.resolve(fn(req as AuthenticatedRequest, res, next)).catch((err) => {
       console.error('API Error:', err);
       if (!res.headersSent) {
+        if (err instanceof StockLinkedExpenseError) {
+          res.status(err.statusCode).json({
+            message: err.message,
+            code: err.code,
+          });
+          return;
+        }
         res.status(500).json({
           message: err?.message || 'Database operation failed. Please try again.',
           code: 'SERVER_ERROR',
@@ -1096,8 +1107,8 @@ apiRouter.put(
 apiRouter.delete(
   '/stocks/:id',
   asyncHandler(async (req, res) => {
-    await deleteStock(req.params.id);
-    res.json({ message: 'success', data: { id: req.params.id } });
+    const result = await deleteStock(req.params.id);
+    res.json({ message: 'success', data: { id: req.params.id, ...result } });
   })
 );
 
@@ -1394,6 +1405,63 @@ apiRouter.delete(
   '/banks/:id',
   asyncHandler(async (req, res) => {
     await deleteBank(req.params.id);
+    res.json({ message: 'success', data: { id: req.params.id } });
+  })
+);
+
+// ==========================================
+// 16. Power Consumption (Solar, Grid & Diesel) CRUD
+// ==========================================
+apiRouter.get(
+  '/power-consumptions',
+  asyncHandler(async (req, res) => {
+    const flockIdParam = req.query.flockId as string | undefined;
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const search = req.query.search as string | undefined;
+
+    let items = await fetchAllPowerConsumptions();
+    if (flockIdParam && flockIdParam !== 'all' && flockIdParam !== 'null' && flockIdParam !== 'undefined') {
+      items = items.filter((it) => String(it.flockId) === String(flockIdParam));
+    }
+    if (startDate || endDate) {
+      items = items.filter((it) => isDateInRange(it.date, startDate, endDate));
+    }
+    if (search && search.trim()) {
+      const s = search.trim().toLowerCase();
+      items = items.filter(
+        (it) =>
+          it.flockName?.toLowerCase().includes(s) ||
+          it.referenceNo?.toLowerCase().includes(s) ||
+          it.notes?.toLowerCase().includes(s) ||
+          it.date?.includes(s)
+      );
+    }
+
+    res.json({ message: 'success', data: paginateItems(items, req, 10) });
+  })
+);
+
+apiRouter.post(
+  '/power-consumptions',
+  asyncHandler(async (req, res) => {
+    const saved = await upsertPowerConsumption(req.body || {});
+    res.json({ message: 'success', data: saved });
+  })
+);
+
+apiRouter.put(
+  '/power-consumptions/:id',
+  asyncHandler(async (req, res) => {
+    const saved = await upsertPowerConsumption(req.body || {}, req.params.id);
+    res.json({ message: 'success', data: saved });
+  })
+);
+
+apiRouter.delete(
+  '/power-consumptions/:id',
+  asyncHandler(async (req, res) => {
+    await deletePowerConsumption(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });
   })
 );

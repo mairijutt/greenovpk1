@@ -141,6 +141,11 @@ export interface FinancialRecord {
   looseEggs?: number;
   bankId?: string;
   bankName?: string;
+  isStockLinked?: boolean;
+  linkedStockId?: number | string;
+  linkedStockHead?: string;
+  linkedStockType?: string;
+  linkedStockQuantity?: number;
 }
 
 export interface BankAccount {
@@ -226,6 +231,28 @@ export interface StaffAttendanceLog {
   status: 'Present' | 'Late' | 'Half Day' | 'On Leave' | 'Absent';
   adminNotes?: string;
   loggedBy?: string;
+  updatedAt?: string;
+}
+
+export interface PowerConsumptionRecord {
+  id: string;
+  trackingId?: number;
+  flockId: string;
+  flockName: string;
+  date: string; // YYYY-MM-DD
+  solarProducedUnits: number;
+  solarConsumedUnits: number;
+  gridConsumedUnits: number;
+  unitRatePkr: number; // solar unit rate (default Rs. 35)
+  solarUnitRatePkr?: number;
+  gridUnitRatePkr?: number; // main grid unit rate (default Rs. 60)
+  dieselPurchasedLiters: number;
+  dieselConsumedLiters: number;
+  dieselRatePerLiter: number;
+  dieselPurchaseCost: number;
+  referenceNo?: string;
+  notes?: string;
+  createdAt?: string;
   updatedAt?: string;
 }
 

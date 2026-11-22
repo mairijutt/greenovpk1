@@ -787,7 +787,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {
         label: 'Unit Economics',
         value: `Rs. ${Math.round(m.avgCartonPrice).toLocaleString()}/ctn`,
-        subtext: `Cost/Bird: Rs. ${m.avgPerBirdCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | OpEx: ${fmtCompactReportPkr(m.operatingExpenses)}`,
+        subtext: `Expense/Bird: Rs. ${m.avgPerBirdCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | OpEx: ${fmtCompactReportPkr(m.operatingExpenses)}`,
         tone: 'indigo',
       },
       {
@@ -811,7 +811,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {
         label: 'Feed Consumed & Rem.',
         value: `${m.feedConsumedBags.toLocaleString()} Bags`,
-        subtext: `Cost: ${fmtCompactReportPkr(m.feedExpenses)} | Rem: ${m.remainingFeedBags.toLocaleString()} Bags`,
+        subtext: `Expense: ${fmtCompactReportPkr(m.feedExpenses)} | Rem: ${m.remainingFeedBags.toLocaleString()} Bags`,
         tone: 'slate',
       },
     ];
@@ -841,7 +841,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       },
       {
         kind: 'section',
-        particulars: 'B. COST OF GOODS SOLD (DIRECT BIRD & PRODUCTION COSTS)',
+        particulars: 'B. DIRECT BIRD & PRODUCTION EXPENSES',
         basis: '',
         amount: '',
         percentRevenue: '',
@@ -869,8 +869,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       },
       {
         kind: 'subtotal',
-        particulars: 'Total Cost of Goods Sold (B)',
-        basis: 'Direct Bird & Feed Cost',
+        particulars: 'Total Direct Expenses (B)',
+        basis: 'Direct Bird & Feed Expense',
         amount: `(${fmtReportPkr(m.cogsExpenses)})`,
         percentRevenue: pctStr(m.cogsExpenses),
       },
@@ -912,7 +912,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {
         kind: 'subtotal',
         particulars: 'Total Operating Expenses (C)',
-        basis: 'Unit Operating Cost (Excl. Bird Cost)',
+        basis: 'Unit Operating Expense (Excl. Bird Expenses)',
         amount: `(${fmtReportPkr(m.operatingExpenses)})`,
         percentRevenue: pctStr(m.operatingExpenses),
       },
@@ -955,7 +955,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         { header: 'Expense (PKR)', align: 'right' as const, width: 28 },
         { header: 'Net P&L (PKR)', align: 'right' as const, width: 28 },
         { header: 'Feed (Bags)', align: 'right' as const, width: 17 },
-        { header: 'Cost/Bird', align: 'right' as const, width: 16 },
+        { header: 'Expense/Bird', align: 'right' as const, width: 16 },
       ],
       unitSummaryRows: unitMatrixList.map(({ name, u }) => [
         name,
@@ -2202,7 +2202,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               icon={Scale}
               color="blue"
               badge={{ text: '~Rs. 117 / kg', color: 'blue' }}
-              subtext="Weighted average procurement cost"
+              subtext="Weighted average procurement expense"
             />
 
             <StatCard

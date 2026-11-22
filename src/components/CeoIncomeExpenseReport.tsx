@@ -198,7 +198,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
           color="rose"
           valueColor="text-rose-700"
           badge={{ text: `${metrics.expenseCount.toLocaleString()} Vouchers`, color: 'rose' }}
-          subtext={`Bird/Feed Cost: ${formatPkr(metrics.cogsExpenses)} • OpEx: ${formatPkr(metrics.operatingExpenses)}`}
+          subtext={`Bird/Feed Expense: ${formatPkr(metrics.cogsExpenses)} • OpEx: ${formatPkr(metrics.operatingExpenses)}`}
           href={buildCardHref('/expenses')}
           target="_blank"
           linkLabel="Open Expenses Ledger"
@@ -280,7 +280,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
             text: `Rem: ${metrics.remainingFeedBags.toLocaleString()} Bags`,
             color: 'blue',
           }}
-          subtext={`Cost: ${formatPkr(metrics.feedExpenses)} • Purchased: ${metrics.feedStockReceivedBags.toLocaleString()} Bags`}
+          subtext={`Expense: ${formatPkr(metrics.feedExpenses)} • Purchased: ${metrics.feedStockReceivedBags.toLocaleString()} Bags`}
           href={buildCardHref('/daily-consumption')}
           target="_blank"
           linkLabel="Open Daily Consumption"
@@ -370,7 +370,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                 {/* Direct Farm Cost (COGS) Section */}
                 <tr className="bg-amber-50/40">
                   <td colSpan={3} className="py-2 px-4 font-black text-amber-900 uppercase text-[10px] tracking-wider">
-                    B. Cost of Goods Sold (Direct Bird &amp; Production Costs)
+                    B. Direct Bird &amp; Production Expenses
                   </td>
                 </tr>
                 <tr className="hover:bg-slate-50/80">
@@ -419,7 +419,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                 </tr>
                 <tr className="bg-amber-50/70 border-t border-amber-200">
                   <td className="py-2.5 px-4 font-bold text-amber-950">
-                    Total Cost of Goods Sold (B)
+                    Total Direct Expenses (B)
                   </td>
                   <td className="py-2.5 px-4 text-right font-bold text-rose-700">
                     ({formatFullPkr(metrics.cogsExpenses)})
@@ -564,7 +564,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
               </div>
               <div className="p-2.5 rounded-xl bg-white border border-slate-200">
                 <div className="text-[10px] font-semibold text-slate-500 uppercase">
-                  Unit Operating Cost
+                  Unit Operating Expense
                 </div>
                 <div className="text-xs font-black text-slate-900 mt-0.5">
                   {formatFullPkr(metrics.operatingExpenses)}
@@ -600,7 +600,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
               <th className="py-3 px-3 text-right">Rem. Production</th>
               <th className="py-3 px-3 text-right">Rem. Feed</th>
               <th className="py-3 px-3 text-right">Avg Carton Price</th>
-              <th className="py-3 px-3.5 text-right">Avg Cost / Bird</th>
+              <th className="py-3 px-3.5 text-right">Avg Expense / Bird</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -963,7 +963,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                 Avg Carton
               </th>
               <th className="py-2.5 px-3.5 text-right bg-indigo-50/80 text-indigo-900">
-                Cost / Bird
+                Expense / Bird
               </th>
             </tr>
           </thead>
@@ -1074,8 +1074,8 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Expense Breakdown by Category Head */}
         <TableCard
-          title="Expense Allocation by Cost Head"
-          subtitle={`COGS vs Operating Expense breakdown for ${metrics.periodLabel}`}
+          title="Expense Allocation by Expense Head"
+          subtitle={`Direct vs Operating Expense breakdown for ${metrics.periodLabel}`}
           badge={
             <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-bold">
               {metrics.expenseByHead.length} Active Heads
@@ -1220,7 +1220,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                   </div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                  <div className="text-[10px] font-semibold text-slate-500">Cost / Carton</div>
+                  <div className="text-[10px] font-semibold text-slate-500">Expense / Carton</div>
                   <div className="text-xs font-black text-slate-900 mt-0.5">
                     Rs. {Math.round(metrics.costPerCartonProduced).toLocaleString()}
                   </div>
