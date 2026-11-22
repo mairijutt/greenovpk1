@@ -530,7 +530,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         allTimeExp: 73051255,
         allTimeEggs: 2242800,
         allTimeRev: 34952096,
-        status: 'Tunnel Ventilation Active · Bank 1 Online',
       },
       {
         unit: 'Unit 2',
@@ -544,7 +543,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         allTimeExp: 253509518.6,
         allTimeEggs: 14463810,
         allTimeRev: 273821904,
-        status: 'Cooling Pads Active · 200 Bags Delivered',
       },
       {
         unit: 'Unit 3',
@@ -558,7 +556,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         allTimeExp: 60593070,
         allTimeEggs: 1420320,
         allTimeRev: 20920177,
-        status: 'Airflow 2.1 m/s · Negative Pressure OK',
       },
     ];
 
@@ -698,7 +695,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         displayNetPerBird: netPerBird,
         displayMarginPercent: marginPercent,
         isProfit,
-        status: u.status,
       };
     });
   }, [eggProductions, financials, mortalityLogs, flocks, consumptionLogs, allFeedStocks, preset, fromDate, toDate]);
@@ -1809,8 +1805,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-emerald-700 font-bold">
-                    <span className="text-[11px] text-slate-500 font-medium">{unit.status}</span>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end text-xs text-emerald-700 font-bold">
                     <span className="flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
                       <span>Open Flocks</span>
                       <ExternalLink className="w-3.5 h-3.5" />

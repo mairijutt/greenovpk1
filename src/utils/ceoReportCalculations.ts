@@ -21,6 +21,18 @@ export const MONTH_OPTIONS = [
 
 export const COGS_CATEGORIES = new Set(['FEED', 'CHICKEN', 'MEDICINE', 'VACCINE']);
 
+export const BIRD_EXPENSE_HEADS = new Set([
+  'FEED',
+  'CHICKEN',
+  'MEDICINE',
+  'UTILITIES',
+  'SALARIES_PAYMENTS',
+  'POL',
+  'VACCINE',
+  'MESS',
+  'RENT',
+]);
+
 export function normalizeDateStr(d?: string): string {
   if (!d) return '';
   return String(d).slice(0, 10);
@@ -107,6 +119,8 @@ export interface CeoSummaryMetrics {
   totalExpenses: number;
   cogsExpenses: number;
   operatingExpenses: number;
+  birdExpenses: number;
+  unitOperatingExpense: number;
   feedExpenses: number;
   salariesExpenses: number;
   medicineVaccineExpenses: number;
@@ -492,6 +506,11 @@ export function computeCeoSummary(params: {
     0
   );
   const operatingExpenses = Math.max(0, totalExpenses - cogsExpenses);
+  const birdExpenses = Object.entries(expHeadMap).reduce(
+    (sum, [head, amt]) => (BIRD_EXPENSE_HEADS.has(head) ? sum + amt : sum),
+    0
+  );
+  const unitOperatingExpense = Math.max(0, totalExpenses - birdExpenses);
 
   // Prior period expenses also on consumed-feed basis for consistent cash rollover
   const prevNonFeedExpenses = prevExpensesList
@@ -593,9 +612,9 @@ export function computeCeoSummary(params: {
   const carriedPrevNetCash = fromDate ? prevSalesRevenue - prevExpensesTotal : 0;
   const carriedNextNetCash = carriedPrevNetCash + netIncome;
 
-  const avgPerBirdCost = activeBirds > 0 ? totalExpenses / activeBirds : 0;
+  const avgPerBirdCost = activeBirds > 0 ? birdExpenses / activeBirds : 0;
   const avgPerBirdRevenue = activeBirds > 0 ? totalSalesRevenue / activeBirds : 0;
-  const avgPerBirdNet = activeBirds > 0 ? netIncome / activeBirds : 0;
+  const avgPerBirdNet = avgPerBirdRevenue - avgPerBirdCost;
   const avgPerBirdFeedCost = activeBirds > 0 ? feedExpenses / activeBirds : 0;
   const costPerCartonProduced = totalCartonsProduced > 0 ? totalExpenses / totalCartonsProduced : 0;
 
@@ -622,6 +641,8 @@ export function computeCeoSummary(params: {
     totalExpenses,
     cogsExpenses,
     operatingExpenses,
+    birdExpenses,
+    unitOperatingExpense,
     feedExpenses,
     salariesExpenses,
     medicineVaccineExpenses,
@@ -829,9 +850,16 @@ export function computeMonthlyBreakdown(params: {
     const totalAvailableFeedBags = carriedPrevFeedBags + feedReceivedBags;
     runningFeedBalance = totalAvailableFeedBags - feedConsumedBags;
 
+    const nonFeedBirdMonthExpenses = mExpenses
+      .filter((x) => {
+        const h = String(x.head || x.category || '').toUpperCase().replace(/\s+/g, '_');
+        return h !== 'FEED' && BIRD_EXPENSE_HEADS.has(h);
+      })
+      .reduce((s, x) => s + (Number(x.amount ?? (x as any).expenseCost) || 0), 0);
+    const monthBirdExpenses = feedConsumedExpense + nonFeedBirdMonthExpenses;
     const cartonsSold = eggsSold / 360;
     const avgCartonPrice = cartonsSold > 0 ? eggRevenue / cartonsSold : 0;
-    const avgPerBirdCost = activeBirds > 0 ? totalExpenses / activeBirds : 0;
+    const avgPerBirdCost = activeBirds > 0 ? monthBirdExpenses / activeBirds : 0;
 
     return {
       monthKey,

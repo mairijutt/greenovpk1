@@ -787,7 +787,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {
         label: 'Unit Economics',
         value: `Rs. ${Math.round(m.avgCartonPrice).toLocaleString()}/ctn`,
-        subtext: `Cost/Bird: Rs. ${Math.round(m.avgPerBirdCost).toLocaleString()} | OpEx: ${fmtCompactReportPkr(m.operatingExpenses)}`,
+        subtext: `Cost/Bird: Rs. ${m.avgPerBirdCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | OpEx: ${fmtCompactReportPkr(m.operatingExpenses)}`,
         tone: 'indigo',
       },
       {
@@ -966,7 +966,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         Math.round(u.totalExpenses).toLocaleString(),
         Math.round(u.netIncome).toLocaleString(),
         u.feedConsumedBags.toLocaleString(),
-        `Rs. ${Math.round(u.avgPerBirdCost).toLocaleString()}`,
+        `Rs. ${u.avgPerBirdCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       ]),
       monthlyColumns: [
         { header: 'Month', align: 'left' as const, width: 20 },

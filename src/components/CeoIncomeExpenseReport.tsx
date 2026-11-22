@@ -9,7 +9,6 @@ import {
   ArrowRightLeft,
   Building2,
   BarChart3,
-  Calculator,
   CalendarDays,
   CreditCard,
   Banknote,
@@ -177,8 +176,8 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
         </div>
       </div>
 
-      {/* Top Relevant KPI Cards (Row 1: Financial P&L & Unit Economics) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top Relevant KPI Cards (Row 1: Financial P&L) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
           title="Total Revenue (Sales)"
           value={formatPkr(metrics.totalSalesRevenue)}
@@ -219,23 +218,6 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
           href={buildCardHref('/dashboard')}
           target="_blank"
           linkLabel="Open Financial Dashboard"
-        />
-
-        <StatCard
-          title="Unit Economics & Operating Cost"
-          value={`Rs. ${Math.round(metrics.avgCartonPrice).toLocaleString()}`}
-          unit="/ carton"
-          icon={Calculator}
-          color="indigo"
-          valueColor="text-indigo-700"
-          badge={{
-            text: `Cost/Bird: Rs. ${Math.round(metrics.avgPerBirdCost).toLocaleString()}`,
-            color: 'indigo',
-          }}
-          subtext={`Rev/Bird: Rs. ${Math.round(metrics.avgPerBirdRevenue).toLocaleString()} • Net/Bird: Rs. ${Math.round(metrics.avgPerBirdNet).toLocaleString()}`}
-          href={buildCardHref('/flocks')}
-          target="_blank"
-          linkLabel="Open Flocks & Sheds"
         />
       </div>
 
