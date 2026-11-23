@@ -230,7 +230,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
           icon={Egg}
           color="amber"
           badge={{ text: `${metrics.avgLayingRate.toFixed(1)}% Laying`, color: 'amber' }}
-          subtext={`${metrics.totalEggsProduced.toLocaleString()} Eggs • ${metrics.brokenEggs.toLocaleString()} Broken (${brokenPct}%)`}
+          subtext={`Net: ${Math.round(metrics.cleanEggsProduced / 360).toLocaleString()} Ctns • ${metrics.brokenEggs.toLocaleString()} Broken (${brokenPct}%)`}
           href={buildCardHref('/egg-production')}
           target="_blank"
           linkLabel="Open Egg Production"
@@ -679,7 +679,17 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                       {um.feedConsumedKg.toLocaleString()} kg
                     </div>
                   </td>
-                  <td className="py-3 px-3 text-right font-bold">
+                  <td
+                    className={`py-3 px-3 text-right font-bold ${
+                      isAllRow
+                        ? um.carriedNextCartons < 0
+                          ? 'text-rose-300'
+                          : 'text-white'
+                        : um.carriedNextCartons < 0
+                        ? 'text-rose-600'
+                        : 'text-slate-900'
+                    }`}
+                  >
                     {Math.round(um.carriedNextCartons).toLocaleString()} ctns
                   </td>
                   <td className="py-3 px-3 text-right font-bold">
@@ -785,10 +795,11 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
               </td>
               <td className="py-3.5 px-4 text-right">
                 <div className="font-bold text-emerald-700">
-                  +{Math.round(metrics.totalCartonsProduced).toLocaleString()} ctns
+                  +{Math.round(metrics.cleanEggsProduced / 360).toLocaleString()} ctns
                 </div>
                 <div className="text-[10px] text-slate-500">
-                  {metrics.totalEggsProduced.toLocaleString()} eggs produced
+                  {Math.round(metrics.totalCartonsProduced).toLocaleString()} prod −{' '}
+                  {(metrics.brokenEggs / 360).toLocaleString(undefined, { maximumFractionDigits: 1 })} broken
                 </div>
               </td>
               <td className="py-3.5 px-4 text-right">
@@ -900,7 +911,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                 Period
               </th>
               <th
-                colSpan={4}
+                colSpan={5}
                 className="py-2 px-3 text-center bg-amber-100/90 text-amber-950 border-r border-amber-200 tracking-wider"
               >
                 Egg Production &amp; Stock (Cartons)
@@ -934,6 +945,9 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
               </th>
               <th className="py-2.5 px-3 text-right bg-amber-50/80 text-amber-900">
                 Produced (Ctns)
+              </th>
+              <th className="py-2.5 px-3 text-right bg-amber-50/80 text-rose-800">
+                Broken (Ctns)
               </th>
               <th className="py-2.5 px-3 text-right bg-amber-50/80 text-amber-900">
                 Sold (Ctns)
@@ -970,7 +984,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
           <tbody className="divide-y divide-slate-100">
             {monthlyRows.length === 0 ? (
               <tr>
-                <td colSpan={13} className="py-8 text-center text-slate-400">
+                <td colSpan={14} className="py-8 text-center text-slate-400">
                   No monthly activity recorded for {selectedYear === 'all' ? 'the selected filters' : selectedYear}.
                 </td>
               </tr>
@@ -1005,17 +1019,36 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                       </div>
                     </td>
                     {/* Egg Production & Stock Section */}
-                    <td className={`py-3 px-3 text-right text-amber-800 font-medium ${eggTint}`}>
+                    <td
+                      className={`py-3 px-3 text-right font-medium ${eggTint} ${
+                        row.carriedPrevCartons < 0 ? 'text-rose-600' : 'text-amber-800'
+                      }`}
+                    >
                       {Math.round(row.carriedPrevCartons).toLocaleString()}
                     </td>
-                    <td className={`py-3 px-3 text-right font-bold text-slate-900 ${eggTint}`}>
-                      {Math.round(row.totalCartonsProduced).toLocaleString()}
+                    <td className={`py-3 px-3 text-right ${eggTint}`}>
+                      <div className="font-bold text-slate-900">
+                        {Math.round(row.totalCartonsProduced).toLocaleString()}
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        Net: {Math.round(row.netCartonsProduced).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className={`py-3 px-3 text-right ${eggTint}`}>
+                      <div className={`font-semibold ${row.brokenEggs > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                        {row.brokenCartons.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {row.brokenEggs.toLocaleString()} eggs
+                      </div>
                     </td>
                     <td className={`py-3 px-3 text-right font-semibold text-slate-700 ${eggTint}`}>
                       {Math.round(row.cartonsSold).toLocaleString()}
                     </td>
                     <td
-                      className={`py-3 px-3 text-right font-bold text-amber-900 border-r border-amber-200/70 ${eggTint}`}
+                      className={`py-3 px-3 text-right font-bold border-r border-amber-200/70 ${eggTint} ${
+                        row.carriedNextCartons < 0 ? 'text-rose-600' : 'text-amber-900'
+                      }`}
                     >
                       {Math.round(row.carriedNextCartons).toLocaleString()} ctns
                     </td>
@@ -1067,6 +1100,84 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
               })
             )}
           </tbody>
+          {monthlyRows.length > 0 && (() => {
+            const openingCartons = monthlyRows[0].carriedPrevCartons;
+            const totalProdCartons = monthlyRows.reduce((s, r) => s + r.totalCartonsProduced, 0);
+            const totalNetCartons = monthlyRows.reduce((s, r) => s + r.netCartonsProduced, 0);
+            const totalBrokenCartons = monthlyRows.reduce((s, r) => s + r.brokenCartons, 0);
+            const totalBrokenEggs = monthlyRows.reduce((s, r) => s + r.brokenEggs, 0);
+            const totalSoldCartons = monthlyRows.reduce((s, r) => s + r.cartonsSold, 0);
+            const closingCartons = monthlyRows[monthlyRows.length - 1].carriedNextCartons;
+            const totalSalesAmt = monthlyRows.reduce((s, r) => s + r.totalSales, 0);
+            const totalExpenseAmt = monthlyRows.reduce((s, r) => s + r.totalExpenses, 0);
+            const totalNetAmt = totalSalesAmt - totalExpenseAmt;
+            const totalFeedRecv = monthlyRows.reduce((s, r) => s + r.feedReceivedBags, 0);
+            const totalFeedCons = monthlyRows.reduce((s, r) => s + r.feedConsumedBags, 0);
+            const closingFeed = monthlyRows[monthlyRows.length - 1].remainingFeedBags;
+
+            return (
+              <tfoot className="bg-slate-900 text-white font-bold border-t-2 border-slate-700 text-xs">
+                <tr>
+                  <td className="py-3 px-3.5 border-r border-slate-700">
+                    Total / Closing ({monthlyRows.length}M)
+                  </td>
+                  <td className="py-3 px-3 text-right text-amber-300">
+                    {Math.round(openingCartons).toLocaleString()}
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    <div>{Math.round(totalProdCartons).toLocaleString()}</div>
+                    <div className="text-[10px] text-slate-300 font-normal">
+                      Net: {Math.round(totalNetCartons).toLocaleString()}
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 text-right text-rose-300">
+                    <div>{totalBrokenCartons.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+                    <div className="text-[10px] text-slate-300 font-normal">
+                      {totalBrokenEggs.toLocaleString()} eggs
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 text-right text-indigo-300">
+                    {Math.round(totalSoldCartons).toLocaleString()}
+                  </td>
+                  <td
+                    className={`py-3 px-3 text-right border-r border-slate-700 ${
+                      closingCartons < 0 ? 'text-rose-300' : 'text-amber-300'
+                    }`}
+                  >
+                    {Math.round(closingCartons).toLocaleString()} ctns
+                  </td>
+                  <td className="py-3 px-3 text-right text-emerald-300">
+                    {formatPkr(totalSalesAmt)}
+                  </td>
+                  <td className="py-3 px-3 text-right text-rose-300">
+                    {formatPkr(totalExpenseAmt)}
+                  </td>
+                  <td
+                    className={`py-3 px-3 text-right border-r border-slate-700 ${
+                      totalNetAmt >= 0 ? 'text-emerald-300' : 'text-rose-300'
+                    }`}
+                  >
+                    {formatPkr(totalNetAmt)}
+                  </td>
+                  <td className="py-3 px-3 text-right text-sky-200">
+                    {(monthlyRows[0].carriedPrevFeedBags + totalFeedRecv).toLocaleString()} bags
+                  </td>
+                  <td className="py-3 px-3 text-right text-slate-200">
+                    {totalFeedCons.toLocaleString()} bags
+                  </td>
+                  <td className="py-3 px-3 text-right text-sky-300 border-r border-slate-700">
+                    {closingFeed.toLocaleString()} bags
+                  </td>
+                  <td className="py-3 px-3 text-right text-amber-300">
+                    Rs. {Math.round(metrics.avgCartonPrice).toLocaleString()}
+                  </td>
+                  <td className="py-3 px-3.5 text-right text-slate-200">
+                    Rs. {Math.round(metrics.avgPerBirdCost).toLocaleString()}
+                  </td>
+                </tr>
+              </tfoot>
+            );
+          })()}
         </table>
       </TableCard>
 

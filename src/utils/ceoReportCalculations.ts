@@ -171,6 +171,10 @@ export interface MonthlyCeoRow {
   monthLabel: string;
   totalEggsProduced: number;
   totalCartonsProduced: number;
+  brokenEggs: number;
+  brokenCartons: number;
+  netEggsProduced: number;
+  netCartonsProduced: number;
   eggsSold: number;
   cartonsSold: number;
   totalSales: number;
@@ -380,6 +384,8 @@ export function computeCeoSummary(params: {
       : 0;
 
   const prevEggsProduced = prevEggs.reduce((s, e) => s + (Number(e.totalEggs) || 0), 0);
+  const prevBrokenEggs = prevEggs.reduce((s, e) => s + (Number(e.damagedEggs ?? e.brokenEggs) || 0), 0);
+  const prevCleanEggsProduced = prevEggsProduced - prevBrokenEggs;
 
   // Period Sales
   const periodSales = unitSales.filter((s) => isInPeriod(s.date));
@@ -589,16 +595,16 @@ export function computeCeoSummary(params: {
   const operatingProfitExclCapex = totalSalesRevenue - (totalExpenses - chickenCapexExpenses);
   const operatingMarginPercent = totalSalesRevenue > 0 ? (operatingProfitExclCapex / totalSalesRevenue) * 100 : 0;
 
-  const carriedPrevEggs = Math.max(0, prevEggsProduced - prevEggsSold);
+  const carriedPrevEggs = prevCleanEggsProduced - prevEggsSold;
   const carriedPrevCartons = carriedPrevEggs / 360;
-  const periodRemainingEggs = totalEggsProduced - eggsSold;
+  const periodRemainingEggs = cleanEggsProduced - eggsSold;
   const periodRemainingCartons = periodRemainingEggs / 360;
-  const carriedNextEggs = Math.max(0, carriedPrevEggs + totalEggsProduced - eggsSold);
+  const carriedNextEggs = carriedPrevEggs + cleanEggsProduced - eggsSold;
   const carriedNextCartons = carriedNextEggs / 360;
 
   const avgCartonPrice = cartonsSold > 0 ? eggSalesRevenue / cartonsSold : 0;
   const avgEggPrice = avgCartonPrice > 0 ? avgCartonPrice / 360 : 0;
-  const carriedNextEggValue = carriedNextCartons * avgCartonPrice;
+  const carriedNextEggValue = Math.max(0, carriedNextCartons) * avgCartonPrice;
 
   const carriedPrevFeedBags = prevFeedReceivedBags - prevFeedConsumedBags;
   const periodNetFeedBags = feedStockReceivedBags - feedConsumedBags;
@@ -752,9 +758,14 @@ export function computeMonthlyBreakdown(params: {
 
   if (selectedYear && selectedYear !== 'all') {
     const yearStart = `${selectedYear}-01-01`;
-    const priorEggsProduced = eggProductions
-      .filter((e) => matchesSelectedUnit(e, selectedUnit) && normalizeDateStr(e.date) < yearStart)
-      .reduce((s, e) => s + (Number(e.totalEggs) || 0), 0);
+    const priorEggRows = eggProductions.filter(
+      (e) => matchesSelectedUnit(e, selectedUnit) && normalizeDateStr(e.date) < yearStart
+    );
+    const priorEggsProduced = priorEggRows.reduce((s, e) => s + (Number(e.totalEggs) || 0), 0);
+    const priorBrokenEggs = priorEggRows.reduce(
+      (s, e) => s + (Number(e.damagedEggs ?? e.brokenEggs) || 0),
+      0
+    );
     const priorEggsSold = salesRecords
       .filter(
         (s) =>
@@ -763,7 +774,7 @@ export function computeMonthlyBreakdown(params: {
           normalizeDateStr(s.date) < yearStart
       )
       .reduce((s, x) => s + getEggSaleQuantity(x), 0);
-    runningEggsBalance = Math.max(0, priorEggsProduced - priorEggsSold);
+    runningEggsBalance = priorEggsProduced - priorBrokenEggs - priorEggsSold;
 
     const priorFeedReceived = allFeedStocks
       .filter((k) => matchesSelectedUnit(k, selectedUnit) && normalizeDateStr(k.date) < yearStart)
@@ -800,6 +811,8 @@ export function computeMonthlyBreakdown(params: {
     );
 
     const totalEggsProduced = mEggs.reduce((s, e) => s + (Number(e.totalEggs) || 0), 0);
+    const brokenEggs = mEggs.reduce((s, e) => s + (Number(e.damagedEggs ?? e.brokenEggs) || 0), 0);
+    const netEggsProduced = Math.max(0, totalEggsProduced - brokenEggs);
     const eggSales = mSales.filter((s) => isEggSaleRecord(s));
     const eggsSold = eggSales.reduce((s, x) => s + getEggSaleQuantity(x), 0);
     const eggRevenue = eggSales.reduce((s, x) => s + (Number(x.amount ?? x.totalAmount) || 0), 0);
@@ -842,8 +855,8 @@ export function computeMonthlyBreakdown(params: {
     const feedConsumedBags = mConsumptions.reduce((s, c) => s + getConsumptionBags(c), 0);
     const feedReceivedBags = mStocks.reduce((s, k) => s + (Number(k.quantity) || 0), 0);
 
-    const carriedPrevCartons = Math.max(0, runningEggsBalance) / 360;
-    runningEggsBalance = Math.max(0, runningEggsBalance + totalEggsProduced - eggsSold);
+    const carriedPrevCartons = runningEggsBalance / 360;
+    runningEggsBalance = runningEggsBalance + (totalEggsProduced - brokenEggs) - eggsSold;
     const carriedNextCartons = runningEggsBalance / 360;
 
     const carriedPrevFeedBags = runningFeedBalance;
@@ -866,6 +879,10 @@ export function computeMonthlyBreakdown(params: {
       monthLabel,
       totalEggsProduced,
       totalCartonsProduced: totalEggsProduced / 360,
+      brokenEggs,
+      brokenCartons: brokenEggs / 360,
+      netEggsProduced,
+      netCartonsProduced: (totalEggsProduced - brokenEggs) / 360,
       eggsSold,
       cartonsSold,
       totalSales,
@@ -875,7 +892,7 @@ export function computeMonthlyBreakdown(params: {
       feedConsumedBags,
       feedReceivedBags,
       carriedPrevCartons,
-      remainingProductionCartons: (totalEggsProduced - eggsSold) / 360,
+      remainingProductionCartons: (totalEggsProduced - brokenEggs - eggsSold) / 360,
       carriedNextCartons,
       carriedPrevFeedBags,
       totalAvailableFeedBags,

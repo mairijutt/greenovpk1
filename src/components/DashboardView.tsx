@@ -1638,7 +1638,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               return (
                 <a
                   key={unit.unit}
-                  href="/flocks"
+                  href="/reports"
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`bg-white rounded-2xl p-6 border transition-all cursor-pointer flex flex-col justify-between hover:shadow-lg block group ${
@@ -1823,7 +1823,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end text-xs text-emerald-700 font-bold">
                     <span className="flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                      <span>Open Flocks</span>
+                      <span>Open Reports</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </span>
                   </div>
