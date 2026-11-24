@@ -47,6 +47,8 @@ interface CeoIncomeExpenseReportProps {
   onAddBank: (bank: BankAccount) => void;
   onEditBank: (bank: BankAccount) => void;
   onDeleteBank: (id: string) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
   onNavigateTab?: (tab: string) => void;
 }
 
@@ -84,6 +86,8 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
   onAddBank,
   onEditBank,
   onDeleteBank,
+  canEdit = true,
+  canDelete = true,
 }) => {
   const [showBankModal, setShowBankModal] = useState(false);
   const [editingBank, setEditingBank] = useState<BankAccount | null>(null);
@@ -1496,7 +1500,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                           {formatFullPkr(item.currentBalance)}
                         </td>
                         <td className="py-3 px-4 text-center">
-                          {isConfirming ? (
+                          {canDelete && isConfirming ? (
                             <div className="inline-flex items-center space-x-1.5">
                               <button
                                 type="button"
@@ -1526,25 +1530,29 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingBank(bank);
-                                  setShowBankModal(true);
-                                }}
-                                title="Edit Bank Opening Balance"
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(bank.id)}
-                                title="Remove Bank Account"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingBank(bank);
+                                    setShowBankModal(true);
+                                  }}
+                                  title="Edit Bank Opening Balance"
+                                  className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteId(bank.id)}
+                                  title="Remove Bank Account"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
@@ -1627,7 +1635,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
         }
         notes={viewingBankItem?.bank.notes}
         onEdit={
-          viewingBankItem
+          canEdit && viewingBankItem
             ? () => {
                 setEditingBank(viewingBankItem.bank);
                 setShowBankModal(true);
@@ -1635,7 +1643,7 @@ export const CeoIncomeExpenseReport: React.FC<CeoIncomeExpenseReportProps> = ({
             : undefined
         }
         onDelete={
-          viewingBankItem
+          canDelete && viewingBankItem
             ? () => {
                 onDeleteBank(viewingBankItem.bank.id);
               }

@@ -7,7 +7,10 @@ import {
   signAuthToken,
   requireAuth,
   requireSuperAdmin,
+  requireFinancialAccess,
+  requireFarmsAccess,
 } from './auth.ts';
+import { getRolePermissions } from '../utils/permissions.ts';
 import {
   ensureDbInitialized,
   flockIdFromInput,
@@ -236,12 +239,42 @@ apiRouter.get('/auth/me', (req: AuthenticatedRequest, res: Response) => {
   });
 });
 
+// Helper: Mask financial fields for supervisor accounts on shared operational modules
+function isFinancialAllowed(req: AuthenticatedRequest): boolean {
+  return getRolePermissions(req.authUser?.role).canViewFinancials;
+}
+
+function maskStockFinancials(item: any) {
+  if (!item || typeof item !== 'object') return item;
+  return {
+    ...item,
+    amount: 0,
+    amountPaid: 0,
+    costPerBag: 0,
+    paymentType: undefined,
+    expenseId: undefined,
+    syncedExpense: undefined,
+  };
+}
+
+function maskPowerFinancials(item: any) {
+  if (!item || typeof item !== 'object') return item;
+  return {
+    ...item,
+    unitRatePkr: 0,
+    solarUnitRatePkr: 0,
+    gridUnitRatePkr: 0,
+    dieselRatePerLiter: 0,
+    dieselPurchaseCost: 0,
+  };
+}
+
 // Challan Upload Handlers
 const dummyChallan = (_req: Request, res: Response) => {
   res.json({ message: 'success', data: { url: '/assets/favicon-DwnAFEdf.png' } });
 };
-apiRouter.post('/expenses/upload-challan', dummyChallan);
-apiRouter.post('/sales/upload-challan', dummyChallan);
+apiRouter.post('/expenses/upload-challan', requireFinancialAccess, dummyChallan);
+apiRouter.post('/sales/upload-challan', requireFinancialAccess, dummyChallan);
 apiRouter.post('/stocks/upload-challan', dummyChallan);
 
 // ==========================================
@@ -400,6 +433,7 @@ apiRouter.get(
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
     const m = await computeMetricsFromDb(flockId, startDate, endDate);
+    const canViewFinancials = isFinancialAllowed(req);
 
     const dailyEggMap: Record<string, { label: string; eggs: number }> = {};
     for (const egg of m.rawEggProductions) {
@@ -421,12 +455,12 @@ apiRouter.get(
       message: 'Dashboard stats generated successfully',
       data: {
         overview: {
-          totalRevenue: m.totalRevenue,
-          totalExpenses: m.totalExpenses,
-          netProfit: m.netProfit,
+          totalRevenue: canViewFinancials ? m.totalRevenue : 0,
+          totalExpenses: canViewFinancials ? m.totalExpenses : 0,
+          netProfit: canViewFinancials ? m.netProfit : 0,
           activeBirds: m.activeBirds,
-          cogs: m.cogs,
-          costPerBird: m.costPerBird,
+          cogs: canViewFinancials ? m.cogs : 0,
+          costPerBird: canViewFinancials ? m.costPerBird : 0,
         },
         production: {
           totalEggs: m.totalEggs,
@@ -445,11 +479,11 @@ apiRouter.get(
         },
         additionalMetrics: {
           flockCount: m.flockCount,
-          avgEggPriceInRange: 18.08,
+          avgEggPriceInRange: canViewFinancials ? 18.08 : 0,
         },
         flockPerformance: m.flockPerformance,
-        salesBreakdown: m.salesBreakdown,
-        expenseBreakdown: m.expenseBreakdown,
+        salesBreakdown: canViewFinancials ? m.salesBreakdown : [],
+        expenseBreakdown: canViewFinancials ? m.expenseBreakdown : [],
         inventoryAlerts: [],
         chart,
       },
@@ -486,6 +520,7 @@ apiRouter.post(
 
 apiRouter.put(
   ['/flock/:id', '/flocks/:id'],
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0 || id > 2147483647) {
@@ -503,6 +538,7 @@ apiRouter.put(
 
 apiRouter.delete(
   ['/flock/:id', '/flocks/:id'],
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0 || id > 2147483647) {
@@ -540,6 +576,7 @@ apiRouter.get(
 // ==========================================
 apiRouter.get(
   '/getFarms',
+  requireFarmsAccess,
   asyncHandler(async (_req, res) => {
     const items = await fetchAllFarms();
     res.json({ message: 'success', data: items });
@@ -548,6 +585,7 @@ apiRouter.get(
 
 apiRouter.get(
   '/farms',
+  requireFarmsAccess,
   asyncHandler(async (_req, res) => {
     const items = await fetchAllFarms();
     res.json({
@@ -559,6 +597,7 @@ apiRouter.get(
 
 apiRouter.post(
   '/farms',
+  requireFarmsAccess,
   asyncHandler(async (req, res) => {
     const saved = await upsertFarm(req.body || {});
     res.json({ message: 'success', data: saved });
@@ -567,6 +606,7 @@ apiRouter.post(
 
 apiRouter.put(
   '/farms/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     const validId = Number.isInteger(id) && id > 0 && id <= 2147483647 ? id : undefined;
@@ -578,6 +618,7 @@ apiRouter.put(
 
 apiRouter.delete(
   '/farms/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0 || id > 2147483647) {
@@ -593,6 +634,7 @@ apiRouter.delete(
 // ==========================================
 apiRouter.get(
   '/user/allUsers',
+  requireSuperAdmin,
   asyncHandler(async (_req, res) => {
     const users = await fetchAllUsers();
     res.json({ message: 'success', data: users });
@@ -775,6 +817,7 @@ apiRouter.post(
 
 apiRouter.put(
   ['/daily-consumption/:id', '/daily-consumptions/:id'],
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertConsumption(req.body || {}, req.params.id);
     res.json({ message: 'success', data: saved });
@@ -783,6 +826,7 @@ apiRouter.put(
 
 apiRouter.delete(
   ['/daily-consumption/:id', '/daily-consumptions/:id'],
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     await deleteConsumption(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });
@@ -847,6 +891,7 @@ apiRouter.post(
 
 apiRouter.put(
   '/bird-health/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertBirdHealth(req.body || {}, req.params.id);
     res.json({ message: 'success', data: saved });
@@ -855,6 +900,7 @@ apiRouter.put(
 
 apiRouter.delete(
   '/bird-health/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     await deleteBirdHealth(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });
@@ -914,6 +960,7 @@ apiRouter.post(
 
 apiRouter.put(
   '/vaccines/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertVaccine(req.body || {}, req.params.id);
     res.json({ message: 'success', data: saved });
@@ -922,6 +969,7 @@ apiRouter.put(
 
 apiRouter.delete(
   '/vaccines/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     await deleteVaccine(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });
@@ -954,6 +1002,7 @@ apiRouter.post(
 
 apiRouter.put(
   ['/egg-production/:id', '/egg-productions/:id'],
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertEggProduction(req.body || {}, req.params.id);
     res.json({ message: 'success', data: saved });
@@ -962,6 +1011,7 @@ apiRouter.put(
 
 apiRouter.delete(
   ['/egg-production/:id', '/egg-productions/:id'],
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     await deleteEggProduction(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });
@@ -995,6 +1045,7 @@ apiRouter.get(
 // ==========================================
 apiRouter.get(
   '/expenses',
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const flockId = getFlockId(req);
     const headFilter = req.query.head as string | undefined;
@@ -1022,6 +1073,7 @@ apiRouter.get(
 
 apiRouter.post(
   ['/expense', '/expenses'],
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const saved = await upsertExpense(req.body || {});
     res.json({ message: 'success', data: saved });
@@ -1030,6 +1082,7 @@ apiRouter.post(
 
 apiRouter.put(
   ['/expense/:id', '/expenses/:id'],
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertExpense(req.body || {}, req.params.id);
     res.json({ message: 'success', data: saved });
@@ -1038,6 +1091,7 @@ apiRouter.put(
 
 apiRouter.delete(
   ['/expense/:id', '/expenses/:id'],
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     await deleteExpense(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });
@@ -1046,6 +1100,7 @@ apiRouter.delete(
 
 apiRouter.get(
   '/expenses/summary',
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const flockId = getFlockId(req);
     const headFilter = req.query.head as string | undefined;
@@ -1084,6 +1139,9 @@ apiRouter.get(
     let items = await fetchAllStocks();
     if (flockId) items = items.filter((it) => it.flockId === flockId);
     if (startDate || endDate) items = items.filter((it) => isDateInRange(it.date, startDate, endDate));
+    if (!isFinancialAllowed(req)) {
+      items = items.map(maskStockFinancials);
+    }
     res.json({ message: 'success', data: paginateItems(items, req, 10) });
   })
 );
@@ -1091,13 +1149,24 @@ apiRouter.get(
 apiRouter.post(
   '/stocks',
   asyncHandler(async (req, res) => {
-    const saved = await upsertStock(req.body || {});
-    res.json({ message: 'success', data: saved });
+    const canFinancial = isFinancialAllowed(req);
+    const payload = canFinancial
+      ? req.body || {}
+      : {
+          ...(req.body || {}),
+          amount: 0,
+          amountPaid: 0,
+          paymentType: 'CASH',
+          skipExpenseSync: true,
+        };
+    const saved = await upsertStock(payload);
+    res.json({ message: 'success', data: canFinancial ? saved : maskStockFinancials(saved) });
   })
 );
 
 apiRouter.put(
   '/stocks/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertStock(req.body || {}, req.params.id);
     res.json({ message: 'success', data: saved });
@@ -1106,6 +1175,7 @@ apiRouter.put(
 
 apiRouter.delete(
   '/stocks/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const result = await deleteStock(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id, ...result } });
@@ -1116,6 +1186,7 @@ apiRouter.get(
   '/stocks/summary',
   asyncHandler(async (req, res) => {
     const flockId = getFlockId(req);
+    const canFinancial = isFinancialAllowed(req);
     let items = await fetchAllStocks();
     if (flockId) items = items.filter((s) => s.flockId === flockId);
     let totalAmount = 0;
@@ -1123,7 +1194,7 @@ apiRouter.get(
     let totalQuantity = 0;
     const headMap: Record<string, number> = {};
     for (const s of items) {
-      const amt = Number(s.amountPaid || s.amount || 0);
+      const amt = canFinancial ? Number(s.amountPaid || s.amount || 0) : 0;
       const qty = Number(s.quantity || 0);
       totalAmount += amt;
       totalQuantity += qty;
@@ -1145,6 +1216,7 @@ apiRouter.get(
 // ==========================================
 apiRouter.get(
   '/sales',
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const flockId = getFlockId(req);
     const startDate = req.query.startDate as string | undefined;
@@ -1160,6 +1232,7 @@ apiRouter.get(
 
 apiRouter.post(
   ['/sale', '/sales'],
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const saved = await upsertSale(req.body || {});
     res.json({ message: 'success', data: saved });
@@ -1168,6 +1241,7 @@ apiRouter.post(
 
 apiRouter.put(
   ['/sale/:id', '/sales/:id'],
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertSale(req.body || {}, req.params.id);
     res.json({ message: 'success', data: saved });
@@ -1176,6 +1250,7 @@ apiRouter.put(
 
 apiRouter.delete(
   ['/sale/:id', '/sales/:id'],
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     await deleteSale(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });
@@ -1184,6 +1259,7 @@ apiRouter.delete(
 
 apiRouter.get(
   '/sales/summary',
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const flockId = getFlockId(req);
     const m = await computeMetricsFromDb(flockId);
@@ -1204,6 +1280,7 @@ apiRouter.get(
 // ==========================================
 apiRouter.get(
   '/salaries',
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const flockId = getFlockId(req);
     const search = req.query.search as string | undefined;
@@ -1224,6 +1301,7 @@ apiRouter.get(
 
 apiRouter.post(
   '/salaries',
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const saved = await upsertSalary(req.body || {});
     res.json({ message: 'success', data: saved });
@@ -1232,6 +1310,7 @@ apiRouter.post(
 
 apiRouter.put(
   '/salaries/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertSalary(req.body || {}, req.params.id);
     res.json({ message: 'success', data: saved });
@@ -1240,6 +1319,7 @@ apiRouter.put(
 
 apiRouter.delete(
   '/salaries/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     await deleteSalary(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });
@@ -1248,6 +1328,7 @@ apiRouter.delete(
 
 apiRouter.get(
   '/workers',
+  requireFinancialAccess,
   asyncHandler(async (_req, res) => {
     const items = await fetchAllWorkers();
     res.json({ message: 'success', data: { items } });
@@ -1256,6 +1337,7 @@ apiRouter.get(
 
 apiRouter.post(
   '/workers',
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const saved = await upsertWorker(req.body || {});
     res.json({ message: 'success', data: saved });
@@ -1264,6 +1346,7 @@ apiRouter.post(
 
 apiRouter.put(
   '/workers/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertWorker({ ...(req.body || {}), id: req.params.id });
     res.json({ message: 'success', data: saved });
@@ -1272,6 +1355,7 @@ apiRouter.put(
 
 apiRouter.delete(
   '/workers/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     await deleteWorker(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });
@@ -1283,6 +1367,7 @@ apiRouter.delete(
 // ==========================================
 apiRouter.get(
   '/reports/income-statement',
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const flockId = getFlockId(req);
     const startDate = req.query.startDate as string | undefined;
@@ -1379,6 +1464,7 @@ apiRouter.get(
 // ==========================================
 apiRouter.get(
   '/banks',
+  requireFinancialAccess,
   asyncHandler(async (_req, res) => {
     const items = await fetchAllBanks();
     res.json({ message: 'success', data: { items } });
@@ -1387,6 +1473,7 @@ apiRouter.get(
 
 apiRouter.post(
   '/banks',
+  requireFinancialAccess,
   asyncHandler(async (req, res) => {
     const saved = await upsertBank(req.body || {});
     res.json({ message: 'success', data: saved });
@@ -1395,6 +1482,7 @@ apiRouter.post(
 
 apiRouter.put(
   '/banks/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertBank({ ...(req.body || {}), id: req.params.id });
     res.json({ message: 'success', data: saved });
@@ -1403,6 +1491,7 @@ apiRouter.put(
 
 apiRouter.delete(
   '/banks/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     await deleteBank(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });
@@ -1438,6 +1527,10 @@ apiRouter.get(
       );
     }
 
+    if (!isFinancialAllowed(req)) {
+      items = items.map(maskPowerFinancials);
+    }
+
     res.json({ message: 'success', data: paginateItems(items, req, 10) });
   })
 );
@@ -1445,13 +1538,25 @@ apiRouter.get(
 apiRouter.post(
   '/power-consumptions',
   asyncHandler(async (req, res) => {
-    const saved = await upsertPowerConsumption(req.body || {});
-    res.json({ message: 'success', data: saved });
+    const canFinancial = isFinancialAllowed(req);
+    const payload = canFinancial
+      ? req.body || {}
+      : {
+          ...(req.body || {}),
+          unitRatePkr: 0,
+          solarUnitRatePkr: 0,
+          gridUnitRatePkr: 0,
+          dieselRatePerLiter: 0,
+          dieselPurchaseCost: 0,
+        };
+    const saved = await upsertPowerConsumption(payload);
+    res.json({ message: 'success', data: canFinancial ? saved : maskPowerFinancials(saved) });
   })
 );
 
 apiRouter.put(
   '/power-consumptions/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     const saved = await upsertPowerConsumption(req.body || {}, req.params.id);
     res.json({ message: 'success', data: saved });
@@ -1460,6 +1565,7 @@ apiRouter.put(
 
 apiRouter.delete(
   '/power-consumptions/:id',
+  requireSuperAdmin,
   asyncHandler(async (req, res) => {
     await deletePowerConsumption(req.params.id);
     res.json({ message: 'success', data: { id: req.params.id } });

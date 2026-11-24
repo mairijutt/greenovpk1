@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../db/index.ts';
+import { getRolePermissions, CanonicalRole, normalizeRole } from '../utils/permissions.ts';
 
 const AUTH_SECRET =
   process.env.AUTH_SECRET ||
@@ -179,9 +180,52 @@ export function requireSuperAdmin(
   next: NextFunction
 ) {
   const user = req.authUser;
-  if (!user || user.role !== 'super_admin') {
+  if (!user || normalizeRole(user.role) !== 'super_admin') {
     return res.status(403).json({
       message: 'Forbidden: Only Super Administrators can perform this action.',
+      code: 'FORBIDDEN',
+    });
+  }
+  return next();
+}
+
+export function requireRoles(...allowed: CanonicalRole[]) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const user = req.authUser;
+    if (!user || !allowed.includes(normalizeRole(user.role))) {
+      return res.status(403).json({
+        message: 'Forbidden: You do not have permission to access this resource.',
+        code: 'FORBIDDEN',
+      });
+    }
+    return next();
+  };
+}
+
+export function requireFinancialAccess(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const perms = getRolePermissions(req.authUser?.role);
+  if (!req.authUser || !perms.canViewFinancials) {
+    return res.status(403).json({
+      message: 'Forbidden: Supervisors do not have access to financial, salary, or report records.',
+      code: 'FORBIDDEN',
+    });
+  }
+  return next();
+}
+
+export function requireFarmsAccess(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const perms = getRolePermissions(req.authUser?.role);
+  if (!req.authUser || !perms.canViewFarms) {
+    return res.status(403).json({
+      message: 'Forbidden: Supervisors do not have access to farm management.',
       code: 'FORBIDDEN',
     });
   }

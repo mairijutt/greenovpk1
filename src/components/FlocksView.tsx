@@ -11,6 +11,8 @@ interface FlocksViewProps {
   onEditFlock?: (flock: Flock) => void;
   onDeleteFlock?: (id: string) => void;
   isSuperAdmin?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
   selectedFarmId?: string;
   onSelectFarm?: (farmId: string) => void;
 }
@@ -22,9 +24,13 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
   onEditFlock,
   onDeleteFlock,
   isSuperAdmin = false,
+  canEdit,
+  canDelete,
   selectedFarmId,
   onSelectFarm,
 }) => {
+  const effectiveCanEdit = canEdit ?? isSuperAdmin;
+  const effectiveCanDelete = canDelete ?? isSuperAdmin;
   const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
   const defaultFarmId = farms[0]?.id || 'farm-1';
   const [showAddModal, setShowAddModal] = useState(false);
@@ -382,28 +388,29 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
-                          {isSuperAdmin ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditModal(flock)}
-                                aria-label={`Edit ${flock.name}`}
-                                title="Edit Flock"
-                                className="inline-flex items-center p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors cursor-pointer"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setDeleteConfirmId(flock.id)}
-                                aria-label={`Delete ${flock.name}`}
-                                title="Delete Flock"
-                                className="inline-flex items-center p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          ) : (
+                          {effectiveCanEdit && onEditFlock && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(flock)}
+                              aria-label={`Edit ${flock.name}`}
+                              title="Edit Flock"
+                              className="inline-flex items-center p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {effectiveCanDelete && onDeleteFlock && (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmId(flock.id)}
+                              aria-label={`Delete ${flock.name}`}
+                              title="Delete Flock"
+                              className="inline-flex items-center p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {!effectiveCanEdit && !effectiveCanDelete && (
                             <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded">
                               Protected
                             </span>
@@ -497,16 +504,20 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
                       setFormData({
                         ...formData,
                         farmId: e.target.value,
-                        farmName: selFarm ? selFarm.name : e.target.value,
+                        farmName: selFarm ? selFarm.name : 'GreenOva',
                       });
                     }}
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-emerald-500 bg-white"
                   >
-                    {farms.map((farm) => (
-                      <option key={farm.id} value={farm.id}>
-                        {farm.name} {farm.code ? `(${farm.code})` : ''}
-                      </option>
-                    ))}
+                    {farms.length === 0 ? (
+                      <option value="farm-1">GreenOva (Main Complex)</option>
+                    ) : (
+                      farms.map((farm) => (
+                        <option key={farm.id} value={farm.id}>
+                          {farm.name} {farm.code ? `(${farm.code})` : ''}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
               </div>
@@ -665,9 +676,9 @@ export const FlocksView: React.FC<FlocksViewProps> = ({
             },
           ]}
           notes={viewingFlock.notes}
-          onEdit={isSuperAdmin ? () => handleOpenEditModal(viewingFlock) : undefined}
+          onEdit={effectiveCanEdit && onEditFlock ? () => handleOpenEditModal(viewingFlock) : undefined}
           onDelete={
-            isSuperAdmin && onDeleteFlock
+            effectiveCanDelete && onDeleteFlock
               ? () => {
                   onDeleteFlock(viewingFlock.id);
                 }

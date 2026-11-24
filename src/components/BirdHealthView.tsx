@@ -44,12 +44,14 @@ interface BirdHealthViewProps {
   vaccines: VaccineLog[];
   flocks: Flock[];
   onOpenRecordModal: (type: 'mortality') => void;
-  onToggleVaccine: (id: string) => void;
+  onToggleVaccine?: (id: string) => void;
   onAddVaccine?: (vaccine: VaccineLog) => Promise<void> | void;
   onEditVaccine?: (vaccine: VaccineLog) => Promise<void> | void;
   onDeleteVaccine?: (id: string) => Promise<void> | void;
   onEditMortality?: (log: MortalityLog) => Promise<void> | void;
   onDeleteMortality?: (log: MortalityLog) => Promise<void> | void;
+  canEdit?: boolean;
+  canDelete?: boolean;
   farms?: Farm[];
   selectedFarmId?: string;
   onSelectFarm?: (farmId: string) => void;
@@ -69,6 +71,8 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
   onDeleteVaccine,
   onEditMortality,
   onDeleteMortality,
+  canEdit = true,
+  canDelete = true,
   farms = [],
   selectedFarmId = 'all',
   onSelectFarm,
@@ -1264,16 +1268,18 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
                             <Eye className="w-3 h-3" />
                             <span>View</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => openEditMortalityModal(log)}
-                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                            title={`Edit Mortality Record #${log.id.replace('m-', '')}`}
-                          >
-                            <Edit className="w-3 h-3" />
-                            <span>Edit</span>
-                          </button>
-                          {onDeleteMortality && confirmDeleteMortalityId !== log.id && (
+                          {canEdit && onEditMortality && (
+                            <button
+                              type="button"
+                              onClick={() => openEditMortalityModal(log)}
+                              className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title={`Edit Mortality Record #${log.id.replace('m-', '')}`}
+                            >
+                              <Edit className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                          {canDelete && onDeleteMortality && confirmDeleteMortalityId !== log.id && (
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteMortalityId(log.id)}
@@ -1284,7 +1290,7 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
                             </button>
                           )}
                         </div>
-                        {onDeleteMortality && confirmDeleteMortalityId === log.id && (
+                        {canDelete && onDeleteMortality && confirmDeleteMortalityId === log.id && (
                           <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
                             <span className="font-bold text-rose-900">Delete?</span>
                             <button
@@ -1371,26 +1377,49 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
                         </span>
                       </div>
 
-                      <button
-                        onClick={() => onToggleVaccine(v.id)}
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center space-x-1 cursor-pointer transition-colors ${
-                          v.status === 'Completed'
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-                        }`}
-                      >
-                        {v.status === 'Completed' ? (
-                          <>
-                            <CheckCircle className="w-3 h-3" />
-                            <span>Administered</span>
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="w-3 h-3" />
-                            <span>Scheduled Due</span>
-                          </>
-                        )}
-                      </button>
+                      {canEdit && onToggleVaccine ? (
+                        <button
+                          type="button"
+                          onClick={() => onToggleVaccine(v.id)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center space-x-1 cursor-pointer transition-colors ${
+                            v.status === 'Completed'
+                              ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                              : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                          }`}
+                        >
+                          {v.status === 'Completed' ? (
+                            <>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Administered</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3 h-3" />
+                              <span>Scheduled Due</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center space-x-1 ${
+                            v.status === 'Completed'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {v.status === 'Completed' ? (
+                            <>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Administered</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3 h-3" />
+                              <span>Scheduled Due</span>
+                            </>
+                          )}
+                        </span>
+                      )}
                     </div>
 
                     <h3 className="text-sm font-bold text-slate-900 mt-1">{v.vaccineName}</h3>
@@ -1433,49 +1462,56 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
 
                   <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onToggleVaccine(v.id)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
-                          v.status === 'Completed'
-                            ? 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
-                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
-                        }`}
-                      >
-                        {v.status === 'Completed' ? 'Mark Scheduled' : '✓ Mark Administered'}
-                      </button>
+                      {canEdit && onToggleVaccine && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleVaccine(v.id)}
+                          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
+                            v.status === 'Completed'
+                              ? 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                          }`}
+                        >
+                          {v.status === 'Completed' ? 'Mark Scheduled' : '✓ Mark Administered'}
+                        </button>
+                      )}
 
                       <button
                         type="button"
                         onClick={() => setViewingVaccine(v)}
-                        className="p-2 rounded-lg border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 transition-colors cursor-pointer"
+                        className={`${!canEdit || !onToggleVaccine ? 'flex-1 flex items-center justify-center gap-1.5 py-2' : 'p-2'} rounded-lg border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 transition-colors cursor-pointer text-xs font-bold`}
                         title="View Vaccine Schedule Details"
                       >
                         <Eye className="w-3.5 h-3.5" />
+                        {(!canEdit || !onToggleVaccine) && <span>View Schedule</span>}
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => openEditVaccineModal(v)}
-                        className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
-                        title="Edit Vaccine Schedule"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
+                      {canEdit && onEditVaccine && (
+                        <button
+                          type="button"
+                          onClick={() => openEditVaccineModal(v)}
+                          className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
+                          title="Edit Vaccine Schedule"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                      )}
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setConfirmDeleteVaccineId(confirmDeleteVaccineId === v.id ? null : v.id)
-                        }
-                        className="p-2 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
-                        title="Delete Vaccine Schedule"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {canDelete && onDeleteVaccine && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setConfirmDeleteVaccineId(confirmDeleteVaccineId === v.id ? null : v.id)
+                          }
+                          className="p-2 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
+                          title="Delete Vaccine Schedule"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
 
-                    {confirmDeleteVaccineId === v.id && (
+                    {canDelete && onDeleteVaccine && confirmDeleteVaccineId === v.id && (
                       <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
                         <span className="font-bold text-rose-900">Delete this schedule?</span>
                         <div className="flex items-center gap-1.5">
@@ -1870,9 +1906,9 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
             { label: 'Recorded By', value: viewingMortality.recordedBy || 'Farm Admin' },
           ]}
           notes={viewingMortality.symptoms}
-          onEdit={() => openEditMortalityModal(viewingMortality)}
+          onEdit={canEdit && onEditMortality ? () => openEditMortalityModal(viewingMortality) : undefined}
           onDelete={
-            onDeleteMortality
+            canDelete && onDeleteMortality
               ? async () => {
                   await onDeleteMortality(viewingMortality);
                   showToast('Mortality record deleted and flock count adjusted.');
@@ -1912,9 +1948,9 @@ export const BirdHealthView: React.FC<BirdHealthViewProps> = ({
             { label: 'Status', value: viewingVaccine.status },
           ]}
           notes={viewingVaccine.vetNotes}
-          onEdit={() => openEditVaccineModal(viewingVaccine)}
+          onEdit={canEdit && onEditVaccine ? () => openEditVaccineModal(viewingVaccine) : undefined}
           onDelete={
-            onDeleteVaccine
+            canDelete && onDeleteVaccine
               ? async () => {
                   await onDeleteVaccine(viewingVaccine.id);
                   showToast(`Deleted schedule "${viewingVaccine.vaccineName}".`);

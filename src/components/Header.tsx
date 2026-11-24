@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Farm } from '../types/farm';
+import { getRolePermissions } from '../utils/permissions';
 
 export interface HealthNotification {
   id: string;
@@ -103,6 +104,7 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, [isDropdownOpen]);
 
+  const perms = getRolePermissions(currentUser?.role);
   const scheduledNotifications = notifications.filter((n) => n.status === 'Scheduled');
   const scheduledCount = scheduledNotifications.length;
 
@@ -168,7 +170,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Right Section: Farm Selector, Bell Notification Prompt & User Profile */}
           <div className="flex items-center space-x-2 sm:space-x-3">
             {/* Global Farm Dropdown */}
-            {farms && farms.length > 0 && (
+            {perms.canViewFarms && farms && farms.length > 0 && (
               <div className="relative flex items-center">
                 <div className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-900/90 hover:bg-emerald-800 border border-emerald-700/80 transition-colors shadow-2xs text-xs">
                   <Building2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />

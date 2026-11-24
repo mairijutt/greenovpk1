@@ -30,6 +30,7 @@ import {
   PanelLeftOpen,
   Zap,
 } from 'lucide-react';
+import { getRolePermissions, getRoleDisplayLabel } from '../utils/permissions';
 
 export type NavTab =
   | 'dashboard'
@@ -134,7 +135,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [currentUser]);
 
-  const sections: NavSection[] = [
+  const perms = getRolePermissions(currentUser?.role);
+
+  const rawSections: NavSection[] = [
     {
       title: 'Analytics & Overview',
       items: [
@@ -169,6 +172,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
   ];
+
+  const sections: NavSection[] = rawSections
+    .map((sec) => ({
+      ...sec,
+      items: sec.items.filter((item) => perms.canAccessTab(item.id)),
+    }))
+    .filter((sec) => sec.items.length > 0);
 
   // Handler: Change Password
   const handleUpdatePassword = (e: React.FormEvent) => {
@@ -936,14 +946,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">System Role / Designation (Optional)</label>
-                <input
-                  type="text"
-                  value={userRole}
-                  onChange={(e) => setUserRole(e.target.value)}
-                  placeholder="Managing Director &amp; Farm Admin"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
-                />
+                <label className="block text-slate-700 font-bold mb-1">System Access Role</label>
+                <div className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 font-semibold text-slate-700 flex items-center justify-between">
+                  <span>{getRoleDisplayLabel(currentUser?.role)}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Managed by Super Admin</span>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">

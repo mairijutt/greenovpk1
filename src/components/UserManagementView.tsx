@@ -133,8 +133,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const [viewingUser, setViewingUser] = useState<UserRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Hydrate users directly from PostgreSQL on mount
+  // Hydrate users directly from PostgreSQL on mount (Super Admin only)
   useEffect(() => {
+    if (!isSuperAdmin) return;
     apiFetch('/api/user/allUsers')
       .then((res) => {
         const rows = res?.data;
@@ -146,7 +147,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
         }
       })
       .catch((err) => console.warn('Failed to load users:', err));
-  }, []);
+  }, [isSuperAdmin]);
 
   // New user form state
   const [newUser, setNewUser] = useState({
@@ -447,31 +448,31 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
         <StatCard
           title="Super Administrators"
           value={users.filter((u) => u.role === 'super_admin').length}
-          unit="Admins"
+          unit="Full Rights"
           icon={ShieldCheck}
           color="emerald"
-          badge={{ text: 'Full Access', color: 'emerald' }}
-          subtext="Executive oversight & approval"
+          badge={{ text: 'Add / Edit / Delete', color: 'emerald' }}
+          subtext="All modules + User Management"
         />
 
         <StatCard
-          title="Shed Supervisors"
-          value={users.filter((u) => u.role === 'supervisor').length}
-          unit="Supervisors"
+          title="Admins"
+          value={users.filter((u) => u.role === 'admin' || u.role === 'accountant').length}
+          unit="Admins"
           icon={UserCheck}
           color="blue"
-          badge={{ text: 'Operational', color: 'blue' }}
-          subtext="Daily data entry & flock logs"
+          badge={{ text: 'View & Add Only', color: 'blue' }}
+          subtext="All except Edit, Delete & Users"
         />
 
         <StatCard
-          title="Veterinary Officers"
-          value={users.filter((u) => u.role === 'veterinarian').length}
-          unit="Vets"
+          title="Supervisors"
+          value={users.filter((u) => u.role === 'supervisor' || u.role === 'veterinarian').length}
+          unit="Supervisors"
           icon={HeartPulse}
-          color="rose"
-          badge={{ text: 'Health Control', color: 'rose' }}
-          subtext="Bio-security and prescriptions"
+          color="amber"
+          badge={{ text: 'Operational Add', color: 'amber' }}
+          subtext="No Financials, Salaries, Reports, Farms"
         />
       </div>
 
@@ -679,11 +680,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                     setNewUser({ ...newUser, role: e.target.value as any });
                   }}
                 >
-                  <option value="supervisor">Supervisor</option>
-                  <option value="veterinarian">Veterinarian</option>
-                  <option value="accountant">Accountant</option>
-                  <option value="admin">Farm Admin</option>
-                  <option value="super_admin">Super Admin</option>
+                  <option value="supervisor">Supervisor (Ops Add Only)</option>
+                  <option value="admin">Admin (No Edit/Delete/Users)</option>
+                  <option value="super_admin">Super Admin (Full Access)</option>
                 </UISelect>
 
                 <UISelect
@@ -699,6 +698,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                   <option value="GreenOva Unit 2">GreenOva Unit 2</option>
                   <option value="GreenOva Unit 3">GreenOva Unit 3</option>
                 </UISelect>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600 leading-relaxed">
+                {newUser.role === 'super_admin'
+                  ? 'Full access across every module including Add, Edit, Delete, and User Management.'
+                  : newUser.role === 'admin' || newUser.role === 'accountant'
+                  ? 'Full access to view and add records across all operational & financial tabs. Edit, Delete, and User Management are hidden.'
+                  : 'Operational data entry only (Flocks, Eggs, Consumption, Bird Health, Stocks, Power). Financials, Sales, Expenses, Salaries, Reports, Farms, and User Management are hidden.'}
               </div>
 
               <UIInput
@@ -790,11 +796,11 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                   value={editRole}
                   onChange={(e) => setEditRole(e.target.value as any)}
                 >
-                  <option value="supervisor">Supervisor</option>
-                  <option value="veterinarian">Veterinarian</option>
-                  <option value="accountant">Accountant</option>
-                  <option value="admin">Farm Admin</option>
-                  <option value="super_admin">Super Admin</option>
+                  <option value="supervisor">Supervisor (Ops Add Only)</option>
+                  <option value="admin">Admin (No Edit/Delete/Users)</option>
+                  <option value="super_admin">Super Admin (Full Access)</option>
+                  {editRole === 'veterinarian' && <option value="veterinarian">Veterinarian (Supervisor)</option>}
+                  {editRole === 'accountant' && <option value="accountant">Accountant (Admin)</option>}
                 </UISelect>
 
                 <UISelect
@@ -808,6 +814,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                   <option value="GreenOva Unit 3">GreenOva Unit 3</option>
                   <option value="Head Office">Head Office</option>
                 </UISelect>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600 leading-relaxed">
+                {editRole === 'super_admin'
+                  ? 'Full access across every module including Add, Edit, Delete, and User Management.'
+                  : editRole === 'admin' || editRole === 'accountant'
+                  ? 'Full access to view and add records across all operational & financial tabs. Edit, Delete, and User Management are hidden.'
+                  : 'Operational data entry only (Flocks, Eggs, Consumption, Bird Health, Stocks, Power). Financials, Sales, Expenses, Salaries, Reports, Farms, and User Management are hidden.'}
               </div>
 
               <div>

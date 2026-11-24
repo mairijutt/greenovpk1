@@ -69,6 +69,8 @@ interface FinanceViewProps {
   onAddTransaction: (record: FinancialRecord) => Promise<void> | void;
   onEditTransaction?: (updated: FinancialRecord) => Promise<void> | void;
   onDeleteTransaction?: (record: FinancialRecord) => Promise<void> | void;
+  canEdit?: boolean;
+  canDelete?: boolean;
   defaultType?: 'all' | 'Income' | 'Expense';
   bankAccounts?: BankAccount[];
   onAddBank?: (bank: BankAccount) => Promise<void> | void;
@@ -83,6 +85,8 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   onAddTransaction,
   onEditTransaction,
   onDeleteTransaction,
+  canEdit = true,
+  canDelete = true,
   defaultType = 'all',
   bankAccounts = [],
   onAddBank,
@@ -3095,16 +3099,18 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                               <Eye className="w-3 h-3" />
                               <span>View</span>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingTx(fin)}
-                              className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                              title={`Edit Sale #${trackingId}`}
-                            >
-                              <Edit className="w-3 h-3" />
-                              <span>Edit</span>
-                            </button>
-                            {onDeleteTransaction && confirmDeleteTxId !== fin.id && (
+                            {canEdit && onEditTransaction && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingTx(fin)}
+                                className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                                title={`Edit Sale #${trackingId}`}
+                              >
+                                <Edit className="w-3 h-3" />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                            {canDelete && onDeleteTransaction && confirmDeleteTxId !== fin.id && (
                               <button
                                 type="button"
                                 onClick={() => setConfirmDeleteTxId(fin.id)}
@@ -3115,7 +3121,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                               </button>
                             )}
                           </div>
-                          {onDeleteTransaction && confirmDeleteTxId === fin.id && (
+                          {canDelete && onDeleteTransaction && confirmDeleteTxId === fin.id && (
                             <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
                               <span className="font-bold text-rose-900">Delete?</span>
                               <button
@@ -3238,20 +3244,22 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                             <Eye className="w-3 h-3" />
                             <span>View</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleAttemptEditTx(fin)}
-                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                            title={
-                              isStockSyncedExpense(fin)
-                                ? 'Stock-linked record (manage in Stocks)'
-                                : `Edit Voucher #${trackingId}`
-                            }
-                          >
-                            <Edit className="w-3 h-3" />
-                            <span>Edit</span>
-                          </button>
-                          {onDeleteTransaction && confirmDeleteTxId !== fin.id && (
+                          {canEdit && onEditTransaction && (
+                            <button
+                              type="button"
+                              onClick={() => handleAttemptEditTx(fin)}
+                              className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title={
+                                isStockSyncedExpense(fin)
+                                  ? 'Stock-linked record (manage in Stocks)'
+                                  : `Edit Voucher #${trackingId}`
+                              }
+                            >
+                              <Edit className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                          {canDelete && onDeleteTransaction && confirmDeleteTxId !== fin.id && (
                             <button
                               type="button"
                               onClick={() => handleAttemptDeleteTx(fin)}
@@ -3266,7 +3274,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                             </button>
                           )}
                         </div>
-                        {onDeleteTransaction && confirmDeleteTxId === fin.id && (
+                        {canDelete && onDeleteTransaction && confirmDeleteTxId === fin.id && (
                           <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
                             <span className="font-bold text-rose-900">Delete?</span>
                             <button
@@ -4519,9 +4527,9 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
           }
           showEmptyAttachment
           onPreviewAttachment={() => setPreviewRecord(viewingTx)}
-          onEdit={() => handleAttemptEditTx(viewingTx)}
+          onEdit={canEdit && onEditTransaction ? () => handleAttemptEditTx(viewingTx) : undefined}
           onDelete={
-            onDeleteTransaction
+            canDelete && onDeleteTransaction
               ? async () => {
                   if (isStockSyncedExpense(viewingTx)) {
                     setStockGuardModal({ action: 'delete', record: viewingTx });

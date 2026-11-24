@@ -83,6 +83,8 @@ interface ReportsViewProps {
   onAddBank?: (bank: BankAccount) => void;
   onEditBank?: (bank: BankAccount) => void;
   onDeleteBank?: (id: string) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
   onNavigateTab?: (tab: string) => void;
 }
 
@@ -104,6 +106,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   onAddBank = () => {},
   onEditBank = () => {},
   onDeleteBank = () => {},
+  canEdit = true,
+  canDelete = true,
   onNavigateTab,
 }) => {
   const defaultYear = String(new Date().getFullYear());
@@ -1727,6 +1731,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           onAddBank={onAddBank}
           onEditBank={onEditBank}
           onDeleteBank={onDeleteBank}
+          canEdit={canEdit}
+          canDelete={canDelete}
           onNavigateTab={onNavigateTab}
         />
       )}

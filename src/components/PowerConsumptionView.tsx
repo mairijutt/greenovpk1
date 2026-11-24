@@ -41,8 +41,11 @@ interface PowerConsumptionViewProps {
   powerLogs: PowerConsumptionRecord[];
   flocks: Flock[];
   onAddPowerLog: (record: Omit<PowerConsumptionRecord, 'id'>) => Promise<PowerConsumptionRecord | void> | void;
-  onEditPowerLog: (record: PowerConsumptionRecord) => Promise<void> | void;
-  onDeletePowerLog: (record: PowerConsumptionRecord) => Promise<void> | void;
+  onEditPowerLog?: (record: PowerConsumptionRecord) => Promise<void> | void;
+  onDeletePowerLog?: (record: PowerConsumptionRecord) => Promise<void> | void;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canViewFinancials?: boolean;
 }
 
 const DEFAULT_SOLAR_RATE_PKR = 35;
@@ -78,6 +81,9 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
   onAddPowerLog,
   onEditPowerLog,
   onDeletePowerLog,
+  canEdit = true,
+  canDelete = true,
+  canViewFinancials = true,
 }) => {
   const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
   const [selectedUnit, setSelectedUnit] = useState<string>(initialUrlFilters.flockId || 'all');
@@ -233,18 +239,26 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
     const gridConsumedUnits = Math.max(0, Number(formGridConsumed) || 0);
     const dieselPurchasedLiters = Math.max(0, Number(formDieselPurchased) || 0);
     const dieselConsumedLiters = Math.max(0, Number(formDieselConsumed) || 0);
-    const solarUnitRatePkr =
-      Number(formSolarRate) > 0 ? Number(formSolarRate) : DEFAULT_SOLAR_RATE_PKR;
-    const gridUnitRatePkr =
-      Number(formGridRate) > 0 ? Number(formGridRate) : DEFAULT_GRID_RATE_PKR;
+    const solarUnitRatePkr = canViewFinancials
+      ? Number(formSolarRate) > 0
+        ? Number(formSolarRate)
+        : DEFAULT_SOLAR_RATE_PKR
+      : 0;
+    const gridUnitRatePkr = canViewFinancials
+      ? Number(formGridRate) > 0
+        ? Number(formGridRate)
+        : DEFAULT_GRID_RATE_PKR
+      : 0;
 
-    let dieselRatePerLiter = Math.max(0, Number(formDieselRate) || 0);
-    let dieselPurchaseCost = Math.max(0, Number(formDieselCost) || 0);
+    let dieselRatePerLiter = canViewFinancials ? Math.max(0, Number(formDieselRate) || 0) : 0;
+    let dieselPurchaseCost = canViewFinancials ? Math.max(0, Number(formDieselCost) || 0) : 0;
 
-    if (dieselPurchaseCost === 0 && dieselPurchasedLiters > 0 && dieselRatePerLiter > 0) {
-      dieselPurchaseCost = Number((dieselPurchasedLiters * dieselRatePerLiter).toFixed(2));
-    } else if (dieselRatePerLiter === 0 && dieselPurchasedLiters > 0 && dieselPurchaseCost > 0) {
-      dieselRatePerLiter = Number((dieselPurchaseCost / dieselPurchasedLiters).toFixed(2));
+    if (canViewFinancials) {
+      if (dieselPurchaseCost === 0 && dieselPurchasedLiters > 0 && dieselRatePerLiter > 0) {
+        dieselPurchaseCost = Number((dieselPurchasedLiters * dieselRatePerLiter).toFixed(2));
+      } else if (dieselRatePerLiter === 0 && dieselPurchasedLiters > 0 && dieselPurchaseCost > 0) {
+        dieselRatePerLiter = Number((dieselPurchaseCost / dieselPurchasedLiters).toFixed(2));
+      }
     }
 
     if (
@@ -253,7 +267,7 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
       gridConsumedUnits === 0 &&
       dieselPurchasedLiters === 0 &&
       dieselConsumedLiters === 0 &&
-      dieselPurchaseCost === 0
+      (!canViewFinancials || dieselPurchaseCost === 0)
     ) {
       setFormError('Please enter at least one solar, main grid, or diesel meter reading.');
       return;
@@ -265,6 +279,7 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
     setIsSaving(true);
     try {
       if (editingRecord) {
+        if (!canEdit || !onEditPowerLog) return;
         const updated: PowerConsumptionRecord = {
           ...editingRecord,
           date: formDate,
@@ -484,15 +499,27 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
       { header: 'Unit / Shed' },
       { header: 'Solar Prod (kWh)', align: 'right' as const },
       { header: 'Solar Used (kWh)', align: 'right' as const },
-      { header: 'Solar Rate (PKR)', align: 'right' as const },
-      { header: 'Solar Cost (PKR)', align: 'right' as const },
+      ...(canViewFinancials
+        ? [
+            { header: 'Solar Rate (PKR)', align: 'right' as const },
+            { header: 'Solar Cost (PKR)', align: 'right' as const },
+          ]
+        : []),
       { header: 'Grid Used (kWh)', align: 'right' as const },
-      { header: 'Grid Rate (PKR)', align: 'right' as const },
-      { header: 'Grid Cost (PKR)', align: 'right' as const },
+      ...(canViewFinancials
+        ? [
+            { header: 'Grid Rate (PKR)', align: 'right' as const },
+            { header: 'Grid Cost (PKR)', align: 'right' as const },
+          ]
+        : []),
       { header: 'Diesel Bought (L)', align: 'right' as const },
       { header: 'Diesel Used (L)', align: 'right' as const },
-      { header: 'Diesel Cost (PKR)', align: 'right' as const },
-      { header: 'Total Power Cost (PKR)', align: 'right' as const },
+      ...(canViewFinancials
+        ? [
+            { header: 'Diesel Cost (PKR)', align: 'right' as const },
+            { header: 'Total Power Cost (PKR)', align: 'right' as const },
+          ]
+        : []),
       { header: 'Notes' },
     ];
 
@@ -507,15 +534,14 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
         getUnitLabel(r.flockId, r.flockName),
         Number(r.solarProducedUnits || 0).toLocaleString(),
         Number(r.solarConsumedUnits || 0).toLocaleString(),
-        sRate,
-        Math.round(solarCost).toLocaleString(),
+        ...(canViewFinancials ? [sRate, Math.round(solarCost).toLocaleString()] : []),
         Number(r.gridConsumedUnits || 0).toLocaleString(),
-        gRate,
-        Math.round(gridCost).toLocaleString(),
+        ...(canViewFinancials ? [gRate, Math.round(gridCost).toLocaleString()] : []),
         Number(r.dieselPurchasedLiters || 0).toLocaleString(),
         Number(r.dieselConsumedLiters || 0).toLocaleString(),
-        Math.round(dCost).toLocaleString(),
-        Math.round(solarCost + gridCost + dCost).toLocaleString(),
+        ...(canViewFinancials
+          ? [Math.round(dCost).toLocaleString(), Math.round(solarCost + gridCost + dCost).toLocaleString()]
+          : []),
         r.notes || r.referenceNo || '—',
       ];
     });
@@ -531,15 +557,12 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
         getUnitLabel(r.flockId, r.flockName),
         Number(r.solarProducedUnits || 0),
         Number(r.solarConsumedUnits || 0),
-        sRate,
-        Math.round(solarCost),
+        ...(canViewFinancials ? [sRate, Math.round(solarCost)] : []),
         Number(r.gridConsumedUnits || 0),
-        gRate,
-        Math.round(gridCost),
+        ...(canViewFinancials ? [gRate, Math.round(gridCost)] : []),
         Number(r.dieselPurchasedLiters || 0),
         Number(r.dieselConsumedLiters || 0),
-        Math.round(dCost),
-        Math.round(solarCost + gridCost + dCost),
+        ...(canViewFinancials ? [Math.round(dCost), Math.round(solarCost + gridCost + dCost)] : []),
         r.notes || r.referenceNo || '',
       ];
     });
@@ -549,15 +572,14 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
       `${filtered.length} logs`,
       totals.solarProduced.toLocaleString(),
       totals.solarConsumed.toLocaleString(),
-      DEFAULT_SOLAR_RATE_PKR,
-      Math.round(totals.solarConsumedCost).toLocaleString(),
+      ...(canViewFinancials ? [DEFAULT_SOLAR_RATE_PKR, Math.round(totals.solarConsumedCost).toLocaleString()] : []),
       totals.gridConsumed.toLocaleString(),
-      DEFAULT_GRID_RATE_PKR,
-      Math.round(totals.gridCost).toLocaleString(),
+      ...(canViewFinancials ? [DEFAULT_GRID_RATE_PKR, Math.round(totals.gridCost).toLocaleString()] : []),
       totals.dieselPurchased.toLocaleString(),
       totals.dieselConsumed.toLocaleString(),
-      Math.round(totals.dieselPurchaseCost).toLocaleString(),
-      Math.round(totals.totalPowerCost).toLocaleString(),
+      ...(canViewFinancials
+        ? [Math.round(totals.dieselPurchaseCost).toLocaleString(), Math.round(totals.totalPowerCost).toLocaleString()]
+        : []),
       '',
     ];
 
@@ -582,7 +604,9 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
         : unitOptions.find((u) => String(u.id) === String(selectedUnit))?.name || 'Selected Unit';
     downloadRecordsPDF({
       title: 'Power & Energy Consumption Ledger',
-      subtitle: `${unitTitle} • Solar: Rs. ${DEFAULT_SOLAR_RATE_PKR}/unit • Main Grid: Rs. ${DEFAULT_GRID_RATE_PKR}/unit`,
+      subtitle: canViewFinancials
+        ? `${unitTitle} • Solar: Rs. ${DEFAULT_SOLAR_RATE_PKR}/unit • Main Grid: Rs. ${DEFAULT_GRID_RATE_PKR}/unit`
+        : `${unitTitle} • Solar, Main Grid & Diesel Meter Ledger`,
       filenameBase: `greenova_power_consumption_${getTodayDateStr()}`,
       columns: payload.columns,
       rows: payload.rows,
@@ -595,7 +619,11 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
     <div className="space-y-6">
       <PageHeader
         title="Power & Energy Consumption"
-        subtitle={`Record daily solar production & usage (Rs. ${DEFAULT_SOLAR_RATE_PKR}/unit), main grid electricity units (Rs. ${DEFAULT_GRID_RATE_PKR}/unit), and diesel purchases & generator fuel consumption.`}
+        subtitle={
+          canViewFinancials
+            ? `Record daily solar production & usage (Rs. ${DEFAULT_SOLAR_RATE_PKR}/unit), main grid electricity units (Rs. ${DEFAULT_GRID_RATE_PKR}/unit), and diesel purchases & generator fuel consumption.`
+            : 'Record daily solar production & usage, main grid electricity units, and diesel purchases & generator fuel consumption.'
+        }
         icon={Zap}
         iconColor="amber"
         actions={
@@ -668,14 +696,18 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
           placeholder="Search by unit, meter ref, date, or notes..."
         />
         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-          <span>
-            Solar: <strong className="text-amber-700 font-mono tabular-nums">Rs. {DEFAULT_SOLAR_RATE_PKR} / unit</strong>
-          </span>
-          <span aria-hidden="true">·</span>
-          <span>
-            Main Grid: <strong className="text-blue-700 font-mono tabular-nums">Rs. {DEFAULT_GRID_RATE_PKR} / unit</strong>
-          </span>
-          <span aria-hidden="true">·</span>
+          {canViewFinancials && (
+            <>
+              <span>
+                Solar: <strong className="text-amber-700 font-mono tabular-nums">Rs. {DEFAULT_SOLAR_RATE_PKR} / unit</strong>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                Main Grid: <strong className="text-blue-700 font-mono tabular-nums">Rs. {DEFAULT_GRID_RATE_PKR} / unit</strong>
+              </span>
+              <span aria-hidden="true">·</span>
+            </>
+          )}
           <span>
             Showing <strong className="text-slate-800 font-mono tabular-nums">{filtered.length}</strong> records
           </span>
@@ -683,7 +715,7 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
       </UIFilterBar>
 
       {/* Primary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${canViewFinancials ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
         <StatCard
           title="Solar Produced & Used"
           value={totals.solarConsumed.toLocaleString(undefined, { maximumFractionDigits: 1 })}
@@ -693,8 +725,10 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
           valueColor="text-amber-700"
           subtext={
             <span className="font-mono tabular-nums">
-              Prod: {totals.solarProduced.toLocaleString(undefined, { maximumFractionDigits: 1 })} u · Cost Rs.{' '}
-              {Math.round(totals.solarConsumedCost).toLocaleString()} (@ Rs. {DEFAULT_SOLAR_RATE_PKR})
+              Prod: {totals.solarProduced.toLocaleString(undefined, { maximumFractionDigits: 1 })} u
+              {canViewFinancials
+                ? ` · Cost Rs. ${Math.round(totals.solarConsumedCost).toLocaleString()} (@ Rs. ${DEFAULT_SOLAR_RATE_PKR})`
+                : ` · Self-use ${totals.solarSelfUsePct.toFixed(0)}%`}
             </span>
           }
         />
@@ -708,7 +742,9 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
           valueColor="text-blue-700"
           subtext={
             <span className="font-mono tabular-nums">
-              Cost: Rs. {Math.round(totals.gridCost).toLocaleString()} (@ Rs. {DEFAULT_GRID_RATE_PKR}/u)
+              {canViewFinancials
+                ? `Cost: Rs. ${Math.round(totals.gridCost).toLocaleString()} (@ Rs. ${DEFAULT_GRID_RATE_PKR}/u)`
+                : `${totals.gridSharePct.toFixed(1)}% of combined electricity`}
             </span>
           }
         />
@@ -729,20 +765,22 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
           }
         />
 
-        <StatCard
-          title="Total Power Cost"
-          value={`Rs. ${Math.round(totals.totalPowerCost).toLocaleString()}`}
-          icon={Gauge}
-          color="emerald"
-          valueColor="text-slate-900"
-          subtext={
-            <span className="font-mono tabular-nums">
-              Solar Rs. {Math.round(totals.solarConsumedCost).toLocaleString()} + Grid Rs.{' '}
-              {Math.round(totals.gridCost).toLocaleString()} + Diesel Rs.{' '}
-              {Math.round(totals.dieselPurchaseCost).toLocaleString()}
-            </span>
-          }
-        />
+        {canViewFinancials && (
+          <StatCard
+            title="Total Power Cost"
+            value={`Rs. ${Math.round(totals.totalPowerCost).toLocaleString()}`}
+            icon={Gauge}
+            color="emerald"
+            valueColor="text-slate-900"
+            subtext={
+              <span className="font-mono tabular-nums">
+                Solar Rs. {Math.round(totals.solarConsumedCost).toLocaleString()} + Grid Rs.{' '}
+                {Math.round(totals.gridCost).toLocaleString()} + Diesel Rs.{' '}
+                {Math.round(totals.dieselPurchaseCost).toLocaleString()}
+              </span>
+            }
+          />
+        )}
       </div>
 
       {/* Energy Mix & Solar Efficiency Summary */}
@@ -755,12 +793,17 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                 Combined consumption of{' '}
                 <span className="font-mono tabular-nums font-bold text-slate-800">
                   {totals.totalElectricityUnits.toLocaleString(undefined, { maximumFractionDigits: 1 })} units
-                </span>{' '}
-                · Solar saved{' '}
-                <span className="font-mono tabular-nums font-bold text-emerald-700">
-                  Rs. {Math.round(totals.solarGridDiffSavings).toLocaleString()}
-                </span>{' '}
-                vs Main Grid tariff
+                </span>
+                {canViewFinancials && (
+                  <>
+                    {' '}
+                    · Solar saved{' '}
+                    <span className="font-mono tabular-nums font-bold text-emerald-700">
+                      Rs. {Math.round(totals.solarGridDiffSavings).toLocaleString()}
+                    </span>{' '}
+                    vs Main Grid tariff
+                  </>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-4 text-xs text-slate-600 font-mono tabular-nums">
@@ -788,9 +831,13 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100 text-xs">
             <div>
-              <div className="text-slate-500 font-medium">Solar Power Cost (Rs. {DEFAULT_SOLAR_RATE_PKR}/u)</div>
+              <div className="text-slate-500 font-medium">
+                {canViewFinancials ? `Solar Power Cost (Rs. ${DEFAULT_SOLAR_RATE_PKR}/u)` : 'Solar Consumption'}
+              </div>
               <div className="text-base font-black text-amber-700 font-mono tabular-nums mt-0.5">
-                Rs. {Math.round(totals.solarConsumedCost).toLocaleString()}
+                {canViewFinancials
+                  ? `Rs. ${Math.round(totals.solarConsumedCost).toLocaleString()}`
+                  : `${totals.solarConsumed.toLocaleString(undefined, { maximumFractionDigits: 1 })} units`}
               </div>
               <div className="text-[11px] text-slate-500 font-mono tabular-nums">
                 {totals.solarProduced.toLocaleString(undefined, { maximumFractionDigits: 1 })} u prod ({totals.solarSelfUsePct.toFixed(0)}% used)
@@ -798,12 +845,18 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
             </div>
 
             <div>
-              <div className="text-slate-500 font-medium">Main Grid Cost (Rs. {DEFAULT_GRID_RATE_PKR}/u)</div>
+              <div className="text-slate-500 font-medium">
+                {canViewFinancials ? `Main Grid Cost (Rs. ${DEFAULT_GRID_RATE_PKR}/u)` : 'Main Grid Consumption'}
+              </div>
               <div className="text-base font-black text-blue-700 font-mono tabular-nums mt-0.5">
-                Rs. {Math.round(totals.gridCost).toLocaleString()}
+                {canViewFinancials
+                  ? `Rs. ${Math.round(totals.gridCost).toLocaleString()}`
+                  : `${totals.gridConsumed.toLocaleString(undefined, { maximumFractionDigits: 1 })} units`}
               </div>
               <div className="text-[11px] text-slate-500 font-mono tabular-nums">
-                {totals.gridConsumed.toLocaleString(undefined, { maximumFractionDigits: 1 })} units @ Rs. {DEFAULT_GRID_RATE_PKR}/unit
+                {canViewFinancials
+                  ? `${totals.gridConsumed.toLocaleString(undefined, { maximumFractionDigits: 1 })} units @ Rs. ${DEFAULT_GRID_RATE_PKR}/unit`
+                  : `${totals.gridSharePct.toFixed(1)}% of total electricity`}
               </div>
             </div>
 
@@ -818,7 +871,9 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                 {totals.dieselBalanceLiters.toLocaleString(undefined, { maximumFractionDigits: 1 })} L
               </div>
               <div className="text-[11px] text-slate-500 font-mono tabular-nums">
-                Spent Rs. {Math.round(totals.dieselPurchaseCost).toLocaleString()} on diesel
+                {canViewFinancials
+                  ? `Spent Rs. ${Math.round(totals.dieselPurchaseCost).toLocaleString()} on diesel`
+                  : `Bought ${totals.dieselPurchased.toLocaleString(undefined, { maximumFractionDigits: 1 })} L • Used ${totals.dieselConsumed.toLocaleString(undefined, { maximumFractionDigits: 1 })} L`}
               </div>
             </div>
           </div>
@@ -828,7 +883,9 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5">
           <h2 className="text-sm font-bold text-slate-900">Unit-Wise Power Summary</h2>
           <p className="text-xs text-slate-500 mt-0.5 mb-3">
-            Solar (Rs. {DEFAULT_SOLAR_RATE_PKR}/u), Grid (Rs. {DEFAULT_GRID_RATE_PKR}/u) &amp; Diesel cost
+            {canViewFinancials
+              ? `Solar (Rs. ${DEFAULT_SOLAR_RATE_PKR}/u), Grid (Rs. ${DEFAULT_GRID_RATE_PKR}/u) & Diesel cost`
+              : 'Solar, Main Grid & Diesel meter summary by unit'}
           </p>
 
           {unitSummary.length === 0 ? (
@@ -845,14 +902,20 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                       Solar {u.solarConsumed.toLocaleString()} u · Grid {u.gridConsumed.toLocaleString()} u · Diesel {u.dieselConsumed.toLocaleString()} L
                     </div>
                   </div>
-                  <div className="text-right shrink-0 font-mono tabular-nums">
-                    <div className="font-bold text-slate-900">
-                      Rs. {Math.round(u.solarCost + u.gridCost + u.dieselCost).toLocaleString()}
+                  {canViewFinancials ? (
+                    <div className="text-right shrink-0 font-mono tabular-nums">
+                      <div className="font-bold text-slate-900">
+                        Rs. {Math.round(u.solarCost + u.gridCost + u.dieselCost).toLocaleString()}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Grid Rs. {Math.round(u.gridCost).toLocaleString()}
+                      </div>
                     </div>
-                    <div className="text-[11px] text-slate-500">
-                      Grid Rs. {Math.round(u.gridCost).toLocaleString()}
+                  ) : (
+                    <div className="text-right shrink-0 font-mono tabular-nums text-[11px] font-semibold text-slate-600">
+                      {u.entries} {u.entries === 1 ? 'log' : 'logs'}
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -871,10 +934,14 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
               <th className="py-3 px-3">Date</th>
               <th className="py-3 px-3">Unit / Shed</th>
               <th className="py-3 px-3 text-right">Solar Prod (Units)</th>
-              <th className="py-3 px-3 text-right">Solar Used (Units &amp; Cost)</th>
-              <th className="py-3 px-3 text-right">Main Grid (Units &amp; Cost)</th>
+              <th className="py-3 px-3 text-right">
+                {canViewFinancials ? 'Solar Used (Units & Cost)' : 'Solar Used (Units)'}
+              </th>
+              <th className="py-3 px-3 text-right">
+                {canViewFinancials ? 'Main Grid (Units & Cost)' : 'Main Grid (Units)'}
+              </th>
               <th className="py-3 px-3 text-right">Diesel Bought / Used</th>
-              <th className="py-3 px-3 text-right">Total Power Cost</th>
+              {canViewFinancials && <th className="py-3 px-3 text-right">Total Power Cost</th>}
               <th className="py-3 px-3">Notes / Ref</th>
               <th className="py-3 px-3 text-center">Action</th>
             </tr>
@@ -882,7 +949,7 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
           <tbody className="divide-y divide-slate-100">
             {paginatedRecords.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-slate-400">
+                <td colSpan={canViewFinancials ? 9 : 8} className="py-12 text-center text-slate-400">
                   No power consumption logs match the selected filters. Click &ldquo;Record Power Log&rdquo; to record solar, grid, and diesel usage.
                 </td>
               </tr>
@@ -911,33 +978,43 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                     </td>
                     <td className="py-3 px-3 text-right font-mono tabular-nums">
                       <div className="font-bold text-slate-900">{solarProd.toLocaleString()} u</div>
-                      <div className="text-[10px] text-amber-700">
-                        Val: Rs. {Math.round(solarProd * sRate).toLocaleString()}
-                      </div>
+                      {canViewFinancials && (
+                        <div className="text-[10px] text-amber-700">
+                          Val: Rs. {Math.round(solarProd * sRate).toLocaleString()}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-3 text-right font-mono tabular-nums">
                       <div className="font-bold text-amber-700">{solarCons.toLocaleString()} u</div>
-                      <div className="text-[10px] text-slate-500">
-                        Rs. {Math.round(solarCost).toLocaleString()} (@ Rs. {sRate})
-                      </div>
+                      {canViewFinancials && (
+                        <div className="text-[10px] text-slate-500">
+                          Rs. {Math.round(solarCost).toLocaleString()} (@ Rs. {sRate})
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-3 text-right font-mono tabular-nums">
                       <div className="font-bold text-blue-700">{gridCons.toLocaleString()} u</div>
-                      <div className="text-[10px] text-slate-500">
-                        Rs. {Math.round(gridCost).toLocaleString()} (@ Rs. {gRate})
-                      </div>
+                      {canViewFinancials && (
+                        <div className="text-[10px] text-slate-500">
+                          Rs. {Math.round(gridCost).toLocaleString()} (@ Rs. {gRate})
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-3 text-right font-mono tabular-nums">
                       <div className="font-semibold text-slate-900">
                         +{dPurch.toLocaleString()} L / -{dCons.toLocaleString()} L
                       </div>
-                      <div className="text-[10px] text-rose-700">
-                        Bought: Rs. {Math.round(dCost).toLocaleString()}
-                      </div>
+                      {canViewFinancials && (
+                        <div className="text-[10px] text-rose-700">
+                          Bought: Rs. {Math.round(dCost).toLocaleString()}
+                        </div>
+                      )}
                     </td>
-                    <td className="py-3 px-3 text-right font-mono font-black text-slate-900 tabular-nums">
-                      Rs. {Math.round(totalPowerCost).toLocaleString()}
-                    </td>
+                    {canViewFinancials && (
+                      <td className="py-3 px-3 text-right font-mono font-black text-slate-900 tabular-nums">
+                        Rs. {Math.round(totalPowerCost).toLocaleString()}
+                      </td>
+                    )}
                     <td
                       className="py-3 px-3 text-slate-600 text-[11px] max-w-[180px] truncate"
                       title={rec.notes || rec.referenceNo || '—'}
@@ -955,16 +1032,18 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                           <Eye className="w-3 h-3" />
                           <span>View</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(rec)}
-                          className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer"
-                          title="Edit Power Log"
-                        >
-                          <Edit className="w-3 h-3" />
-                          <span>Edit</span>
-                        </button>
-                        {confirmDeleteId !== rec.id && (
+                        {canEdit && onEditPowerLog && (
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(rec)}
+                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer"
+                            title="Edit Power Log"
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                        {canDelete && onDeletePowerLog && confirmDeleteId !== rec.id && (
                           <button
                             type="button"
                             onClick={() => setConfirmDeleteId(rec.id)}
@@ -975,7 +1054,7 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                           </button>
                         )}
                       </div>
-                      {confirmDeleteId === rec.id && (
+                      {canDelete && onDeletePowerLog && confirmDeleteId === rec.id && (
                         <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
                           <span className="font-bold text-rose-900">Delete?</span>
                           <button
@@ -1088,7 +1167,9 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                     {editingRecord ? 'Edit Power Consumption Record' : 'Record Power & Energy Log'}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Solar default Rs. {DEFAULT_SOLAR_RATE_PKR}/unit • Main Grid default Rs. {DEFAULT_GRID_RATE_PKR}/unit • Diesel fuel tracking
+                    {canViewFinancials
+                      ? `Solar default Rs. ${DEFAULT_SOLAR_RATE_PKR}/unit • Main Grid default Rs. ${DEFAULT_GRID_RATE_PKR}/unit • Diesel fuel tracking`
+                      : 'Record solar units, main grid units, and diesel generator fuel readings'}
                   </p>
                 </div>
               </div>
@@ -1110,7 +1191,7 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
             )}
 
             <form onSubmit={handleFormSubmit} className="mt-4 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className={`grid grid-cols-1 sm:grid-cols-2 ${canViewFinancials ? 'lg:grid-cols-4' : ''} gap-3`}>
                 <UIInput
                   label="Date *"
                   type="date"
@@ -1129,24 +1210,28 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                     </option>
                   ))}
                 </UISelect>
-                <UIInput
-                  label="Solar Rate (Rs. / unit)"
-                  type="number"
-                  min="1"
-                  step="0.5"
-                  value={formSolarRate}
-                  onChange={(e) => setFormSolarRate(e.target.value)}
-                  helperText={`Default Rs. ${DEFAULT_SOLAR_RATE_PKR}`}
-                />
-                <UIInput
-                  label="Main Grid Rate (Rs. / unit)"
-                  type="number"
-                  min="1"
-                  step="0.5"
-                  value={formGridRate}
-                  onChange={(e) => setFormGridRate(e.target.value)}
-                  helperText={`Default Rs. ${DEFAULT_GRID_RATE_PKR}`}
-                />
+                {canViewFinancials && (
+                  <>
+                    <UIInput
+                      label="Solar Rate (Rs. / unit)"
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      value={formSolarRate}
+                      onChange={(e) => setFormSolarRate(e.target.value)}
+                      helperText={`Default Rs. ${DEFAULT_SOLAR_RATE_PKR}`}
+                    />
+                    <UIInput
+                      label="Main Grid Rate (Rs. / unit)"
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      value={formGridRate}
+                      onChange={(e) => setFormGridRate(e.target.value)}
+                      helperText={`Default Rs. ${DEFAULT_GRID_RATE_PKR}`}
+                    />
+                  </>
+                )}
               </div>
 
               {/* Solar & Main Grid */}
@@ -1186,7 +1271,7 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
               {/* Diesel Generator */}
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
                 <div className="text-xs font-bold text-slate-800">Diesel Generator Fuel (Purchased &amp; Consumed)</div>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className={`grid grid-cols-1 ${canViewFinancials ? 'sm:grid-cols-4' : 'sm:grid-cols-2'} gap-3`}>
                   <UIInput
                     label="Diesel Purchased (L)"
                     type="number"
@@ -1196,24 +1281,28 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                     value={formDieselPurchased}
                     onChange={(e) => handleDieselLitersOrRateChange(e.target.value, formDieselRate)}
                   />
-                  <UIInput
-                    label="Diesel Rate (Rs./L)"
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    placeholder="e.g. 265"
-                    value={formDieselRate}
-                    onChange={(e) => handleDieselLitersOrRateChange(formDieselPurchased, e.target.value)}
-                  />
-                  <UIInput
-                    label="Diesel Purchase Cost (Rs.)"
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="Auto or manual Rs."
-                    value={formDieselCost}
-                    onChange={(e) => setFormDieselCost(e.target.value)}
-                  />
+                  {canViewFinancials && (
+                    <>
+                      <UIInput
+                        label="Diesel Rate (Rs./L)"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        placeholder="e.g. 265"
+                        value={formDieselRate}
+                        onChange={(e) => handleDieselLitersOrRateChange(formDieselPurchased, e.target.value)}
+                      />
+                      <UIInput
+                        label="Diesel Purchase Cost (Rs.)"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="Auto or manual Rs."
+                        value={formDieselCost}
+                        onChange={(e) => setFormDieselCost(e.target.value)}
+                      />
+                    </>
+                  )}
                   <UIInput
                     label="Diesel Consumed (L)"
                     type="number"
@@ -1227,33 +1316,54 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
               </div>
 
               {/* Live Calculation Summary */}
-              <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div>
-                  <div className="text-[11px] text-slate-500">Solar Cost (@ Rs.{formPreview.solarRate})</div>
-                  <div className="font-black text-amber-800 font-mono tabular-nums">
-                    Rs. {Math.round(formPreview.solarConsCost).toLocaleString()}
+              {canViewFinancials ? (
+                <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <div className="text-[11px] text-slate-500">Solar Cost (@ Rs.{formPreview.solarRate})</div>
+                    <div className="font-black text-amber-800 font-mono tabular-nums">
+                      Rs. {Math.round(formPreview.solarConsCost).toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-500">Grid Cost (@ Rs.{formPreview.gridRate})</div>
+                    <div className="font-black text-blue-800 font-mono tabular-nums">
+                      Rs. {Math.round(formPreview.gridCost).toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-500">Diesel Net (Bought - Used)</div>
+                    <div className="font-black text-slate-900 font-mono tabular-nums">
+                      {formPreview.dieselNetLiters >= 0 ? '+' : ''}
+                      {formPreview.dieselNetLiters.toLocaleString(undefined, { maximumFractionDigits: 1 })} L
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-500">Total Power Cost</div>
+                    <div className="font-black text-slate-900 font-mono tabular-nums">
+                      Rs. {Math.round(formPreview.totalPowerCost).toLocaleString()}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-[11px] text-slate-500">Grid Cost (@ Rs.{formPreview.gridRate})</div>
-                  <div className="font-black text-blue-800 font-mono tabular-nums">
-                    Rs. {Math.round(formPreview.gridCost).toLocaleString()}
+              ) : (
+                <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <div className="text-[11px] text-slate-500">Total Electricity Used (Solar + Grid)</div>
+                    <div className="font-black text-slate-900 font-mono tabular-nums">
+                      {((Number(formSolarConsumed) || 0) + (Number(formGridConsumed) || 0)).toLocaleString(undefined, {
+                        maximumFractionDigits: 1,
+                      })}{' '}
+                      units
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-500">Diesel Net (Bought - Used)</div>
+                    <div className="font-black text-slate-900 font-mono tabular-nums">
+                      {formPreview.dieselNetLiters >= 0 ? '+' : ''}
+                      {formPreview.dieselNetLiters.toLocaleString(undefined, { maximumFractionDigits: 1 })} L
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-[11px] text-slate-500">Diesel Net (Bought - Used)</div>
-                  <div className="font-black text-slate-900 font-mono tabular-nums">
-                    {formPreview.dieselNetLiters >= 0 ? '+' : ''}
-                    {formPreview.dieselNetLiters.toLocaleString(undefined, { maximumFractionDigits: 1 })} L
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-slate-500">Total Power Cost</div>
-                  <div className="font-black text-slate-900 font-mono tabular-nums">
-                    Rs. {Math.round(formPreview.totalPowerCost).toLocaleString()}
-                  </div>
-                </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <UIInput
@@ -1317,18 +1427,25 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
             onClose={() => setViewingRecord(null)}
             title={`Power Consumption • ${viewingRecord.date}`}
             subtitle={`${unitLabel}${viewingRecord.referenceNo ? ` • Ref #${viewingRecord.referenceNo}` : ''}`}
-            badge={{ text: `Solar Rs. ${sRate}/u • Grid Rs. ${gRate}/u`, color: 'amber' }}
+            badge={{
+              text: canViewFinancials ? `Solar Rs. ${sRate}/u • Grid Rs. ${gRate}/u` : unitLabel,
+              color: 'amber',
+            }}
             fields={[
               { label: 'Date', value: viewingRecord.date, mono: true },
               { label: 'Unit / Shed', value: unitLabel },
               {
                 label: 'Solar Produced',
-                value: `${solarProd.toLocaleString()} units (Val: Rs. ${Math.round(solarProd * sRate).toLocaleString()})`,
+                value: canViewFinancials
+                  ? `${solarProd.toLocaleString()} units (Val: Rs. ${Math.round(solarProd * sRate).toLocaleString()})`
+                  : `${solarProd.toLocaleString()} units`,
                 mono: true,
               },
               {
-                label: 'Solar Consumed & Cost',
-                value: `${solarCons.toLocaleString()} units • Rs. ${Math.round(solarCost).toLocaleString()} (@ Rs. ${sRate}/u)`,
+                label: canViewFinancials ? 'Solar Consumed & Cost' : 'Solar Consumed',
+                value: canViewFinancials
+                  ? `${solarCons.toLocaleString()} units • Rs. ${Math.round(solarCost).toLocaleString()} (@ Rs. ${sRate}/u)`
+                  : `${solarCons.toLocaleString()} units`,
                 mono: true,
               },
               {
@@ -1336,14 +1453,20 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                 value: `${gridCons.toLocaleString()} units`,
                 mono: true,
               },
-              {
-                label: 'Main Grid Cost',
-                value: `Rs. ${Math.round(gridCost).toLocaleString()} (@ Rs. ${gRate}/unit)`,
-                mono: true,
-              },
+              ...(canViewFinancials
+                ? [
+                    {
+                      label: 'Main Grid Cost',
+                      value: `Rs. ${Math.round(gridCost).toLocaleString()} (@ Rs. ${gRate}/unit)`,
+                      mono: true,
+                    },
+                  ]
+                : []),
               {
                 label: 'Diesel Purchased',
-                value: `${dPurch.toLocaleString()} L (Rs. ${Math.round(dCost).toLocaleString()})`,
+                value: canViewFinancials
+                  ? `${dPurch.toLocaleString()} L (Rs. ${Math.round(dCost).toLocaleString()})`
+                  : `${dPurch.toLocaleString()} L`,
                 mono: true,
               },
               {
@@ -1351,20 +1474,28 @@ export const PowerConsumptionView: React.FC<PowerConsumptionViewProps> = ({
                 value: `${dCons.toLocaleString()} L`,
                 mono: true,
               },
-              {
-                label: 'Total Power Cost (Solar + Grid + Diesel)',
-                value: `Rs. ${Math.round(solarCost + gridCost + dCost).toLocaleString()}`,
-                mono: true,
-                highlight: true,
-                fullWidth: true,
-              },
+              ...(canViewFinancials
+                ? [
+                    {
+                      label: 'Total Power Cost (Solar + Grid + Diesel)',
+                      value: `Rs. ${Math.round(solarCost + gridCost + dCost).toLocaleString()}`,
+                      mono: true,
+                      highlight: true,
+                      fullWidth: true,
+                    },
+                  ]
+                : []),
             ]}
             notes={viewingRecord.notes}
-            onEdit={() => openEditModal(viewingRecord)}
-            onDelete={async () => {
-              await onDeletePowerLog(viewingRecord);
-              showToast(`Power log (${viewingRecord.date}) deleted.`);
-            }}
+            onEdit={canEdit && onEditPowerLog ? () => openEditModal(viewingRecord) : undefined}
+            onDelete={
+              canDelete && onDeletePowerLog
+                ? async () => {
+                    await onDeletePowerLog(viewingRecord);
+                    showToast(`Power log (${viewingRecord.date}) deleted.`);
+                  }
+                : undefined
+            }
           />
         );
       })()}

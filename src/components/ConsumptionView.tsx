@@ -51,6 +51,8 @@ interface ConsumptionViewProps {
   onOpenRecordModal: (type: 'feed') => void;
   onEditConsumption?: (log: FeedConsumption) => Promise<void> | void;
   onDeleteConsumption?: (log: FeedConsumption) => Promise<void> | void;
+  canEdit?: boolean;
+  canDelete?: boolean;
   farms?: Farm[];
   selectedFarmId?: string;
   onSelectFarm?: (farmId: string) => void;
@@ -66,6 +68,8 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
   onOpenRecordModal,
   onEditConsumption,
   onDeleteConsumption,
+  canEdit = true,
+  canDelete = true,
   farms = [],
   selectedFarmId = 'farm-1',
   onSelectFarm,
@@ -1588,16 +1592,18 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
                             <Eye className="w-3 h-3" />
                             <span>View</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(log)}
-                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                            title={`Edit Consumption Record #${log.challanNo || log.trackingId || log.id.replace('c-', '')}`}
-                          >
-                            <Edit className="w-3 h-3" />
-                            <span>Edit</span>
-                          </button>
-                          {onDeleteConsumption && confirmDeleteId !== log.id && (
+                          {canEdit && onEditConsumption && (
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(log)}
+                              className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                              title={`Edit Consumption Record #${log.challanNo || log.trackingId || log.id.replace('c-', '')}`}
+                            >
+                              <Edit className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                          {canDelete && onDeleteConsumption && confirmDeleteId !== log.id && (
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteId(log.id)}
@@ -1608,7 +1614,7 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
                             </button>
                           )}
                         </div>
-                        {onDeleteConsumption && confirmDeleteId === log.id && (
+                        {canDelete && onDeleteConsumption && confirmDeleteId === log.id && (
                           <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
                             <span className="font-bold text-rose-900">Delete?</span>
                             <button
@@ -1884,9 +1890,9 @@ export const ConsumptionView: React.FC<ConsumptionViewProps> = ({
             },
           ]}
           notes={viewingLog.notes}
-          onEdit={() => openEditModal(viewingLog)}
+          onEdit={canEdit && onEditConsumption ? () => openEditModal(viewingLog) : undefined}
           onDelete={
-            onDeleteConsumption
+            canDelete && onDeleteConsumption
               ? async () => {
                   await onDeleteConsumption(viewingLog);
                   setToastMessage('Feed consumption record deleted from database.');

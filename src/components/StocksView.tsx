@@ -80,6 +80,9 @@ interface StocksViewProps {
   ) => void;
   initialFocus?: { head?: string; unit?: string } | null;
   onClearInitialFocus?: () => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canViewFinancials?: boolean;
 }
 
 export const StocksView: React.FC<StocksViewProps> = ({
@@ -87,6 +90,9 @@ export const StocksView: React.FC<StocksViewProps> = ({
   onStockExpenseSynced,
   initialFocus,
   onClearInitialFocus,
+  canEdit = true,
+  canDelete = true,
+  canViewFinancials = true,
 }) => {
   const initialUrlFilters = useMemo(() => getInitialUrlFilters(), []);
   const [activeTab, setActiveTab] = useState<'shipments' | 'add-stock'>('shipments');
@@ -107,14 +113,18 @@ export const StocksView: React.FC<StocksViewProps> = ({
 
   // Persistent Stock Records Ledger (starts with 145 authentic records, accepts new entries)
   const [allStockRecords, setAllStockRecords] = useState<StockRecord[]>(() => {
+    const stripFin = (list: StockRecord[]) =>
+      canViewFinancials
+        ? list
+        : list.map((r) => ({ ...r, amount: 0, costPerBag: 0, paymentType: 'N/A' }));
     const saved = localStorage.getItem('greenova_stocks_v2');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return stripFin(parsed);
       } catch (e) {}
     }
-    return liveStockRecords;
+    return stripFin(liveStockRecords);
   });
 
   const getLocalToday = () => {
@@ -220,9 +230,9 @@ export const StocksView: React.FC<StocksViewProps> = ({
             category: String(r.head || 'FEED'),
             quantity: Number(r.quantity || 0),
             bags: Number(r.bags ?? r.quantity ?? 0),
-            amount: Number(r.amountPaid ?? r.amount ?? 0),
-            costPerBag: Number(r.costPerBag || 0),
-            paymentType: String(r.paymentType || 'CASH'),
+            amount: canViewFinancials ? Number(r.amountPaid ?? r.amount ?? 0) : 0,
+            costPerBag: canViewFinancials ? Number(r.costPerBag || 0) : 0,
+            paymentType: canViewFinancials ? String(r.paymentType || 'CASH') : 'N/A',
             challanNo: String(r.challanNo || ''),
             notes: String(r.notes || ''),
             expenseId: Number(r.expenseId || 0) || undefined,
@@ -230,15 +240,17 @@ export const StocksView: React.FC<StocksViewProps> = ({
           };
         });
         setAllStockRecords(mapped);
-        try {
-          localStorage.setItem('greenova_stocks_v2', JSON.stringify(mapped));
-        } catch {}
+        if (canViewFinancials) {
+          try {
+            localStorage.setItem('greenova_stocks_v2', JSON.stringify(mapped));
+          } catch {}
+        }
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, []);
+  }, [canViewFinancials]);
 
   // Edit Stock Record Modal State
   const [editingStock, setEditingStock] = useState<StockRecord | null>(null);
@@ -472,13 +484,15 @@ export const StocksView: React.FC<StocksViewProps> = ({
       setFormError('Please enter a valid Quantity greater than 0.');
       return;
     }
-    if (!formAmount || Number(formAmount) <= 0) {
-      setFormError('Please enter a valid Amount (PKR) greater than 0.');
-      return;
-    }
-    if (!formPaymentType) {
-      setFormError('Please select a payment type.');
-      return;
+    if (canViewFinancials) {
+      if (!formAmount || Number(formAmount) <= 0) {
+        setFormError('Please enter a valid Amount (PKR) greater than 0.');
+        return;
+      }
+      if (!formPaymentType) {
+        setFormError('Please select a payment type.');
+        return;
+      }
     }
     if (!formChallan.trim()) {
       setFormError('Please enter a challan number.');
@@ -487,8 +501,9 @@ export const StocksView: React.FC<StocksViewProps> = ({
     setIsSavingStock(true);
 
     const qty = Number(formQuantity) || 0;
-    const amt = Number(formAmount) || 0;
-    const costBag = qty > 0 ? Math.round(amt / qty) : 0;
+    const amt = canViewFinancials ? Number(formAmount) || 0 : 0;
+    const costBag = canViewFinancials && qty > 0 ? Math.round(amt / qty) : 0;
+    const paymentLabel = canViewFinancials ? formPaymentType.toUpperCase() : 'N/A';
     const maxTracking = allStockRecords.reduce((max, r) => Math.max(max, r.trackingId || 0), 0);
     const flockId = formFlock === 'Unit 2' ? '9' : formFlock === 'Unit 3' ? '10' : '8';
     const clientId = `stk-${Date.now()}`;
@@ -507,7 +522,7 @@ export const StocksView: React.FC<StocksViewProps> = ({
           quantity: qty,
           amount: amt,
           amountPaid: amt,
-          paymentType: formPaymentType.toUpperCase(),
+          paymentType: paymentLabel,
           notes: formNotes,
           attachment: attachmentData || attachmentName || null,
         }),
@@ -531,7 +546,7 @@ export const StocksView: React.FC<StocksViewProps> = ({
         bags: qty,
         amount: amt,
         costPerBag: costBag,
-        paymentType: formPaymentType.toUpperCase(),
+        paymentType: paymentLabel,
         challanNo: formChallan.trim(),
         notes: formNotes || `${qty} ${formHead === 'FEED' ? 'bags' : 'units'} of ${formStockType} received...`,
         expenseId: canonicalExpenseId,
@@ -540,42 +555,46 @@ export const StocksView: React.FC<StocksViewProps> = ({
 
       const updated = [newRecord, ...allStockRecords];
       setAllStockRecords(updated);
-      try {
-        localStorage.setItem('greenova_stocks_v2', JSON.stringify(updated));
-      } catch (err) {
-        console.warn('LocalStorage error:', err);
+      if (canViewFinancials) {
+        try {
+          localStorage.setItem('greenova_stocks_v2', JSON.stringify(updated));
+        } catch (err) {
+          console.warn('LocalStorage error:', err);
+        }
       }
 
       // Sync corresponding Farm Expense state (already persisted atomically in DB via POST /api/stocks)
-      if (res?.data?.syncedExpense && onStockExpenseSynced) {
-        onStockExpenseSynced(
-          'create',
-          mapSyncedExpenseToFinancial(res.data.syncedExpense, newRecord)
-        );
-      } else if (onAddTransaction && !onStockExpenseSynced) {
-        const expenseRecord: FinancialRecord = {
-          id: `exp-stk-${Date.now()}`,
-          type: 'Expense',
-          category: formHead,
-          head: formHead,
-          amount: amt,
-          date: formDate,
-          referenceNo: `STK-${newRecord.trackingId}`,
-          challanNo: formChallan.trim(),
-          flockId: Number(flockId),
-          flockName: formFlock,
-          description: `Stock Intake: ${qty} ${formHead === 'FEED' ? 'bags' : 'units'} of ${formStockType} (${formHead}) via ${formPaymentType}`,
-          notes: formNotes || `Stock record #${newRecord.trackingId} auto-synced to Farm Expenses ledger.`,
-          status: 'Paid',
-          attachment: attachmentData || null,
-          attachmentName: attachmentName || null,
-          isStockLinked: true,
-          linkedStockId: newRecord.trackingId,
-          linkedStockHead: formHead,
-          linkedStockType: formStockType,
-          linkedStockQuantity: qty,
-        };
-        await onAddTransaction(expenseRecord);
+      if (canViewFinancials) {
+        if (res?.data?.syncedExpense && onStockExpenseSynced) {
+          onStockExpenseSynced(
+            'create',
+            mapSyncedExpenseToFinancial(res.data.syncedExpense, newRecord)
+          );
+        } else if (onAddTransaction && !onStockExpenseSynced) {
+          const expenseRecord: FinancialRecord = {
+            id: `exp-stk-${Date.now()}`,
+            type: 'Expense',
+            category: formHead,
+            head: formHead,
+            amount: amt,
+            date: formDate,
+            referenceNo: `STK-${newRecord.trackingId}`,
+            challanNo: formChallan.trim(),
+            flockId: Number(flockId),
+            flockName: formFlock,
+            description: `Stock Intake: ${qty} ${formHead === 'FEED' ? 'bags' : 'units'} of ${formStockType} (${formHead}) via ${formPaymentType}`,
+            notes: formNotes || `Stock record #${newRecord.trackingId} auto-synced to Farm Expenses ledger.`,
+            status: 'Paid',
+            attachment: attachmentData || null,
+            attachmentName: attachmentName || null,
+            isStockLinked: true,
+            linkedStockId: newRecord.trackingId,
+            linkedStockHead: formHead,
+            linkedStockType: formStockType,
+            linkedStockQuantity: qty,
+          };
+          await onAddTransaction(expenseRecord);
+        }
       }
 
       const savedHead = normalizeStockHead(formHead);
@@ -585,7 +604,9 @@ export const StocksView: React.FC<StocksViewProps> = ({
       setActiveTab('shipments');
       setCurrentPage(1);
       setToastMessage(
-        `Stock #${newRecord.trackingId} (${STOCK_HEAD_META[savedHead].label}) saved & synchronized with Farm Expenses!`
+        canViewFinancials
+          ? `Stock #${newRecord.trackingId} (${STOCK_HEAD_META[savedHead].label}) saved & synchronized with Farm Expenses!`
+          : `Stock #${newRecord.trackingId} (${STOCK_HEAD_META[savedHead].label}) saved to database.`
       );
       setTimeout(() => setToastMessage(null), 4000);
     } catch (err: any) {
@@ -899,9 +920,13 @@ export const StocksView: React.FC<StocksViewProps> = ({
       { header: 'Category', align: 'left' as const },
       { header: 'Item / Stock Type', align: 'left' as const },
       { header: qtyColLabel, align: 'right' as const },
-      { header: rateColLabel, align: 'right' as const },
-      { header: 'Amount (PKR)', align: 'right' as const },
-      { header: 'Payment', align: 'center' as const },
+      ...(canViewFinancials
+        ? [
+            { header: rateColLabel, align: 'right' as const },
+            { header: 'Amount (PKR)', align: 'right' as const },
+            { header: 'Payment', align: 'center' as const },
+          ]
+        : []),
       { header: 'Challan #', align: 'left' as const },
       { header: 'Notes', align: 'left' as const },
     ];
@@ -921,9 +946,13 @@ export const StocksView: React.FC<StocksViewProps> = ({
         r.head,
         r.head === 'FEED' ? `Feed ${r.type}` : r.type || r.feedType,
         qty.toLocaleString(),
-        (r.costPerBag || 0).toLocaleString(),
-        amt.toLocaleString(),
-        r.paymentType || '-',
+        ...(canViewFinancials
+          ? [
+              (r.costPerBag || 0).toLocaleString(),
+              amt.toLocaleString(),
+              r.paymentType || '-',
+            ]
+          : []),
         r.challanNo ? `CH-${r.challanNo}` : '-',
         r.notes || '-',
       ];
@@ -936,9 +965,13 @@ export const StocksView: React.FC<StocksViewProps> = ({
       r.head,
       r.head === 'FEED' ? `Feed ${r.type}` : r.type || r.feedType,
       Number(r.quantity || 0),
-      Number(r.costPerBag || 0),
-      Number(r.amount || 0),
-      r.paymentType || '',
+      ...(canViewFinancials
+        ? [
+            Number(r.costPerBag || 0),
+            Number(r.amount || 0),
+            r.paymentType || '',
+          ]
+        : []),
       r.challanNo || '',
       r.notes || '',
     ]);
@@ -950,9 +983,7 @@ export const StocksView: React.FC<StocksViewProps> = ({
       '',
       '',
       sumQty.toLocaleString(),
-      '',
-      sumAmt.toLocaleString(),
-      '',
+      ...(canViewFinancials ? ['', sumAmt.toLocaleString(), ''] : []),
       '',
       '',
     ];
@@ -1066,7 +1097,9 @@ export const StocksView: React.FC<StocksViewProps> = ({
             <div className="mb-6">
               <h2 className="text-xl font-black text-slate-900 tracking-tight">Stock Details</h2>
               <p className="text-xs text-slate-500 mt-1">
-                Enter the stock purchase or payment details below
+                {canViewFinancials
+                  ? 'Enter the stock purchase or payment details below'
+                  : 'Enter the unit stock intake details below'}
               </p>
             </div>
 
@@ -1198,7 +1231,7 @@ export const StocksView: React.FC<StocksViewProps> = ({
                 </div>
               </div>
 
-              {/* Row 3: Quantity & Amount */}
+              {/* Row 3 & 4: Quantity, Challan, and optional Financial Amount & Payment Type */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Quantity *</label>
@@ -1223,66 +1256,81 @@ export const StocksView: React.FC<StocksViewProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Amount *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formAmount}
-                    onFocus={() => {
-                      if (Number(formAmount) === 0) setFormAmount('');
-                    }}
-                    onBlur={() => {
-                      if (formAmount === '') setFormAmount(0);
-                    }}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      setFormAmount(raw === '' ? '' : Math.max(0, Number(raw) || 0));
-                      setFormError(null);
-                    }}
-                    placeholder="0"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-black text-emerald-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                    required
-                  />
-                </div>
+                {canViewFinancials ? (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Amount *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={formAmount}
+                      onFocus={() => {
+                        if (Number(formAmount) === 0) setFormAmount('');
+                      }}
+                      onBlur={() => {
+                        if (formAmount === '') setFormAmount(0);
+                      }}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setFormAmount(raw === '' ? '' : Math.max(0, Number(raw) || 0));
+                        setFormError(null);
+                      }}
+                      placeholder="0"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-black text-emerald-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Challan Number *</label>
+                    <input
+                      type="text"
+                      value={formChallan}
+                      onChange={(e) => setFormChallan(e.target.value)}
+                      placeholder="e.g. 1445 or CH-8902"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                      required
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Row 4: Payment Type & Challan Number */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Payment Type *</label>
-                  <select
-                    value={formPaymentType}
-                    onChange={(e) => {
-                      setFormPaymentType(e.target.value);
-                      setFormError(null);
-                    }}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
-                    required
-                  >
-                    <option value="" disabled>
-                      Select payment type
-                    </option>
-                    <option value="Cash">Cash</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Credit">Credit</option>
-                  </select>
-                </div>
+              {canViewFinancials && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Payment Type *</label>
+                    <select
+                      value={formPaymentType}
+                      onChange={(e) => {
+                        setFormPaymentType(e.target.value);
+                        setFormError(null);
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
+                      required
+                    >
+                      <option value="" disabled>
+                        Select payment type
+                      </option>
+                      <option value="Cash">Cash</option>
+                      <option value="Bank Transfer">Bank Transfer</option>
+                      <option value="Cheque">Cheque</option>
+                      <option value="Credit">Credit</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Challan Number *</label>
-                  <input
-                    type="text"
-                    value={formChallan}
-                    onChange={(e) => setFormChallan(e.target.value)}
-                    placeholder="e.g. 1445 or CH-8902"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                    required
-                  />
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Challan Number *</label>
+                    <input
+                      type="text"
+                      value={formChallan}
+                      onChange={(e) => setFormChallan(e.target.value)}
+                      placeholder="e.g. 1445 or CH-8902"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Row 5: Attachment */}
               <div>
@@ -1400,13 +1448,15 @@ export const StocksView: React.FC<StocksViewProps> = ({
                   {headSummaryStats.all.qty.toLocaleString()}{' '}
                   <span className="text-[10px] font-normal">items</span>
                 </div>
-                <div
-                  className={`text-[11px] font-semibold mt-0.5 font-mono ${
-                    selectedHead === 'all' ? 'text-slate-300' : 'text-slate-500'
-                  }`}
-                >
-                  Rs. {Math.round(headSummaryStats.all.amount).toLocaleString()}
-                </div>
+                {canViewFinancials && (
+                  <div
+                    className={`text-[11px] font-semibold mt-0.5 font-mono ${
+                      selectedHead === 'all' ? 'text-slate-300' : 'text-slate-500'
+                    }`}
+                  >
+                    Rs. {Math.round(headSummaryStats.all.amount).toLocaleString()}
+                  </div>
+                )}
               </button>
 
               {headSummaryStats.byHead.map((item) => {
@@ -1445,13 +1495,15 @@ export const StocksView: React.FC<StocksViewProps> = ({
                       {item.qty.toLocaleString()}{' '}
                       <span className="text-[10px] font-normal">{meta.unitLabel}</span>
                     </div>
-                    <div
-                      className={`text-[11px] font-semibold mt-0.5 font-mono ${
-                        isSelected ? 'text-indigo-100' : 'text-slate-500'
-                      }`}
-                    >
-                      Rs. {Math.round(item.amount).toLocaleString()}
-                    </div>
+                    {canViewFinancials && (
+                      <div
+                        className={`text-[11px] font-semibold mt-0.5 font-mono ${
+                          isSelected ? 'text-indigo-100' : 'text-slate-500'
+                        }`}
+                      >
+                        Rs. {Math.round(item.amount).toLocaleString()}
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -1459,7 +1511,7 @@ export const StocksView: React.FC<StocksViewProps> = ({
           </div>
 
           {/* Key Stat Cards (Adaptive to Selected Head & Unit) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${canViewFinancials ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}>
             <StatCard
               title={
                 selectedHead === 'FEED'
@@ -1482,36 +1534,40 @@ export const StocksView: React.FC<StocksViewProps> = ({
               }
             />
 
-            <StatCard
-              title="Total Stock Amount Paid"
-              value={`Rs. ${Math.round(filteredStats.totalAmount).toLocaleString()}`}
-              icon={DollarSign}
-              color="emerald"
-              valueColor="text-emerald-700"
-              badge={{ text: 'Disbursed', color: 'emerald' }}
-              subtext={
-                selectedHead === 'all'
-                  ? 'All stock invoice disbursements'
-                  : `${STOCK_HEAD_META[selectedHead].label} invoice disbursements`
-              }
-            />
+            {canViewFinancials && (
+              <StatCard
+                title="Total Stock Amount Paid"
+                value={`Rs. ${Math.round(filteredStats.totalAmount).toLocaleString()}`}
+                icon={DollarSign}
+                color="emerald"
+                valueColor="text-emerald-700"
+                badge={{ text: 'Disbursed', color: 'emerald' }}
+                subtext={
+                  selectedHead === 'all'
+                    ? 'All stock invoice disbursements'
+                    : `${STOCK_HEAD_META[selectedHead].label} invoice disbursements`
+                }
+              />
+            )}
 
-            <StatCard
-              title={selectedHead === 'FEED' ? 'Average Expense per Bag' : 'Average Expense per Unit'}
-              value={`Rs. ${filteredStats.avgCost.toLocaleString()}`}
-              icon={Layers}
-              color="blue"
-              badge={{
-                text:
-                  selectedHead === 'FEED' && filteredStats.avgCost > 0
-                    ? `~Rs. ${Math.round(filteredStats.avgCost / 50)} / kg`
-                    : selectedHead === 'all'
-                    ? 'All Categories'
-                    : STOCK_HEAD_META[selectedHead].shortLabel,
-                color: 'blue',
-              }}
-              subtext="Weighted average procurement expense"
-            />
+            {canViewFinancials && (
+              <StatCard
+                title={selectedHead === 'FEED' ? 'Average Expense per Bag' : 'Average Expense per Unit'}
+                value={`Rs. ${filteredStats.avgCost.toLocaleString()}`}
+                icon={Layers}
+                color="blue"
+                badge={{
+                  text:
+                    selectedHead === 'FEED' && filteredStats.avgCost > 0
+                      ? `~Rs. ${Math.round(filteredStats.avgCost / 50)} / kg`
+                      : selectedHead === 'all'
+                      ? 'All Categories'
+                      : STOCK_HEAD_META[selectedHead].shortLabel,
+                  color: 'blue',
+                }}
+                subtext="Weighted average procurement expense"
+              />
+            )}
 
             <StatCard
               title="Active Stock Units"
@@ -1589,13 +1645,15 @@ export const StocksView: React.FC<StocksViewProps> = ({
                         {card.showPct ? ` (${card.data.pct}%)` : ''}
                       </span>
                     </div>
-                    <div
-                      className={`text-[11px] font-semibold mt-0.5 font-mono ${
-                        isSel ? 'text-indigo-100' : 'text-slate-500'
-                      }`}
-                    >
-                      Rs. {Math.round(card.data.amount).toLocaleString()}
-                    </div>
+                    {canViewFinancials && (
+                      <div
+                        className={`text-[11px] font-semibold mt-0.5 font-mono ${
+                          isSel ? 'text-indigo-100' : 'text-slate-500'
+                        }`}
+                      >
+                        Rs. {Math.round(card.data.amount).toLocaleString()}
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -1678,13 +1736,15 @@ export const StocksView: React.FC<StocksViewProps> = ({
                                 <div className="font-mono font-bold">
                                   {u.cell.qty.toLocaleString()} {meta.unitLabel}
                                 </div>
-                                <div
-                                  className={`text-[10px] font-mono ${
-                                    isCellSel ? 'text-indigo-100' : 'text-slate-500'
-                                  }`}
-                                >
-                                  Rs. {Math.round(u.cell.amount).toLocaleString()}
-                                </div>
+                                {canViewFinancials && (
+                                  <div
+                                    className={`text-[10px] font-mono ${
+                                      isCellSel ? 'text-indigo-100' : 'text-slate-500'
+                                    }`}
+                                  >
+                                    Rs. {Math.round(u.cell.amount).toLocaleString()}
+                                  </div>
+                                )}
                               </button>
                             </td>
                           );
@@ -1703,9 +1763,11 @@ export const StocksView: React.FC<StocksViewProps> = ({
                             <div className="font-mono font-black text-slate-900">
                               {row.total.qty.toLocaleString()} {meta.unitLabel}
                             </div>
-                            <div className="text-[10px] font-mono font-semibold text-emerald-700">
-                              Rs. {Math.round(row.total.amount).toLocaleString()}
-                            </div>
+                            {canViewFinancials && (
+                              <div className="text-[10px] font-mono font-semibold text-emerald-700">
+                                Rs. {Math.round(row.total.amount).toLocaleString()}
+                              </div>
+                            )}
                           </button>
                         </td>
                       </tr>
@@ -1716,16 +1778,24 @@ export const StocksView: React.FC<StocksViewProps> = ({
                   <tr>
                     <td className="py-2.5 px-3.5">All 5 Heads Total</td>
                     <td className="py-2.5 px-3 text-right font-mono">
-                      Rs. {Math.round(unitWiseHeadMatrix.totals.unit1.amount).toLocaleString()}
+                      {canViewFinancials
+                        ? `Rs. ${Math.round(unitWiseHeadMatrix.totals.unit1.amount).toLocaleString()}`
+                        : `${unitWiseHeadMatrix.totals.unit1.qty.toLocaleString()} items`}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono">
-                      Rs. {Math.round(unitWiseHeadMatrix.totals.unit2.amount).toLocaleString()}
+                      {canViewFinancials
+                        ? `Rs. ${Math.round(unitWiseHeadMatrix.totals.unit2.amount).toLocaleString()}`
+                        : `${unitWiseHeadMatrix.totals.unit2.qty.toLocaleString()} items`}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono">
-                      Rs. {Math.round(unitWiseHeadMatrix.totals.unit3.amount).toLocaleString()}
+                      {canViewFinancials
+                        ? `Rs. ${Math.round(unitWiseHeadMatrix.totals.unit3.amount).toLocaleString()}`
+                        : `${unitWiseHeadMatrix.totals.unit3.qty.toLocaleString()} items`}
                     </td>
                     <td className="py-2.5 px-3.5 text-right font-mono text-emerald-300">
-                      Rs. {Math.round(unitWiseHeadMatrix.totals.all.amount).toLocaleString()}
+                      {canViewFinancials
+                        ? `Rs. ${Math.round(unitWiseHeadMatrix.totals.all.amount).toLocaleString()}`
+                        : `${unitWiseHeadMatrix.totals.all.qty.toLocaleString()} items`}
                     </td>
                   </tr>
                 </tfoot>
@@ -1809,50 +1879,52 @@ export const StocksView: React.FC<StocksViewProps> = ({
               )}
 
               {/* Payment Type Filter */}
-              <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedPayment('all');
-                    setCurrentPage(1);
-                  }}
-                  className={`px-2 py-1 rounded-md font-bold cursor-pointer ${
-                    selectedPayment === 'all'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  All Payments
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedPayment('CASH');
-                    setCurrentPage(1);
-                  }}
-                  className={`px-2 py-1 rounded-md font-bold cursor-pointer ${
-                    selectedPayment === 'CASH'
-                      ? 'bg-white text-amber-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Cash
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedPayment('BANK_TRANSFER');
-                    setCurrentPage(1);
-                  }}
-                  className={`px-2 py-1 rounded-md font-bold cursor-pointer ${
-                    selectedPayment === 'BANK_TRANSFER'
-                      ? 'bg-white text-purple-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Bank Transfer
-                </button>
-              </div>
+              {canViewFinancials && (
+                <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPayment('all');
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2 py-1 rounded-md font-bold cursor-pointer ${
+                      selectedPayment === 'all'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All Payments
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPayment('CASH');
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2 py-1 rounded-md font-bold cursor-pointer ${
+                      selectedPayment === 'CASH'
+                        ? 'bg-white text-amber-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Cash
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPayment('BANK_TRANSFER');
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2 py-1 rounded-md font-bold cursor-pointer ${
+                      selectedPayment === 'BANK_TRANSFER'
+                        ? 'bg-white text-purple-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Bank Transfer
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1900,11 +1972,13 @@ export const StocksView: React.FC<StocksViewProps> = ({
                         ? 'Quantity'
                         : 'Quantity (Units)'}
                     </th>
-                    <th className="py-3 px-3 text-right">Amount (PKR)</th>
-                    <th className="py-3 px-3 text-right">
-                      {selectedHead === 'FEED' ? 'Avg Rate/Bag' : 'Avg Rate/Unit'}
-                    </th>
-                    <th className="py-3 px-3">Payment</th>
+                    {canViewFinancials && <th className="py-3 px-3 text-right">Amount (PKR)</th>}
+                    {canViewFinancials && (
+                      <th className="py-3 px-3 text-right">
+                        {selectedHead === 'FEED' ? 'Avg Rate/Bag' : 'Avg Rate/Unit'}
+                      </th>
+                    )}
+                    {canViewFinancials && <th className="py-3 px-3">Payment</th>}
                     <th className="py-3 px-3">Challan #</th>
                     <th className="py-3 px-3">Dispatch / Store Notes</th>
                     <th className="py-3 px-3 text-center">Action</th>
@@ -1913,7 +1987,7 @@ export const StocksView: React.FC<StocksViewProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {paginatedShipments.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="py-10 text-center text-slate-500">
+                      <td colSpan={canViewFinancials ? 12 : 9} className="py-10 text-center text-slate-500">
                         <div className="space-y-2">
                           <p className="font-semibold text-slate-700">
                             No {selectedHead === 'all' ? '' : STOCK_HEAD_META[selectedHead].label.toLowerCase() + ' '}stock records match the selected filters
@@ -1979,23 +2053,29 @@ export const StocksView: React.FC<StocksViewProps> = ({
                             {normHead === 'FEED' ? 'bags' : 'units'}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-right font-bold font-mono text-emerald-800">
-                          Rs. {record.amount.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-3 text-right font-mono text-slate-600">
-                          Rs. {record.costPerBag ? record.costPerBag.toLocaleString() : '0'}
-                        </td>
-                        <td className="py-3 px-3">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                              record.paymentType === 'CASH'
-                                ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                                : 'bg-purple-50 text-purple-800 border border-purple-200'
-                            }`}
-                          >
-                            {record.paymentType}
-                          </span>
-                        </td>
+                        {canViewFinancials && (
+                          <td className="py-3 px-3 text-right font-bold font-mono text-emerald-800">
+                            Rs. {record.amount.toLocaleString()}
+                          </td>
+                        )}
+                        {canViewFinancials && (
+                          <td className="py-3 px-3 text-right font-mono text-slate-600">
+                            Rs. {record.costPerBag ? record.costPerBag.toLocaleString() : '0'}
+                          </td>
+                        )}
+                        {canViewFinancials && (
+                          <td className="py-3 px-3">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                record.paymentType === 'CASH'
+                                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                  : 'bg-purple-50 text-purple-800 border border-purple-200'
+                              }`}
+                            >
+                              {record.paymentType}
+                            </span>
+                          </td>
+                        )}
                         <td className="py-3 px-3 font-mono font-medium text-slate-700">
                           {record.challanNo ? `CH-${record.challanNo}` : '-'}
                         </td>
@@ -2013,16 +2093,18 @@ export const StocksView: React.FC<StocksViewProps> = ({
                               <Eye className="w-3 h-3" />
                               <span>View</span>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => openEditStockModal(record)}
-                              className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
-                              title={`Edit Stock Record #${record.trackingId}`}
-                            >
-                              <Edit className="w-3 h-3" />
-                              <span>Edit</span>
-                            </button>
-                            {confirmDeleteStockId !== record.id && (
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => openEditStockModal(record)}
+                                className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[11px] font-bold transition-colors cursor-pointer shadow-2xs"
+                                title={`Edit Stock Record #${record.trackingId}`}
+                              >
+                                <Edit className="w-3 h-3" />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                            {canDelete && confirmDeleteStockId !== record.id && (
                               <button
                                 type="button"
                                 onClick={() => setConfirmDeleteStockId(record.id)}
@@ -2033,7 +2115,7 @@ export const StocksView: React.FC<StocksViewProps> = ({
                               </button>
                             )}
                           </div>
-                          {confirmDeleteStockId === record.id && (
+                          {canDelete && confirmDeleteStockId === record.id && (
                             <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
                               <span className="font-bold text-rose-900">Delete?</span>
                               <button
@@ -2306,7 +2388,10 @@ export const StocksView: React.FC<StocksViewProps> = ({
           onClose={() => setViewingStock(null)}
           title={`Stock Intake Record #${viewingStock.trackingId || viewingStock.id}`}
           subtitle={`${viewingStock.flockName} • ${viewingStock.date}`}
-          badge={{ text: `${viewingStock.head} — ${viewingStock.paymentType}`, color: 'indigo' }}
+          badge={{
+            text: canViewFinancials ? `${viewingStock.head} — ${viewingStock.paymentType}` : viewingStock.head,
+            color: 'indigo',
+          }}
           fields={[
             { label: 'Tracking ID', value: `#${viewingStock.trackingId || viewingStock.id}`, mono: true },
             { label: 'Intake Date', value: viewingStock.date, mono: true },
@@ -2321,22 +2406,26 @@ export const StocksView: React.FC<StocksViewProps> = ({
               }`,
               mono: true,
             },
-            {
-              label: 'Rate Per Bag / Unit',
-              value: `Rs. ${(viewingStock.costPerBag || 0).toLocaleString()}`,
-              mono: true,
-            },
-            {
-              label: 'Total Amount Paid',
-              value: `Rs. ${viewingStock.amount.toLocaleString()}`,
-              mono: true,
-              highlight: true,
-            },
-            { label: 'Payment Method', value: viewingStock.paymentType },
+            ...(canViewFinancials
+              ? [
+                  {
+                    label: 'Rate Per Bag / Unit',
+                    value: `Rs. ${(viewingStock.costPerBag || 0).toLocaleString()}`,
+                    mono: true,
+                  },
+                  {
+                    label: 'Total Amount Paid',
+                    value: `Rs. ${viewingStock.amount.toLocaleString()}`,
+                    mono: true,
+                    highlight: true,
+                  },
+                  { label: 'Payment Method', value: viewingStock.paymentType },
+                ]
+              : []),
           ]}
           notes={viewingStock.notes}
-          onEdit={() => openEditStockModal(viewingStock)}
-          onDelete={() => handleDeleteStock(viewingStock)}
+          onEdit={canEdit ? () => openEditStockModal(viewingStock) : undefined}
+          onDelete={canDelete ? () => handleDeleteStock(viewingStock) : undefined}
         />
       )}
     </div>

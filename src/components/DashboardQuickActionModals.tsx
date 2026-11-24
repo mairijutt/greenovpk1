@@ -945,6 +945,7 @@ interface DashboardStockModalProps {
   onAddTransaction?: (record: FinancialRecord) => Promise<void> | void;
   onStockSaved?: () => void;
   onSuccessToast?: (message: string) => void;
+  canViewFinancials?: boolean;
 }
 
 export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
@@ -955,6 +956,7 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
   onAddTransaction,
   onStockSaved,
   onSuccessToast,
+  canViewFinancials = true,
 }) => {
   const [formDate, setFormDate] = useState(getTodayDateStr);
   const [formHead, setFormHead] = useState('FEED');
@@ -1045,11 +1047,11 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
       setFormError('Please enter a valid Quantity greater than 0.');
       return;
     }
-    if (!formAmount || Number(formAmount) <= 0) {
+    if (canViewFinancials && (!formAmount || Number(formAmount) <= 0)) {
       setFormError('Please enter a valid Amount (PKR) greater than 0.');
       return;
     }
-    if (!formPaymentType) {
+    if (canViewFinancials && !formPaymentType) {
       setFormError('Please select a payment type.');
       return;
     }
@@ -1069,8 +1071,9 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
     } catch {}
 
     const qty = Number(formQuantity) || 0;
-    const amt = Number(formAmount) || 0;
-    const costBag = qty > 0 ? Math.round(amt / qty) : 0;
+    const amt = canViewFinancials ? Number(formAmount) || 0 : 0;
+    const costBag = canViewFinancials && qty > 0 ? Math.round(amt / qty) : 0;
+    const payMode = canViewFinancials ? formPaymentType.toUpperCase() : 'CASH';
     const maxTracking = existingStocks.reduce((max, r) => Math.max(max, r.trackingId || 0), 0);
     const flockId = formFlock === 'Unit 2' ? '9' : formFlock === 'Unit 3' ? '10' : '8';
     const clientId = `stk-${Date.now()}`;
@@ -1089,7 +1092,7 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
           quantity: qty,
           amount: amt,
           amountPaid: amt,
-          paymentType: formPaymentType.toUpperCase(),
+          paymentType: payMode,
           notes: formNotes,
           attachment: attachmentData || attachmentName || null,
         }),
@@ -1112,19 +1115,21 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
         bags: qty,
         amount: amt,
         costPerBag: costBag,
-        paymentType: formPaymentType.toUpperCase(),
+        paymentType: canViewFinancials ? payMode : 'N/A',
         challanNo: formChallan.trim(),
         notes: formNotes || `${qty} bags of ${formStockType} received...`,
       };
 
       const updated = [newRecord, ...existingStocks];
-      try {
-        localStorage.setItem('greenova_stocks_v2', JSON.stringify(updated));
-      } catch (err) {
-        console.warn('LocalStorage error:', err);
+      if (canViewFinancials) {
+        try {
+          localStorage.setItem('greenova_stocks_v2', JSON.stringify(updated));
+        } catch (err) {
+          console.warn('LocalStorage error:', err);
+        }
       }
 
-      if (onAddTransaction) {
+      if (canViewFinancials && onAddTransaction) {
         const expenseRecord: FinancialRecord = {
           id: `exp-stk-${Date.now()}`,
           trackingId: newRecord.trackingId,
@@ -1181,7 +1186,9 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
             <div>
               <h2 className="text-lg font-black text-slate-900 tracking-tight">Stock Details</h2>
               <p className="text-xs text-slate-500">
-                Enter the stock purchase or payment details below
+                {canViewFinancials
+                  ? 'Enter the stock purchase or payment details below'
+                  : 'Enter the stock quantity intake details below'}
               </p>
             </div>
           </div>
@@ -1340,68 +1347,87 @@ export const DashboardStockModal: React.FC<DashboardStockModalProps> = ({
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Amount *</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={formAmount}
-                onFocus={() => {
-                  if (Number(formAmount) === 0) setFormAmount('');
-                }}
-                onBlur={() => {
-                  if (formAmount === '') setFormAmount(0);
-                }}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  setFormAmount(raw === '' ? '' : Math.max(0, Number(raw) || 0));
-                  setFormError(null);
-                }}
-                placeholder="0"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-black text-emerald-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                required
-              />
-            </div>
+            {canViewFinancials ? (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Amount *</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={formAmount}
+                  onFocus={() => {
+                    if (Number(formAmount) === 0) setFormAmount('');
+                  }}
+                  onBlur={() => {
+                    if (formAmount === '') setFormAmount(0);
+                  }}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setFormAmount(raw === '' ? '' : Math.max(0, Number(raw) || 0));
+                    setFormError(null);
+                  }}
+                  placeholder="0"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-black text-emerald-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  required
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Challan Number *</label>
+                <input
+                  type="text"
+                  value={formChallan}
+                  onChange={(e) => {
+                    setFormChallan(e.target.value);
+                    setFormError(null);
+                  }}
+                  placeholder="e.g. 1445 or CH-8902"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  required
+                />
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Payment Type *</label>
-              <select
-                value={formPaymentType}
-                onChange={(e) => {
-                  setFormPaymentType(e.target.value);
-                  setFormError(null);
-                }}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
-                required
-              >
-                <option value="" disabled>
-                  Select payment type
-                </option>
-                <option value="Cash">Cash</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Cheque">Cheque</option>
-                <option value="Credit">Credit</option>
-              </select>
-            </div>
+          {canViewFinancials && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Payment Type *</label>
+                <select
+                  value={formPaymentType}
+                  onChange={(e) => {
+                    setFormPaymentType(e.target.value);
+                    setFormError(null);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden cursor-pointer"
+                  required
+                >
+                  <option value="" disabled>
+                    Select payment type
+                  </option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Credit">Credit</option>
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Challan Number *</label>
-              <input
-                type="text"
-                value={formChallan}
-                onChange={(e) => {
-                  setFormChallan(e.target.value);
-                  setFormError(null);
-                }}
-                placeholder="e.g. 1445 or CH-8902"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                required
-              />
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Challan Number *</label>
+                <input
+                  type="text"
+                  value={formChallan}
+                  onChange={(e) => {
+                    setFormChallan(e.target.value);
+                    setFormError(null);
+                  }}
+                  placeholder="e.g. 1445 or CH-8902"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  required
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1454,6 +1480,7 @@ interface DashboardPowerModalProps {
   onClose: () => void;
   onAddPowerLog?: (record: Omit<PowerConsumptionRecord, 'id'>) => Promise<PowerConsumptionRecord | void> | void;
   onSuccessToast?: (message: string) => void;
+  canViewFinancials?: boolean;
 }
 
 const DEFAULT_SOLAR_RATE_PKR = 35;
@@ -1465,6 +1492,7 @@ export const DashboardPowerModal: React.FC<DashboardPowerModalProps> = ({
   onClose,
   onAddPowerLog,
   onSuccessToast,
+  canViewFinancials = true,
 }) => {
   const [formDate, setFormDate] = useState(getTodayDateStr);
   const [formFlockId, setFormFlockId] = useState('8');
@@ -1577,18 +1605,26 @@ export const DashboardPowerModal: React.FC<DashboardPowerModalProps> = ({
     const gridConsumedUnits = Math.max(0, Number(formGridConsumed) || 0);
     const dieselPurchasedLiters = Math.max(0, Number(formDieselPurchased) || 0);
     const dieselConsumedLiters = Math.max(0, Number(formDieselConsumed) || 0);
-    const solarUnitRatePkr =
-      Number(formSolarRate) > 0 ? Number(formSolarRate) : DEFAULT_SOLAR_RATE_PKR;
-    const gridUnitRatePkr =
-      Number(formGridRate) > 0 ? Number(formGridRate) : DEFAULT_GRID_RATE_PKR;
+    const solarUnitRatePkr = canViewFinancials
+      ? Number(formSolarRate) > 0
+        ? Number(formSolarRate)
+        : DEFAULT_SOLAR_RATE_PKR
+      : 0;
+    const gridUnitRatePkr = canViewFinancials
+      ? Number(formGridRate) > 0
+        ? Number(formGridRate)
+        : DEFAULT_GRID_RATE_PKR
+      : 0;
 
-    let dieselRatePerLiter = Math.max(0, Number(formDieselRate) || 0);
-    let dieselPurchaseCost = Math.max(0, Number(formDieselCost) || 0);
+    let dieselRatePerLiter = canViewFinancials ? Math.max(0, Number(formDieselRate) || 0) : 0;
+    let dieselPurchaseCost = canViewFinancials ? Math.max(0, Number(formDieselCost) || 0) : 0;
 
-    if (dieselPurchaseCost === 0 && dieselPurchasedLiters > 0 && dieselRatePerLiter > 0) {
-      dieselPurchaseCost = Number((dieselPurchasedLiters * dieselRatePerLiter).toFixed(2));
-    } else if (dieselRatePerLiter === 0 && dieselPurchasedLiters > 0 && dieselPurchaseCost > 0) {
-      dieselRatePerLiter = Number((dieselPurchaseCost / dieselPurchasedLiters).toFixed(2));
+    if (canViewFinancials) {
+      if (dieselPurchaseCost === 0 && dieselPurchasedLiters > 0 && dieselRatePerLiter > 0) {
+        dieselPurchaseCost = Number((dieselPurchasedLiters * dieselRatePerLiter).toFixed(2));
+      } else if (dieselRatePerLiter === 0 && dieselPurchasedLiters > 0 && dieselPurchaseCost > 0) {
+        dieselRatePerLiter = Number((dieselPurchaseCost / dieselPurchasedLiters).toFixed(2));
+      }
     }
 
     if (
@@ -1668,7 +1704,9 @@ export const DashboardPowerModal: React.FC<DashboardPowerModalProps> = ({
             <div>
               <h3 className="text-base font-black text-slate-900">Record Power &amp; Energy Log</h3>
               <p className="text-xs text-slate-500">
-                Solar default Rs. {DEFAULT_SOLAR_RATE_PKR}/unit • Main Grid default Rs. {DEFAULT_GRID_RATE_PKR}/unit • Diesel fuel tracking
+                {canViewFinancials
+                  ? `Solar default Rs. ${DEFAULT_SOLAR_RATE_PKR}/unit • Main Grid default Rs. ${DEFAULT_GRID_RATE_PKR}/unit • Diesel fuel tracking`
+                  : 'Solar units, Main Grid electricity units, and Diesel fuel meter tracking'}
               </p>
             </div>
           </div>
@@ -1690,7 +1728,7 @@ export const DashboardPowerModal: React.FC<DashboardPowerModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className={`grid grid-cols-1 ${canViewFinancials ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-2'} gap-3`}>
             <UIInput
               label="Date *"
               type="date"
@@ -1709,24 +1747,28 @@ export const DashboardPowerModal: React.FC<DashboardPowerModalProps> = ({
                 </option>
               ))}
             </UISelect>
-            <UIInput
-              label="Solar Rate (Rs. / unit)"
-              type="number"
-              min="1"
-              step="0.5"
-              value={formSolarRate}
-              onChange={(e) => setFormSolarRate(e.target.value)}
-              helperText={`Default Rs. ${DEFAULT_SOLAR_RATE_PKR}`}
-            />
-            <UIInput
-              label="Main Grid Rate (Rs. / unit)"
-              type="number"
-              min="1"
-              step="0.5"
-              value={formGridRate}
-              onChange={(e) => setFormGridRate(e.target.value)}
-              helperText={`Default Rs. ${DEFAULT_GRID_RATE_PKR}`}
-            />
+            {canViewFinancials && (
+              <>
+                <UIInput
+                  label="Solar Rate (Rs. / unit)"
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={formSolarRate}
+                  onChange={(e) => setFormSolarRate(e.target.value)}
+                  helperText={`Default Rs. ${DEFAULT_SOLAR_RATE_PKR}`}
+                />
+                <UIInput
+                  label="Main Grid Rate (Rs. / unit)"
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={formGridRate}
+                  onChange={(e) => setFormGridRate(e.target.value)}
+                  helperText={`Default Rs. ${DEFAULT_GRID_RATE_PKR}`}
+                />
+              </>
+            )}
           </div>
 
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
@@ -1768,7 +1810,7 @@ export const DashboardPowerModal: React.FC<DashboardPowerModalProps> = ({
             <div className="text-xs font-bold text-slate-800">
               Diesel Generator Fuel (Purchased &amp; Consumed)
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className={`grid grid-cols-1 ${canViewFinancials ? 'sm:grid-cols-4' : 'sm:grid-cols-2'} gap-3`}>
               <UIInput
                 label="Diesel Purchased (L)"
                 type="number"
@@ -1778,24 +1820,28 @@ export const DashboardPowerModal: React.FC<DashboardPowerModalProps> = ({
                 value={formDieselPurchased}
                 onChange={(e) => handleDieselLitersOrRateChange(e.target.value, formDieselRate)}
               />
-              <UIInput
-                label="Diesel Rate (Rs./L)"
-                type="number"
-                min="0"
-                step="0.5"
-                placeholder="e.g. 265"
-                value={formDieselRate}
-                onChange={(e) => handleDieselLitersOrRateChange(formDieselPurchased, e.target.value)}
-              />
-              <UIInput
-                label="Diesel Purchase Cost (Rs.)"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="Auto or manual Rs."
-                value={formDieselCost}
-                onChange={(e) => setFormDieselCost(e.target.value)}
-              />
+              {canViewFinancials && (
+                <>
+                  <UIInput
+                    label="Diesel Rate (Rs./L)"
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    placeholder="e.g. 265"
+                    value={formDieselRate}
+                    onChange={(e) => handleDieselLitersOrRateChange(formDieselPurchased, e.target.value)}
+                  />
+                  <UIInput
+                    label="Diesel Purchase Cost (Rs.)"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="Auto or manual Rs."
+                    value={formDieselCost}
+                    onChange={(e) => setFormDieselCost(e.target.value)}
+                  />
+                </>
+              )}
               <UIInput
                 label="Diesel Consumed (L)"
                 type="number"
@@ -1808,33 +1854,51 @@ export const DashboardPowerModal: React.FC<DashboardPowerModalProps> = ({
             </div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div>
-              <div className="text-[11px] text-slate-500">Solar Cost (@ Rs.{preview.solarRate})</div>
-              <div className="font-black text-amber-800 font-mono tabular-nums">
-                Rs. {Math.round(preview.solarConsCost).toLocaleString()}
+          {canViewFinancials ? (
+            <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <div className="text-[11px] text-slate-500">Solar Cost (@ Rs.{preview.solarRate})</div>
+                <div className="font-black text-amber-800 font-mono tabular-nums">
+                  Rs. {Math.round(preview.solarConsCost).toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-slate-500">Grid Cost (@ Rs.{preview.gridRate})</div>
+                <div className="font-black text-blue-800 font-mono tabular-nums">
+                  Rs. {Math.round(preview.gridCost).toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-slate-500">Diesel Net (Bought - Used)</div>
+                <div className="font-black text-slate-900 font-mono tabular-nums">
+                  {preview.dieselNetLiters >= 0 ? '+' : ''}
+                  {preview.dieselNetLiters.toLocaleString(undefined, { maximumFractionDigits: 1 })} L
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-slate-500">Total Power Cost</div>
+                <div className="font-black text-slate-900 font-mono tabular-nums">
+                  Rs. {Math.round(preview.totalPowerCost).toLocaleString()}
+                </div>
               </div>
             </div>
-            <div>
-              <div className="text-[11px] text-slate-500">Grid Cost (@ Rs.{preview.gridRate})</div>
-              <div className="font-black text-blue-800 font-mono tabular-nums">
-                Rs. {Math.round(preview.gridCost).toLocaleString()}
+          ) : (
+            <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <div className="text-[11px] text-slate-500">Total Electricity Consumed</div>
+                <div className="font-black text-slate-900 font-mono tabular-nums">
+                  {(Number(formSolarConsumed || 0) + Number(formGridConsumed || 0)).toLocaleString()} Units
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-slate-500">Diesel Net (Bought - Used)</div>
+                <div className="font-black text-slate-900 font-mono tabular-nums">
+                  {preview.dieselNetLiters >= 0 ? '+' : ''}
+                  {preview.dieselNetLiters.toLocaleString(undefined, { maximumFractionDigits: 1 })} L
+                </div>
               </div>
             </div>
-            <div>
-              <div className="text-[11px] text-slate-500">Diesel Net (Bought - Used)</div>
-              <div className="font-black text-slate-900 font-mono tabular-nums">
-                {preview.dieselNetLiters >= 0 ? '+' : ''}
-                {preview.dieselNetLiters.toLocaleString(undefined, { maximumFractionDigits: 1 })} L
-              </div>
-            </div>
-            <div>
-              <div className="text-[11px] text-slate-500">Total Power Cost</div>
-              <div className="font-black text-slate-900 font-mono tabular-nums">
-                Rs. {Math.round(preview.totalPowerCost).toLocaleString()}
-              </div>
-            </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <UIInput

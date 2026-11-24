@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CheckCircle2, AlertCircle, X, LayoutDashboard, Egg, Wheat, TrendingUp, FileBarChart2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, X, LayoutDashboard, Egg, Wheat, TrendingUp, FileBarChart2, Layers, Boxes } from 'lucide-react';
 import { Header, HealthNotification } from './components/Header';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
@@ -19,6 +19,7 @@ import { LoginView } from './components/LoginView';
 import { RecordModal } from './components/RecordModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { apiFetch } from './services/api';
+import { getRolePermissions } from './utils/permissions';
 
 import {
   initialFarms,
@@ -136,13 +137,16 @@ export default function App() {
     return null;
   });
 
+  const perms = useMemo(() => getRolePermissions(currentUser?.role), [currentUser?.role]);
+
   // Navigate tab and sync browser URL path (e.g., /dashboard, /sales, /flocks)
   const handleNavigateTab = (tab: NavTab) => {
-    setCurrentTab(tab);
-    const targetPath = tab === 'dashboard' ? '/dashboard' : `/${tab}`;
+    const allowedTab = currentUser && !perms.canAccessTab(tab) ? 'dashboard' : tab;
+    setCurrentTab(allowedTab);
+    const targetPath = allowedTab === 'dashboard' ? '/dashboard' : `/${allowedTab}`;
     if (typeof window !== 'undefined' && window.location.pathname !== targetPath) {
       try {
-        window.history.pushState({ tab }, '', targetPath);
+        window.history.pushState({ tab: allowedTab }, '', targetPath);
       } catch (e) {}
     }
   };
@@ -154,14 +158,21 @@ export default function App() {
     if (currentUser) {
       const currentPath = window.location.pathname;
       const detectedTab = getTabFromPath(currentPath);
-      const expectedPath = detectedTab === 'dashboard' ? '/dashboard' : `/${detectedTab}`;
-      if (currentPath === '/' || currentPath === '' || currentPath === '/login') {
+      const effectiveTab = perms.canAccessTab(detectedTab) ? detectedTab : 'dashboard';
+      if (effectiveTab !== currentTab && perms.canAccessTab(detectedTab)) {
+        // Keep currentTab in sync with URL on role load
+      } else if (!perms.canAccessTab(currentTab)) {
+        setCurrentTab('dashboard');
+      }
+      const expectedPath = effectiveTab === 'dashboard' ? '/dashboard' : `/${effectiveTab}`;
+      if (currentPath === '/' || currentPath === '' || currentPath === '/login' || !perms.canAccessTab(detectedTab)) {
+        setCurrentTab(effectiveTab);
         try {
-          window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
+          window.history.replaceState({ tab: effectiveTab }, '', expectedPath);
         } catch (e) {}
       } else if (currentPath !== expectedPath) {
         try {
-          window.history.replaceState({ tab: detectedTab }, '', expectedPath);
+          window.history.replaceState({ tab: effectiveTab }, '', expectedPath);
         } catch (e) {}
       }
     } else {
@@ -174,12 +185,19 @@ export default function App() {
 
     const handlePopState = () => {
       const tab = getTabFromPath(window.location.pathname);
-      setCurrentTab(tab);
+      if (currentUser && !perms.canAccessTab(tab)) {
+        setCurrentTab('dashboard');
+        try {
+          window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
+        } catch {}
+      } else {
+        setCurrentTab(tab);
+      }
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [currentUser]);
+  }, [currentUser, perms]);
 
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [recordModalType, setRecordModalType] = useState<'egg' | 'mortality' | 'feed' | null>(null);
@@ -205,8 +223,11 @@ export default function App() {
     }, 900);
   };
 
+  const initialCanViewFinancials = currentUser ? getRolePermissions(currentUser.role).canViewFinancials : true;
+
   // Domain State
   const [farms, setFarms] = useState<Farm[]>(() => {
+    if (!initialCanViewFinancials) return [];
     const saved = localStorage.getItem('greenova_farm_records');
     if (saved) {
       try {
@@ -308,6 +329,7 @@ export default function App() {
     return initialInventory;
   });
   const [financials, setFinancials] = useState<FinancialRecord[]>(() => {
+    if (!initialCanViewFinancials) return [];
     const savedV3 = localStorage.getItem('greenova_financials_v3');
     if (savedV3) {
       try {
@@ -325,6 +347,7 @@ export default function App() {
     return [...liveSalesRecords, ...liveExpenseRecords];
   });
   const [workers, setWorkers] = useState<Worker[]>(() => {
+    if (!initialCanViewFinancials) return [];
     const saved = localStorage.getItem('greenova_staff_v2');
     if (saved) {
       try {
@@ -365,6 +388,7 @@ export default function App() {
   });
 
   const [salaryDisbursals, setSalaryDisbursals] = useState<SalaryDisbursal[]>(() => {
+    if (!initialCanViewFinancials) return [];
     const saved = localStorage.getItem('greenova_salaries_v3') || localStorage.getItem('greenova_salaries_v2');
     if (saved) {
       try {
@@ -376,6 +400,7 @@ export default function App() {
   });
 
   const [advanceRecords, setAdvanceRecords] = useState<AdvanceSalaryRecord[]>(() => {
+    if (!initialCanViewFinancials) return [];
     const saved = localStorage.getItem('greenova_advances_v3') || localStorage.getItem('greenova_advances_v2');
     if (saved) {
       try {
@@ -387,6 +412,7 @@ export default function App() {
   });
 
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(() => {
+    if (!initialCanViewFinancials) return [];
     try {
       const saved = localStorage.getItem('greenova_banks_v1');
       if (saved) {
@@ -415,13 +441,15 @@ export default function App() {
     } catch {}
   }, [powerLogs]);
   useEffect(() => {
+    if (!perms.canViewFinancials) return;
     try {
       localStorage.setItem('greenova_banks_v1', JSON.stringify(bankAccounts));
     } catch {}
-  }, [bankAccounts]);
+  }, [bankAccounts, perms.canViewFinancials]);
   useEffect(() => {
+    if (!perms.canViewFarms) return;
     localStorage.setItem('greenova_farm_records', JSON.stringify(farms));
-  }, [farms]);
+  }, [farms, perms.canViewFarms]);
   useEffect(() => {
     localStorage.setItem('greenova_flocks', JSON.stringify(flocks));
   }, [flocks]);
@@ -441,17 +469,21 @@ export default function App() {
     localStorage.setItem('greenova_inventory', JSON.stringify(inventory));
   }, [inventory]);
   useEffect(() => {
+    if (!perms.canViewFinancials) return;
     localStorage.setItem('greenova_financials_v3', JSON.stringify(financials));
-  }, [financials]);
+  }, [financials, perms.canViewFinancials]);
   useEffect(() => {
+    if (!perms.canViewSalaries) return;
     localStorage.setItem('greenova_staff_v2', JSON.stringify(workers));
-  }, [workers]);
+  }, [workers, perms.canViewSalaries]);
   useEffect(() => {
+    if (!perms.canViewSalaries) return;
     localStorage.setItem('greenova_salaries_v3', JSON.stringify(salaryDisbursals));
-  }, [salaryDisbursals]);
+  }, [salaryDisbursals, perms.canViewSalaries]);
   useEffect(() => {
+    if (!perms.canViewSalaries) return;
     localStorage.setItem('greenova_advances_v3', JSON.stringify(advanceRecords));
-  }, [advanceRecords]);
+  }, [advanceRecords, perms.canViewSalaries]);
 
   // Cross-tab synchronization via storage events (keeps Dashboard and new tabs in sync)
   useEffect(() => {
@@ -490,11 +522,13 @@ export default function App() {
     let active = true;
 
     const hydrateAllFromDb = async () => {
+      let activeRole = currentUser?.role;
       try {
         const meRes = await apiFetch('/api/auth/me');
         if (!active) return;
         const verifiedUser = meRes?.data?.user;
         if (verifiedUser) {
+          activeRole = verifiedUser.role || activeRole;
           setCurrentUser((prev) => {
             if (!prev) return prev;
             const updated = {
@@ -515,6 +549,35 @@ export default function App() {
         return;
       }
 
+      const activePerms = getRolePermissions(activeRole);
+      if (!activePerms.canManageUsers) {
+        try {
+          localStorage.removeItem('greenova_users_v2');
+        } catch {}
+      }
+      if (!activePerms.canViewFinancials) {
+        setFinancials([]);
+        setSalaryDisbursals([]);
+        setAdvanceRecords([]);
+        setWorkers([]);
+        setBankAccounts([]);
+        setFarms([]);
+        try {
+          [
+            'greenova_financials_v3',
+            'greenova_financials_v2',
+            'greenova_salaries_v3',
+            'greenova_salaries_v2',
+            'greenova_advances_v3',
+            'greenova_advances_v2',
+            'greenova_staff_v2',
+            'greenova_banks_v1',
+            'greenova_farm_records',
+          ].forEach((k) => localStorage.removeItem(k));
+        } catch {}
+      }
+
+      const rejected = Promise.resolve({ skipped: true });
       const [
         flocksRes,
         farmsRes,
@@ -530,16 +593,16 @@ export default function App() {
         powerRes,
       ] = await Promise.allSettled([
         apiFetch('/api/flocks'),
-        apiFetch('/api/farms'),
-        apiFetch('/api/banks'),
+        activePerms.canViewFarms ? apiFetch('/api/farms') : rejected,
+        activePerms.canViewFinancials ? apiFetch('/api/banks') : rejected,
         apiFetch('/api/egg-productions?limit=5000'),
         apiFetch('/api/daily-consumptions?limit=5000'),
         apiFetch('/api/bird-health?limit=5000'),
         apiFetch('/api/vaccines'),
-        apiFetch('/api/sales?limit=5000'),
-        apiFetch('/api/expenses?limit=5000'),
-        apiFetch('/api/salaries?limit=5000'),
-        apiFetch('/api/workers'),
+        activePerms.canViewFinancials ? apiFetch('/api/sales?limit=5000') : rejected,
+        activePerms.canViewFinancials ? apiFetch('/api/expenses?limit=5000') : rejected,
+        activePerms.canViewSalaries ? apiFetch('/api/salaries?limit=5000') : rejected,
+        activePerms.canViewSalaries ? apiFetch('/api/workers') : rejected,
         apiFetch('/api/power-consumptions?limit=5000'),
       ]);
 
@@ -1749,30 +1812,15 @@ export default function App() {
         localStorage.setItem('greenova_salaries_v3', JSON.stringify(nextSalaries));
       } catch {}
 
-      if (newSalary.advanceDeducted > 0) {
-        const matchedWorker = workers.find(
-          (w) => w.name.toLowerCase() === newSalary.employeeName.toLowerCase()
-        );
-        if (matchedWorker) {
-          const updatedWorker: Worker = {
-            ...matchedWorker,
-            advanceBalance: Math.max(
-              0,
-              (matchedWorker.advanceBalance || 0) - newSalary.advanceDeducted
-            ),
-          };
-          await apiFetch(`/api/workers/${updatedWorker.id}`, {
-            method: 'PUT',
-            body: JSON.stringify(updatedWorker),
-          });
-          setWorkers((prev) => {
-            const nextWorkers = prev.map((w) => (w.id === updatedWorker.id ? updatedWorker : w));
-            try {
-              localStorage.setItem('greenova_staff_v2', JSON.stringify(nextWorkers));
-            } catch {}
-            return nextWorkers;
-          });
-        }
+      if (res?.data?.updatedWorker) {
+        const updatedWorker: Worker = res.data.updatedWorker;
+        setWorkers((prev) => {
+          const nextWorkers = prev.map((w) => (String(w.id) === String(updatedWorker.id) ? updatedWorker : w));
+          try {
+            localStorage.setItem('greenova_staff_v2', JSON.stringify(nextWorkers));
+          } catch {}
+          return nextWorkers;
+        });
       }
 
       triggerSavedRefresh(
@@ -1817,20 +1865,10 @@ export default function App() {
         localStorage.setItem('greenova_advances_v3', JSON.stringify(nextAdv));
       } catch {}
 
-      const matchedWorker = workers.find(
-        (w) => w.name.toLowerCase() === newAdvance.employeeName.toLowerCase()
-      );
-      if (matchedWorker) {
-        const updatedWorker: Worker = {
-          ...matchedWorker,
-          advanceBalance: (matchedWorker.advanceBalance || 0) + newAdvance.advanceAmount,
-        };
-        await apiFetch(`/api/workers/${updatedWorker.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(updatedWorker),
-        });
+      if (res?.data?.updatedWorker) {
+        const updatedWorker: Worker = res.data.updatedWorker;
         setWorkers((prev) => {
-          const nextWorkers = prev.map((w) => (w.id === updatedWorker.id ? updatedWorker : w));
+          const nextWorkers = prev.map((w) => (String(w.id) === String(updatedWorker.id) ? updatedWorker : w));
           try {
             localStorage.setItem('greenova_staff_v2', JSON.stringify(nextWorkers));
           } catch {}
@@ -2219,7 +2257,7 @@ export default function App() {
     });
   };
 
-  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isSuperAdmin = perms.isSuperAdmin;
 
   // Health notifications derived strictly from scheduled vaccines & medications (unconditionally declared at top level)
   const healthNotifications: HealthNotification[] = useMemo(() => {
@@ -2249,28 +2287,51 @@ export default function App() {
       });
   }, [vaccines, latestHealthPrompt]);
 
+  const computeInitials = (name?: string, isSuper?: boolean) => {
+    const clean = (name || '').trim();
+    if (!clean) return isSuper ? 'SA' : 'GU';
+    return (
+      clean
+        .split(/\s+/)
+        .map((p) => p[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'GU'
+    );
+  };
+
   // If not logged in, render the Login View directly
   if (!currentUser) {
     return (
       <>
         <LoginView
           onLoginSuccess={(user) => {
-            const isSuper = user.role === 'super_admin';
+            const loginPerms = getRolePermissions(user.role);
+            const isSuper = loginPerms.isSuperAdmin;
             const profile = {
-              name: user.name || (isSuper ? 'Ahsan Nawaz' : 'Farm Supervisor'),
+              name: user.name || (isSuper ? 'Ahsan Nawaz' : 'GreenOva User'),
               email: user.email,
               token: user.token,
               phone: isSuper ? '+92 300 8645210' : '+92 301 7654321',
-              role: user.role || (isSuper ? 'super_admin' : 'supervisor'),
+              role: user.role || 'supervisor',
               isSuperAdmin: isSuper,
-              initials: isSuper ? 'AN' : 'FS',
+              initials: computeInitials(user.name, isSuper),
               emailVerified: true,
             };
+            if (!loginPerms.canViewFinancials) {
+              setFinancials([]);
+              setSalaryDisbursals([]);
+              setAdvanceRecords([]);
+              setWorkers([]);
+              setBankAccounts([]);
+              setFarms([]);
+            }
             setCurrentUser(profile);
             try {
               localStorage.setItem('greenova_user', JSON.stringify(profile));
             } catch (e) {}
-            const targetTab = currentTab && currentTab !== 'dashboard' ? currentTab : 'dashboard';
+            const requestedTab = currentTab && currentTab !== 'dashboard' ? currentTab : 'dashboard';
+            const targetTab = loginPerms.canAccessTab(requestedTab) ? requestedTab : 'dashboard';
             setCurrentTab(targetTab);
             const targetPath = targetTab === 'dashboard' ? '/dashboard' : `/${targetTab}`;
             try {
@@ -2282,6 +2343,8 @@ export default function App() {
       </>
     );
   }
+
+  const effectiveTab: NavTab = perms.canAccessTab(currentTab) ? currentTab : 'dashboard';
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans antialiased">
@@ -2299,14 +2362,14 @@ export default function App() {
         latestPrompt={latestHealthPrompt}
         onClearPrompt={() => setLatestHealthPrompt(null)}
         onNavigateTab={(tab) => handleNavigateTab(tab as NavTab)}
-        onToggleVaccineStatus={handleToggleVaccine}
+        onToggleVaccineStatus={perms.canEdit ? handleToggleVaccine : undefined}
       />
 
       {/* Main Body */}
       <div className="flex-1 flex overflow-x-clip relative">
         {/* Navigation Sidebar matching live menu */}
         <Sidebar
-          currentTab={currentTab}
+          currentTab={effectiveTab}
           onSelectTab={handleNavigateTab}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -2319,79 +2382,89 @@ export default function App() {
 
         {/* Dynamic Content View Area */}
         <main className="flex-1 min-w-0 p-4 pb-24 sm:p-6 md:pb-8 lg:p-8 max-w-7xl w-full mx-auto">
-          {currentTab === 'dashboard' && (
+          {effectiveTab === 'dashboard' && (
             <DashboardView
-              farms={farms}
+              farms={perms.canViewFarms ? farms : []}
               flocks={flocks}
               eggProductions={eggProductions}
               mortalityLogs={mortalityLogs}
               consumptionLogs={consumptionLogs}
-              financials={financials}
+              financials={perms.canViewFinancials ? financials : []}
               inventory={inventory}
-              bankAccounts={bankAccounts}
-              onAddTransaction={handleAddTransaction}
-              onAddBank={handleAddBank}
+              bankAccounts={perms.canViewFinancials ? bankAccounts : []}
+              onAddTransaction={perms.canViewFinancials ? handleAddTransaction : undefined}
+              onAddBank={perms.canViewFinancials ? handleAddBank : undefined}
               onRestock={handleRestock}
               onAddPowerLog={handleAddPowerLog}
               onOpenRecordModal={(type) => setRecordModalType(type)}
               onNavigateTab={handleNavigateTab}
+              canViewFinancials={perms.canViewFinancials}
+              canViewReports={perms.canViewReports}
             />
           )}
 
-          {currentTab === 'flocks' && (
+          {effectiveTab === 'flocks' && (
             <FlocksView
               flocks={flocks}
-              farms={farms}
+              farms={perms.canViewFarms ? farms : []}
               onAddFlock={handleAddFlock}
-              onEditFlock={handleEditFlock}
-              onDeleteFlock={handleDeleteFlock}
+              onEditFlock={perms.canEdit ? handleEditFlock : undefined}
+              onDeleteFlock={perms.canDelete ? handleDeleteFlock : undefined}
               isSuperAdmin={isSuperAdmin}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
             />
           )}
 
-          {currentTab === 'egg-production' && (
+          {effectiveTab === 'egg-production' && (
             <EggProductionView
               eggProductions={eggProductions}
               flocks={flocks}
               onOpenRecordModal={() => setRecordModalType('egg')}
-              onEditEgg={handleEditEgg}
-              onDeleteEgg={handleDeleteEgg}
+              onEditEgg={perms.canEdit ? handleEditEgg : undefined}
+              onDeleteEgg={perms.canDelete ? handleDeleteEgg : undefined}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
             />
           )}
 
-          {currentTab === 'daily-consumption' && (
+          {effectiveTab === 'daily-consumption' && (
             <ConsumptionView
               consumptionLogs={consumptionLogs}
               flocks={flocks}
               mortalityLogs={mortalityLogs}
               onOpenRecordModal={() => setRecordModalType('feed')}
-              onEditConsumption={handleEditFeed}
-              onDeleteConsumption={handleDeleteFeed}
+              onEditConsumption={perms.canEdit ? handleEditFeed : undefined}
+              onDeleteConsumption={perms.canDelete ? handleDeleteFeed : undefined}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
             />
           )}
 
-          {currentTab === 'bird-health' && (
+          {effectiveTab === 'bird-health' && (
             <BirdHealthView
               mortalityLogs={mortalityLogs}
               vaccines={vaccines}
               flocks={flocks}
               onOpenRecordModal={() => setRecordModalType('mortality')}
-              onToggleVaccine={handleToggleVaccine}
+              onToggleVaccine={perms.canEdit ? handleToggleVaccine : undefined}
               onAddVaccine={handleAddVaccine}
-              onEditVaccine={handleEditVaccine}
-              onDeleteVaccine={handleDeleteVaccine}
-              onEditMortality={handleEditMortality}
-              onDeleteMortality={handleDeleteMortality}
+              onEditVaccine={perms.canEdit ? handleEditVaccine : undefined}
+              onDeleteVaccine={perms.canDelete ? handleDeleteVaccine : undefined}
+              onEditMortality={perms.canEdit ? handleEditMortality : undefined}
+              onDeleteMortality={perms.canDelete ? handleDeleteMortality : undefined}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
             />
           )}
 
-          {currentTab === 'sales' && (
+          {effectiveTab === 'sales' && perms.canViewFinancials && (
             <FinanceView
               financials={financials}
               flocks={flocks}
               onAddTransaction={handleAddTransaction}
-              onEditTransaction={handleEditTransaction}
-              onDeleteTransaction={handleDeleteTransaction}
+              onEditTransaction={perms.canEdit ? handleEditTransaction : undefined}
+              onDeleteTransaction={perms.canDelete ? handleDeleteTransaction : undefined}
               defaultType="Income"
               bankAccounts={bankAccounts}
               onAddBank={handleAddBank}
@@ -2399,16 +2472,18 @@ export default function App() {
                 setStockNavFocus({ head, unit });
                 handleNavigateTab('stocks');
               }}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
             />
           )}
 
-          {currentTab === 'expenses' && (
+          {effectiveTab === 'expenses' && perms.canViewFinancials && (
             <FinanceView
               financials={financials}
               flocks={flocks}
               onAddTransaction={handleAddTransaction}
-              onEditTransaction={handleEditTransaction}
-              onDeleteTransaction={handleDeleteTransaction}
+              onEditTransaction={perms.canEdit ? handleEditTransaction : undefined}
+              onDeleteTransaction={perms.canDelete ? handleDeleteTransaction : undefined}
               defaultType="Expense"
               bankAccounts={bankAccounts}
               onAddBank={handleAddBank}
@@ -2416,21 +2491,26 @@ export default function App() {
                 setStockNavFocus({ head, unit });
                 handleNavigateTab('stocks');
               }}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
             />
           )}
 
-          {currentTab === 'stocks' && (
+          {effectiveTab === 'stocks' && (
             <StocksView
               inventory={inventory}
               onRestock={handleRestock}
-              onAddTransaction={handleAddTransaction}
-              onStockExpenseSynced={handleStockExpenseSynced}
+              onAddTransaction={perms.canViewFinancials ? handleAddTransaction : undefined}
+              onStockExpenseSynced={perms.canViewFinancials ? handleStockExpenseSynced : undefined}
               initialFocus={stockNavFocus}
               onClearInitialFocus={() => setStockNavFocus(null)}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
+              canViewFinancials={perms.canViewFinancials}
             />
           )}
 
-          {currentTab === 'salaries' && (
+          {effectiveTab === 'salaries' && perms.canViewSalaries && (
             <SalariesView
               workers={workers}
               disbursals={salaryDisbursals}
@@ -2439,16 +2519,18 @@ export default function App() {
               onAddSalaryDisbursal={handleAddSalaryDisbursal}
               onAddAdvanceRecord={handleAddAdvanceRecord}
               onAddWorker={handleAddWorker}
-              onUpdateWorker={handleUpdateWorker}
-              onDeleteWorker={handleDeleteWorker}
-              onEditSalaryDisbursal={handleEditSalaryDisbursal}
-              onDeleteSalaryDisbursal={handleDeleteSalaryDisbursal}
-              onEditAdvanceRecord={handleEditAdvanceRecord}
-              onDeleteAdvanceRecord={handleDeleteAdvanceRecord}
+              onUpdateWorker={perms.canEdit ? handleUpdateWorker : undefined}
+              onDeleteWorker={perms.canDelete ? handleDeleteWorker : undefined}
+              onEditSalaryDisbursal={perms.canEdit ? handleEditSalaryDisbursal : undefined}
+              onDeleteSalaryDisbursal={perms.canDelete ? handleDeleteSalaryDisbursal : undefined}
+              onEditAdvanceRecord={perms.canEdit ? handleEditAdvanceRecord : undefined}
+              onDeleteAdvanceRecord={perms.canDelete ? handleDeleteAdvanceRecord : undefined}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
             />
           )}
 
-          {currentTab === 'reports' && (
+          {effectiveTab === 'reports' && perms.canViewReports && (
             <ReportsView
               flocks={flocks}
               eggProductions={eggProductions}
@@ -2458,33 +2540,40 @@ export default function App() {
               inventory={inventory}
               bankAccounts={bankAccounts}
               onAddBank={handleAddBank}
-              onEditBank={handleEditBank}
-              onDeleteBank={handleDeleteBank}
+              onEditBank={perms.canEdit ? handleEditBank : undefined}
+              onDeleteBank={perms.canDelete ? handleDeleteBank : undefined}
               onNavigateTab={(tab) => handleNavigateTab(tab as NavTab)}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
             />
           )}
 
-          {currentTab === 'power-consumption' && (
+          {effectiveTab === 'power-consumption' && (
             <PowerConsumptionView
               powerLogs={powerLogs}
               flocks={flocks}
               onAddPowerLog={handleAddPowerLog}
-              onEditPowerLog={handleEditPowerLog}
-              onDeletePowerLog={handleDeletePowerLog}
+              onEditPowerLog={perms.canEdit ? handleEditPowerLog : undefined}
+              onDeletePowerLog={perms.canDelete ? handleDeletePowerLog : undefined}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
+              canViewFinancials={perms.canViewFinancials}
             />
           )}
 
-          {currentTab === 'farms' && (
+          {effectiveTab === 'farms' && perms.canViewFarms && (
             <FarmsView
               farms={farms}
               flocks={flocks}
               onAddFarm={handleAddFarm}
-              onEditFarm={handleEditFarm}
-              onDeleteFarm={handleDeleteFarm}
+              onEditFarm={perms.canEdit ? handleEditFarm : undefined}
+              onDeleteFarm={perms.canDelete ? handleDeleteFarm : undefined}
+              canEdit={perms.canEdit}
+              canDelete={perms.canDelete}
             />
           )}
 
-          {currentTab === 'users' && <UserManagementView currentUser={currentUser} />}
+          {effectiveTab === 'users' && perms.canManageUsers && <UserManagementView currentUser={currentUser} />}
         </main>
       </div>
 
@@ -2494,21 +2583,36 @@ export default function App() {
           <div className="relative max-w-md w-full">
             <LoginView
               onLoginSuccess={(user) => {
-                const isSuper = user.role === 'super_admin';
+                const loginPerms = getRolePermissions(user.role);
+                const isSuper = loginPerms.isSuperAdmin;
                 const profile = {
-                  name: user.name || (isSuper ? 'Ahsan Nawaz' : 'Farm Supervisor'),
+                  name: user.name || (isSuper ? 'Ahsan Nawaz' : 'GreenOva User'),
                   email: user.email,
                   token: user.token,
                   phone: isSuper ? '+92 300 8645210' : '+92 301 7654321',
-                  role: user.role || (isSuper ? 'super_admin' : 'supervisor'),
+                  role: user.role || 'supervisor',
                   isSuperAdmin: isSuper,
-                  initials: isSuper ? 'AN' : 'FS',
+                  initials: computeInitials(user.name, isSuper),
                   emailVerified: true,
                 };
+                if (!loginPerms.canViewFinancials) {
+                  setFinancials([]);
+                  setSalaryDisbursals([]);
+                  setAdvanceRecords([]);
+                  setWorkers([]);
+                  setBankAccounts([]);
+                  setFarms([]);
+                }
                 try {
                   localStorage.setItem('greenova_user', JSON.stringify(profile));
                 } catch {}
                 setCurrentUser(profile);
+                if (!loginPerms.canAccessTab(currentTab)) {
+                  setCurrentTab('dashboard');
+                  try {
+                    window.history.pushState({ tab: 'dashboard' }, '', '/dashboard');
+                  } catch {}
+                }
                 setShowLoginModal(false);
               }}
               onCancel={() => setShowLoginModal(false)}
@@ -2577,16 +2681,23 @@ export default function App() {
         className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] pb-[env(safe-area-inset-bottom)]"
       >
         <div className="grid grid-cols-5 h-16">
-          {(
-            [
-              { id: 'dashboard', label: 'Home', Icon: LayoutDashboard },
-              { id: 'egg-production', label: 'Eggs', Icon: Egg },
-              { id: 'daily-consumption', label: 'Feed', Icon: Wheat },
-              { id: 'sales', label: 'Sales', Icon: TrendingUp },
-              { id: 'reports', label: 'Reports', Icon: FileBarChart2 },
-            ] as const
+          {(perms.canViewFinancials
+            ? ([
+                { id: 'dashboard', label: 'Home', Icon: LayoutDashboard },
+                { id: 'egg-production', label: 'Eggs', Icon: Egg },
+                { id: 'daily-consumption', label: 'Feed', Icon: Wheat },
+                { id: 'sales', label: 'Sales', Icon: TrendingUp },
+                { id: 'reports', label: 'Reports', Icon: FileBarChart2 },
+              ] as const)
+            : ([
+                { id: 'dashboard', label: 'Home', Icon: LayoutDashboard },
+                { id: 'flocks', label: 'Flocks', Icon: Layers },
+                { id: 'egg-production', label: 'Eggs', Icon: Egg },
+                { id: 'daily-consumption', label: 'Feed', Icon: Wheat },
+                { id: 'stocks', label: 'Stocks', Icon: Boxes },
+              ] as const)
           ).map(({ id, label, Icon }) => {
-            const active = currentTab === id;
+            const active = effectiveTab === id;
             return (
               <button
                 key={id}

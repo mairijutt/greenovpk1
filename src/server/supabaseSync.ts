@@ -1310,35 +1310,39 @@ export async function upsertStock(stock: any, explicitId?: number | string) {
       }
     }
 
-    let expenseRow: any = null;
-    if (linkedExpenseId > 0) {
-      const updExp = await client.query(
-        `UPDATE public."Expense"
-         SET expense_date = $1,
-             expense_cost = $2,
-             head = $3::"ExpenseHead",
-             notes = $4,
-             attachment = COALESCE($5, attachment),
-             "challanNo" = $6,
-             "flockId" = $7,
-             "updatedAt" = NOW()
-         WHERE id = $8
-         RETURNING *`,
-        [dateIso, amt, expenseHead, syncNotes, stock.attachment || null, challanNo, fid, linkedExpenseId]
-      );
-      expenseRow = updExp.rows[0] || null;
-    }
+    const skipExpenseSync = Boolean(stock.skipExpenseSync) && !linkedExpenseId && !prev.id;
 
-    if (!expenseRow) {
-      const expClientId = stock.expenseClientId || `exp-stk-${Date.now()}`;
-      const insExp = await client.query(
-        `INSERT INTO public."Expense" (expense_date, expense_cost, head, notes, attachment, "challanNo", "flockId", "clientId", "createdAt", "updatedAt")
-         VALUES ($1,$2,$3::"ExpenseHead",$4,$5,$6,$7,$8,NOW(),NOW())
-         RETURNING *`,
-        [dateIso, amt, expenseHead, syncNotes, stock.attachment || null, challanNo, fid, expClientId]
-      );
-      expenseRow = insExp.rows[0];
-      linkedExpenseId = Number(expenseRow.id);
+    let expenseRow: any = null;
+    if (!skipExpenseSync) {
+      if (linkedExpenseId > 0) {
+        const updExp = await client.query(
+          `UPDATE public."Expense"
+           SET expense_date = $1,
+               expense_cost = $2,
+               head = $3::"ExpenseHead",
+               notes = $4,
+               attachment = COALESCE($5, attachment),
+               "challanNo" = $6,
+               "flockId" = $7,
+               "updatedAt" = NOW()
+           WHERE id = $8
+           RETURNING *`,
+          [dateIso, amt, expenseHead, syncNotes, stock.attachment || null, challanNo, fid, linkedExpenseId]
+        );
+        expenseRow = updExp.rows[0] || null;
+      }
+
+      if (!expenseRow) {
+        const expClientId = stock.expenseClientId || `exp-stk-${Date.now()}`;
+        const insExp = await client.query(
+          `INSERT INTO public."Expense" (expense_date, expense_cost, head, notes, attachment, "challanNo", "flockId", "clientId", "createdAt", "updatedAt")
+           VALUES ($1,$2,$3::"ExpenseHead",$4,$5,$6,$7,$8,NOW(),NOW())
+           RETURNING *`,
+          [dateIso, amt, expenseHead, syncNotes, stock.attachment || null, challanNo, fid, expClientId]
+        );
+        expenseRow = insExp.rows[0];
+        linkedExpenseId = Number(expenseRow.id);
+      }
     }
 
     let savedStockRow: any;
@@ -1406,10 +1410,10 @@ export async function upsertStock(stock: any, explicitId?: number | string) {
       await alignSequence('Stock');
     }
 
-    const formattedExpense = formatExpenseRow(expenseRow, savedStockRow);
+    const formattedExpense = expenseRow ? formatExpenseRow(expenseRow, savedStockRow) : undefined;
     return {
       ...savedStockRow,
-      expenseId: linkedExpenseId,
+      expenseId: linkedExpenseId || undefined,
       syncedExpense: formattedExpense,
     };
   } catch (err) {
@@ -1984,13 +1988,65 @@ export async function upsertSalary(s: any, explicitId?: number | string) {
     await alignSequence('Salary');
     return res.rows[0];
   } else {
-    const res = await pool.query(
-      `INSERT INTO public."Salary" ("clientId", "recordType", "employeeName", designation, "basicSalary", "salaryAmount", advance, deduction, "remainingBalance", total, remarks, "flockId", date, month, "challanNo", "paymentMode", "repaymentStatus", "createdAt", "updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW(),NOW())
-       RETURNING *`,
-      [clientId, recordType, employeeName, designation, basicSalary, salaryAmount, advance, deduction, remainingBalance, total, remarks, fid, dateStr, month, challanNo, paymentMode, repaymentStatus]
-    );
-    return res.rows[0];
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const res = await client.query(
+        `INSERT INTO public."Salary" ("clientId", "recordType", "employeeName", designation, "basicSalary", "salaryAmount", advance, deduction, "remainingBalance", total, remarks, "flockId", date, month, "challanNo", "paymentMode", "repaymentStatus", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW(),NOW())
+         RETURNING *`,
+        [clientId, recordType, employeeName, designation, basicSalary, salaryAmount, advance, deduction, remainingBalance, total, remarks, fid, dateStr, month, challanNo, paymentMode, repaymentStatus]
+      );
+
+      let updatedWorker: any = undefined;
+      if (advance > 0 && !prev.id) {
+        const workerLookup = s.workerId
+          ? await client.query('SELECT * FROM public."StaffWorker" WHERE id = $1 LIMIT 1', [String(s.workerId)])
+          : await client.query('SELECT * FROM public."StaffWorker" WHERE LOWER(name) = LOWER($1) LIMIT 1', [employeeName]);
+        const matchedWorker = workerLookup.rows[0];
+        if (matchedWorker) {
+          const currentAdv = Number(matchedWorker.advanceBalance || 0);
+          const nextBalance =
+            recordType === 'advance'
+              ? currentAdv + advance
+              : Math.max(0, currentAdv - advance);
+          const updRes = await client.query(
+            'UPDATE public."StaffWorker" SET "advanceBalance" = $1, "updatedAt" = NOW() WHERE id = $2 RETURNING *',
+            [nextBalance, matchedWorker.id]
+          );
+          if (updRes.rows[0]) {
+            const r = updRes.rows[0];
+            updatedWorker = {
+              id: r.id,
+              name: r.name,
+              role: r.role,
+              farmAssigned: r.farmAssigned || '',
+              flockId: String(r.flockId || 9),
+              flockName: r.flockName || flockNameForId(Number(r.flockId || 9)),
+              monthlySalary: Number(r.monthlySalary || 0),
+              advanceBalance: Number(r.advanceBalance || 0),
+              phone: r.phone || '',
+              status: r.status || 'Active',
+              joinedDate: r.joinedDate || '',
+              checkInTime: r.checkInTime || '07:00 AM',
+              checkOutTime: r.checkOutTime || '05:00 PM',
+              shift: r.shift || 'Morning Shift (07:00 - 17:00)',
+              shiftHours: Number(r.shiftHours || 10),
+              attendanceStatus: r.attendanceStatus || 'Present',
+              notes: r.notes || '',
+            };
+          }
+        }
+      }
+
+      await client.query('COMMIT');
+      return updatedWorker ? { ...res.rows[0], updatedWorker } : res.rows[0];
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 }
 

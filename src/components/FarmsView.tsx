@@ -23,6 +23,8 @@ interface FarmsViewProps {
   onEditFarm?: (farm: Farm) => void;
   onDeleteFarm?: (id: string) => void;
   onUpdateFarms?: (farms: Farm[]) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 export const FarmsView: React.FC<FarmsViewProps> = ({
@@ -32,6 +34,8 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
   onEditFarm,
   onDeleteFarm,
   onUpdateFarms,
+  canEdit = true,
+  canDelete = true,
 }) => {
   const [farmList, setFarmList] = useState<Farm[]>(farms);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
@@ -240,15 +244,17 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(farm)}
-                        title="Edit Farm Record"
-                        className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors cursor-pointer"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      {confirmDeleteFarmId !== farm.id && (
+                      {canEdit && onEditFarm && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(farm)}
+                          title="Edit Farm Record"
+                          className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {canDelete && onDeleteFarm && confirmDeleteFarmId !== farm.id && (
                         <button
                           type="button"
                           onClick={() => setConfirmDeleteFarmId(farm.id)}
@@ -259,7 +265,7 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
                         </button>
                       )}
                     </div>
-                    {confirmDeleteFarmId === farm.id && (
+                    {canDelete && onDeleteFarm && confirmDeleteFarmId === farm.id && (
                       <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
                         <span className="font-bold text-rose-900">Delete?</span>
                         <button
@@ -492,9 +498,9 @@ export const FarmsView: React.FC<FarmsViewProps> = ({
               fullWidth: true,
             },
           ]}
-          onEdit={() => handleOpenEdit(viewingFarm)}
+          onEdit={canEdit && onEditFarm ? () => handleOpenEdit(viewingFarm) : undefined}
           onDelete={
-            farmList.length > 1
+            canDelete && onDeleteFarm && farmList.length > 1
               ? () => {
                   handleDelete(viewingFarm.id);
                 }

@@ -49,6 +49,8 @@ interface EggProductionViewProps {
   onOpenRecordModal: (type: 'egg') => void;
   onEditEgg?: (updated: EggProduction) => Promise<void> | void;
   onDeleteEgg?: (id: string) => Promise<void> | void;
+  canEdit?: boolean;
+  canDelete?: boolean;
   farms?: Farm[];
   selectedFarmId?: string;
   onSelectFarm?: (farmId: string) => void;
@@ -63,6 +65,8 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
   onOpenRecordModal,
   onEditEgg,
   onDeleteEgg,
+  canEdit = true,
+  canDelete = true,
   farms = [],
   selectedFarmId = 'farm-1',
   onSelectFarm,
@@ -1568,16 +1572,18 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                           <Eye className="w-3.5 h-3.5 text-sky-700" />
                           <span>View</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingEgg(entry)}
-                          className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
-                          title={`Edit record #${entry.id}`}
-                        >
-                          <Edit className="w-3.5 h-3.5 text-amber-700" />
-                          <span>Edit</span>
-                        </button>
-                        {onDeleteEgg && confirmDeleteId !== entry.id && (
+                        {canEdit && onEditEgg && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingEgg(entry)}
+                            className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                            title={`Edit record #${entry.id}`}
+                          >
+                            <Edit className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                        {canDelete && onDeleteEgg && confirmDeleteId !== entry.id && (
                           <button
                             type="button"
                             onClick={() => setConfirmDeleteId(entry.id)}
@@ -1588,7 +1594,7 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
                           </button>
                         )}
                       </div>
-                      {onDeleteEgg && confirmDeleteId === entry.id && (
+                      {canDelete && onDeleteEgg && confirmDeleteId === entry.id && (
                         <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[11px]">
                           <span className="font-bold text-rose-900">Delete?</span>
                           <button
@@ -1757,9 +1763,9 @@ export const EggProductionView: React.FC<EggProductionViewProps> = ({
             },
           ]}
           notes={viewingEgg.notes}
-          onEdit={() => setEditingEgg(viewingEgg)}
+          onEdit={canEdit && onEditEgg ? () => setEditingEgg(viewingEgg) : undefined}
           onDelete={
-            onDeleteEgg
+            canDelete && onDeleteEgg
               ? async () => {
                   await onDeleteEgg(viewingEgg.id);
                   setToastMessage(`Egg record #${viewingEgg.id} deleted from database.`);
