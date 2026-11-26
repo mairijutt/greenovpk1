@@ -70,11 +70,6 @@ import {
   liveExpenseRecords,
 } from '../data/liveExpenses.ts';
 import { liveMortalityLogs } from '../data/liveBirdHealth.ts';
-import {
-  computeConsumedFeedCostForUnit,
-  getUnitFromRecord,
-  isFeedStockRecord,
-} from '../utils/ceoReportCalculations.ts';
 
 interface DashboardViewProps {
   farms: Farm[];
@@ -261,7 +256,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           paymentMethod: f.paymentMethod || (online > 0 ? (cash > 0 ? 'Split' : 'Online') : 'Cash'),
         };
       });
-    const combined = [...userSales, ...liveSalesRecords.filter((ls) => !financials.some((f) => f.id === ls.id))];
+    const hasDbSales = financials.some((f) => f.type === 'Income');
+    const combined = hasDbSales ? userSales : liveSalesRecords;
     return combined.filter((s) => {
       const matchFlock = isFlockMatch(s.flockId, s.flock);
       const matchDate = isDateMatch(s.date);
@@ -287,34 +283,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const normalizeExpenseHead = (exp: any) =>
     String(exp?.head || exp?.category || '').trim().toUpperCase().replace(/\s+/g, '_');
   const isBirdRelatedExpense = (exp: any) => BIRD_EXPENSE_HEADS.has(normalizeExpenseHead(exp));
-  const isFeedExpense = (exp: any) => normalizeExpenseHead(exp) === 'FEED';
 
   const activeUserExpenses = useMemo(() => {
     if (!canViewFinancials) return [];
-    const allExpenses = [
-      ...financials.filter((f) => f.type === 'Expense'),
-      ...liveExpenseRecords.filter((le) => !financials.some((f) => f.id === le.id)),
-    ];
+    const dbExpenses = financials.filter((f) => f.type === 'Expense');
+    const allExpenses = dbExpenses.length > 0 ? dbExpenses : liveExpenseRecords;
     return allExpenses.filter((e) => {
       const matchFlock = isFlockMatch(e.flockId, e.flockName);
       const matchDate = isDateMatch(e.date);
       return matchFlock && matchDate;
     });
   }, [canViewFinancials, selectedFlock, fromDate, toDate, financials]);
-
-  const allFeedStocks = useMemo(() => {
-    if (!canViewFinancials) return [];
-    let savedStocks: any[] = [];
-    try {
-      const saved = localStorage.getItem('greenova_stocks_v2');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) savedStocks = parsed;
-      }
-    } catch (e) {}
-    const stockList = savedStocks.length > 0 ? savedStocks : liveStockRecords;
-    return stockList.filter((s: any) => isFeedStockRecord(s));
-  }, [canViewFinancials, stockRefreshKey]);
 
   const activeStocks = useMemo(() => {
     let savedStocks: any[] = [];
@@ -369,7 +348,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return { totalEggs, morningEggs, eveningEggs, brokenEggs, cleanTrays, avgLaying, count: activeEggLogs.length };
   }, [activeEggLogs, liveBirdsCount]);
 
-  // 2. Financial Metrics - Dynamically sums sales and expenses (feed valued on consumed-bags basis to match Income vs Expense Report)
+  // 2. Financial Metrics - Dynamically sums all recorded sales and expenses (matches Sales & Expenses ledgers)
   const dynamicFinance = useMemo(() => {
     if (!canViewFinancials) {
       return {
@@ -378,13 +357,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         online: 0,
         cash: 0,
         expenses: 0,
-        consumedFeedExpense: 0,
+        feedExpenses: 0,
         birdExpenses: 0,
         unitOperatingCost: 0,
         net: 0,
         profitMarginPercent: 0,
         isProfit: true,
         salesCount: 0,
+        expenseCount: 0,
       };
     }
     const revenue = activeSales.reduce((sum, s) => sum + (s.amount || 0), 0);
@@ -392,49 +372,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const online = activeSales.reduce((sum, s) => sum + ((s as any).onlinePayment || 0), 0);
     const cash = activeSales.reduce((sum, s) => sum + ((s as any).cashPayment || (s.amount - ((s as any).onlinePayment || 0))), 0);
 
-    const nonFeedExpenses = activeUserExpenses
-      .filter((e) => !isFeedExpense(e))
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
-
-    let consumedFeedExpense = 0;
-    if (selectedFlock === 'all') {
-      const unitNames = new Set<string>(['Unit 1', 'Unit 2', 'Unit 3']);
-      consumptionLogs.forEach((c) => unitNames.add(getUnitFromRecord(c)));
-      allFeedStocks.forEach((k) => unitNames.add(getUnitFromRecord(k)));
-      for (const uName of unitNames) {
-        const uRawFeed = activeUserExpenses
-          .filter((e) => isFeedExpense(e) && getUnitFromRecord(e).toLowerCase() === uName.toLowerCase())
-          .reduce((s, e) => s + (e.amount || 0), 0);
-        consumedFeedExpense += computeConsumedFeedCostForUnit({
-          unitStocks: allFeedStocks.filter((k) => getUnitFromRecord(k).toLowerCase() === uName.toLowerCase()),
-          allFeedStocks,
-          unitConsumptions: consumptionLogs.filter((c) => getUnitFromRecord(c).toLowerCase() === uName.toLowerCase()),
-          rawUnitFeedExpenses: uRawFeed,
-          fromDate,
-          toDate,
-        });
-      }
-    } else {
-      const targetUnitName =
-        selectedFlock === '8' ? 'Unit 1' : selectedFlock === '9' ? 'Unit 2' : selectedFlock === '10' ? 'Unit 3' : selectedFlock;
-      const rawFeed = activeUserExpenses.filter(isFeedExpense).reduce((s, e) => s + (e.amount || 0), 0);
-      consumedFeedExpense = computeConsumedFeedCostForUnit({
-        unitStocks: allFeedStocks.filter((k) => isFlockMatch(k.flockId, k.flockName)),
-        allFeedStocks,
-        unitConsumptions: consumptionLogs.filter((c) =>
-          isFlockMatch(c.flockId, c.flockName) || getUnitFromRecord(c).toLowerCase() === targetUnitName.toLowerCase()
-        ),
-        rawUnitFeedExpenses: rawFeed,
-        fromDate,
-        toDate,
-      });
-    }
-
-    const expenses = nonFeedExpenses + consumedFeedExpense;
-    const nonFeedBirdExpenses = activeUserExpenses
-      .filter((e) => !isFeedExpense(e) && isBirdRelatedExpense(e))
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
-    const birdExpenses = consumedFeedExpense + nonFeedBirdExpenses;
+    const expenses = activeUserExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const feedExpenses = activeUserExpenses
+      .filter((e) => normalizeExpenseHead(e) === 'FEED')
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const birdExpenses = activeUserExpenses
+      .filter((e) => isBirdRelatedExpense(e))
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
     const unitOperatingCost = Math.max(0, expenses - birdExpenses);
 
     const net = revenue - expenses;
@@ -446,15 +390,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       online,
       cash,
       expenses,
-      consumedFeedExpense,
+      feedExpenses,
       birdExpenses,
       unitOperatingCost,
       net,
       profitMarginPercent,
       isProfit: net >= 0,
       salesCount: activeSales.length,
+      expenseCount: activeUserExpenses.length,
     };
-  }, [canViewFinancials, activeSales, activeUserExpenses, allFeedStocks, consumptionLogs, fromDate, toDate, selectedFlock]);
+  }, [canViewFinancials, activeSales, activeUserExpenses]);
 
   // 3. Consumption Metrics
   const dynamicConsumption = useMemo(() => {
@@ -525,7 +470,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       eggsPerBird,
       profitMarginPercent,
       isProfit: netPerBird >= 0,
-      feedCostPerBird: Number((dynamicFinance.consumedFeedExpense / birds).toFixed(2)),
+      feedCostPerBird: Number((dynamicFinance.feedExpenses / birds).toFixed(2)),
     };
   }, [liveBirdsCount, dynamicFinance, dynamicEggs]);
 
@@ -594,11 +539,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     ];
 
     // All sales in the active date range (unfiltered by selectedFlock so each card gets its unit's sales)
+    const dbSalesList = financials.filter((f) => f.type === 'Income');
     const allPeriodSales = canViewFinancials
-      ? [
-          ...financials.filter((f) => f.type === 'Income'),
-          ...liveSalesRecords.filter((ls) => !financials.some((f) => f.id === ls.id)),
-        ].filter((s) => isDateMatch(s.date))
+      ? (dbSalesList.length > 0 ? dbSalesList : liveSalesRecords).filter((s) => isDateMatch(s.date))
       : [];
 
     // All egg logs in the active date range
@@ -610,11 +553,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const allPeriodMortality = sourceMortality.filter((m) => isDateMatch(m.date));
 
     // All expenses in the active date range
+    const dbExpensesList = financials.filter((f) => f.type === 'Expense');
     const allPeriodExpenses = canViewFinancials
-      ? [
-          ...financials.filter((f) => f.type === 'Expense'),
-          ...liveExpenseRecords.filter((le) => !financials.some((f) => f.id === le.id)),
-        ].filter((e) => isDateMatch(e.date))
+      ? (dbExpensesList.length > 0 ? dbExpensesList : liveExpenseRecords).filter((e) => isDateMatch(e.date))
       : [];
 
     return units.map((u) => {
@@ -637,40 +578,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const onlineRev = unitSales.reduce((sum, s: any) => sum + (Number(s.onlinePayment) || 0), 0);
       const cashRev = unitSales.reduce((sum, s: any) => sum + (Number(s.cashPayment) || Math.max(0, (s.amount || 0) - (Number(s.onlinePayment) || 0))), 0);
 
-      // Unit expenses computed on consumed-feed basis (so Dashboard & Unit Cards match Income vs Expense Report)
+      // Unit expenses from all recorded vouchers (matching Expenses ledger)
       const unitExps = canViewFinancials
         ? allPeriodExpenses.filter((e: any) => isRecordForUnit(e.flockId, e.flockName, u.id, u.unit))
         : [];
-      const unitNonFeedExps = canViewFinancials
-        ? unitExps.filter((e: any) => !isFeedExpense(e)).reduce((sum, e) => sum + (e.amount || 0), 0)
-        : 0;
-      const unitRawFeedExps = canViewFinancials
-        ? unitExps.filter(isFeedExpense).reduce((sum, e) => sum + (e.amount || 0), 0)
-        : 0;
-      const unitConsumedFeedCost = canViewFinancials
-        ? computeConsumedFeedCostForUnit({
-            unitStocks: allFeedStocks.filter((k: any) => isRecordForUnit(k.flockId, k.flockName, u.id, u.unit)),
-            allFeedStocks,
-            unitConsumptions: consumptionLogs.filter((c: any) => isRecordForUnit(c.flockId, c.flockName, u.id, u.unit)),
-            rawUnitFeedExpenses: unitRawFeedExps,
-            fromDate,
-            toDate,
-          })
+      const unitRecordedExpenses = canViewFinancials
+        ? unitExps.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
         : 0;
 
       const expenses = !canViewFinancials
         ? 0
-        : unitExps.length > 0 || unitConsumedFeedCost > 0
-        ? unitNonFeedExps + unitConsumedFeedCost
+        : unitExps.length > 0
+        ? unitRecordedExpenses
         : preset === 'all' && !fromDate && !toDate
         ? u.allTimeExp
         : 0;
-      const unitNonFeedBirdExps = canViewFinancials
+      const unitBirdExpenses = canViewFinancials
         ? unitExps
-            .filter((e: any) => !isFeedExpense(e) && isBirdRelatedExpense(e))
-            .reduce((sum, e) => sum + (e.amount || 0), 0)
+            .filter((e: any) => isBirdRelatedExpense(e))
+            .reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
         : 0;
-      const unitBirdExpenses = unitConsumedFeedCost + unitNonFeedBirdExps;
       const unitOperatingCost = Math.max(0, expenses - unitBirdExpenses);
 
       // Unit mortality specifically for this unit
@@ -759,7 +686,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         isProfit,
       };
     });
-  }, [canViewFinancials, eggProductions, financials, mortalityLogs, flocks, consumptionLogs, allFeedStocks, preset, fromDate, toDate]);
+  }, [canViewFinancials, eggProductions, financials, mortalityLogs, flocks, preset, fromDate, toDate]);
 
   // Unit Operating Cost = Total Farm Operating Expenses minus Bird Cost (FEED consumed, CHICKEN, MEDICINE, UTILITIES, SALARIES_PAYMENTS, POL, VACCINE, MESS, RENT)
   const unitOperatingEconomics = useMemo(() => {
@@ -829,10 +756,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return monthMap.get(mKey)!;
     };
 
-    const combinedSales = [
-      ...financials.filter((f) => f.type === 'Income'),
-      ...liveSalesRecords.filter((ls) => !financials.some((f) => f.id === ls.id)),
-    ].filter((s: any) => isFlockMatch(s.flockId, s.flockName || s.flock));
+    const dbSalesList = financials.filter((f) => f.type === 'Income');
+    const combinedSales = (dbSalesList.length > 0 ? dbSalesList : liveSalesRecords).filter((s: any) =>
+      isFlockMatch(s.flockId, s.flockName || s.flock)
+    );
 
     for (const sale of combinedSales) {
       const bucket = getOrCreateMonth(sale.date);
@@ -841,63 +768,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       }
     }
 
-    const combinedExpenses = [
-      ...financials.filter((f) => f.type === 'Expense'),
-      ...liveExpenseRecords.filter((le) => !financials.some((f) => f.id === le.id)),
-    ].filter((e: any) => isFlockMatch(e.flockId, e.flockName || (e as any).flock));
+    const dbExpensesList = financials.filter((f) => f.type === 'Expense');
+    const combinedExpenses = (dbExpensesList.length > 0 ? dbExpensesList : liveExpenseRecords).filter((e: any) =>
+      isFlockMatch(e.flockId, e.flockName || (e as any).flock)
+    );
 
     for (const exp of combinedExpenses) {
-      if (isFeedExpense(exp)) continue;
       const bucket = getOrCreateMonth(exp.date);
       if (bucket) {
         bucket.expense += Number(exp.amount) || 0;
-      }
-    }
-
-    // Add consumed-basis feed expense for each month bucket
-    for (const [mKey, bucket] of monthMap.entries()) {
-      const mFrom = `${mKey}-01`;
-      const mTo = `${mKey}-31`;
-      if (selectedFlock === 'all') {
-        const unitNames = new Set<string>(['Unit 1', 'Unit 2', 'Unit 3']);
-        consumptionLogs.forEach((c) => unitNames.add(getUnitFromRecord(c)));
-        allFeedStocks.forEach((k) => unitNames.add(getUnitFromRecord(k)));
-        for (const uName of unitNames) {
-          const uRawFeed = combinedExpenses
-            .filter(
-              (e: any) =>
-                isFeedExpense(e) &&
-                String(e.date || '').startsWith(mKey) &&
-                getUnitFromRecord(e).toLowerCase() === uName.toLowerCase()
-            )
-            .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-          bucket.expense += computeConsumedFeedCostForUnit({
-            unitStocks: allFeedStocks.filter((k) => getUnitFromRecord(k).toLowerCase() === uName.toLowerCase()),
-            allFeedStocks,
-            unitConsumptions: consumptionLogs.filter((c) => getUnitFromRecord(c).toLowerCase() === uName.toLowerCase()),
-            rawUnitFeedExpenses: uRawFeed,
-            fromDate: mFrom,
-            toDate: mTo,
-          });
-        }
-      } else {
-        const targetUnitName =
-          selectedFlock === '8' ? 'Unit 1' : selectedFlock === '9' ? 'Unit 2' : selectedFlock === '10' ? 'Unit 3' : selectedFlock;
-        const rawFeed = combinedExpenses
-          .filter((e: any) => isFeedExpense(e) && String(e.date || '').startsWith(mKey))
-          .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-        bucket.expense += computeConsumedFeedCostForUnit({
-          unitStocks: allFeedStocks.filter((k) => isFlockMatch(k.flockId, k.flockName)),
-          allFeedStocks,
-          unitConsumptions: consumptionLogs.filter(
-            (c) =>
-              isFlockMatch(c.flockId, c.flockName) ||
-              getUnitFromRecord(c).toLowerCase() === targetUnitName.toLowerCase()
-          ),
-          rawUnitFeedExpenses: rawFeed,
-          fromDate: mFrom,
-          toDate: mTo,
-        });
       }
     }
 
@@ -907,7 +786,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         ...item,
         net: item.income - item.expense,
       }));
-  }, [canViewFinancials, financials, selectedFlock, consumptionLogs, allFeedStocks]);
+  }, [canViewFinancials, financials, selectedFlock]);
 
   // Selected flock label for titles
   const scopeLabel = useMemo(() => {
@@ -1159,7 +1038,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
                 <p className="text-xs font-semibold text-rose-600 mt-1.5 flex items-center gap-1.5">
                   <span className="inline-block w-2 h-2 rounded-full bg-rose-500"></span>
-                  <span>{preset === 'today' ? 'Feed Consumed & Operations' : 'Feed Consumed Basis • 21 Heads'}</span>
+                  <span>{preset === 'today' ? 'All Recorded Operations' : `${dynamicFinance.expenseCount} Expense Vouchers • 21 Heads`}</span>
                 </p>
               </div>
             </div>
